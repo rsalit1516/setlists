@@ -63,6 +63,10 @@ public class SetlistDbContext : DbContext
 
     private static void ConfigureRelationships(ModelBuilder modelBuilder)
     {
+        // Configure SetSong composite primary key
+        modelBuilder.Entity<SetSong>()
+            .HasKey(ss => new { ss.SetId, ss.SongId });
+
         // Gig -> Sets (One-to-Many)
         modelBuilder.Entity<Set>()
             .HasOne(s => s.Gig)
