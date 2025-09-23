@@ -1,4 +1,4 @@
-﻿namespace Setlist.Tests;
+namespace Setlist.Tests;
 
 public class UnitTest1
 {

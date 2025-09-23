@@ -98,3 +98,6 @@ app.UseAuthorization();
 app.ConfigureApiEndpoints();
 
 app.Run();
+
+// Make the implicit Program class available for testing
+public partial class Program { }
