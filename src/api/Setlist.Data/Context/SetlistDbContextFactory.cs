@@ -12,11 +12,11 @@ public class SetlistDbContextFactory : IDesignTimeDbContextFactory<SetlistDbCont
     public SetlistDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<SetlistDbContext>();
-        
+
         // Use a default connection string for design time
         // This will be overridden at runtime by the API project
         optionsBuilder.UseSqlServer("Server=localhost,1434;Database=SetlistDb;User Id=SA;Password=SetlistDev123!;TrustServerCertificate=true;");
-        
+
         return new SetlistDbContext(optionsBuilder.Options);
     }
 }

@@ -26,26 +26,27 @@ public class SetRepository : ISetRepository
                 .OrderByDescending(s => s.CreatedDate)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .Select(s => new SetDto(
-                    s.Id,
-                    s.Name,
-                    s.GigId,
-                    s.Notes,
-                    s.SetSongs.Select(ss => new SetSongDto(
-                        ss.SongId,
-                        ss.Song.Name,
-                        ss.Song.Artist,
-                        ss.Song.DurationSeconds,
-                        ss.Order
-                    )).OrderBy(ss => ss.Order).ToList(),
-                    s.CreatedDate,
-                    s.UpdatedDate
-                ))
                 .ToListAsync();
+
+            var setDtos = sets.Select(s => new SetDto(
+                s.Id,
+                s.Name,
+                s.GigId,
+                s.Notes,
+                s.SetSongs.Select(ss => new SetSongDto(
+                    ss.SongId,
+                    ss.Song.Name,
+                    ss.Song.Artist,
+                    ss.Song.DurationSeconds,
+                    ss.Order
+                )).OrderBy(ss => ss.Order).ToList(),
+                s.CreatedDate,
+                s.UpdatedDate
+            )).ToList();
 
             var result = new PaginatedResult<SetDto>
             {
-                Items = sets,
+                Items = setDtos,
                 TotalCount = totalCount,
                 Page = page,
                 PageSize = pageSize,
@@ -70,25 +71,30 @@ public class SetRepository : ISetRepository
             var set = await _context.Sets
                 .Include(s => s.SetSongs)
                     .ThenInclude(ss => ss.Song)
-                .Where(s => s.Id == id)
-                .Select(s => new SetDto(
-                    s.Id,
-                    s.Name,
-                    s.GigId,
-                    s.Notes,
-                    s.SetSongs.Select(ss => new SetSongDto(
-                        ss.SongId,
-                        ss.Song.Name,
-                        ss.Song.Artist,
-                        ss.Song.DurationSeconds,
-                        ss.Order
-                    )).OrderBy(ss => ss.Order).ToList(),
-                    s.CreatedDate,
-                    s.UpdatedDate
-                ))
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(s => s.Id == id);
 
-            return new ApiResponse<SetDto?>(set);
+            if (set == null)
+            {
+                return new ApiResponse<SetDto?>(null);
+            }
+
+            var setDto = new SetDto(
+                set.Id,
+                set.Name,
+                set.GigId,
+                set.Notes,
+                set.SetSongs.Select(ss => new SetSongDto(
+                    ss.SongId,
+                    ss.Song.Name,
+                    ss.Song.Artist,
+                    ss.Song.DurationSeconds,
+                    ss.Order
+                )).OrderBy(ss => ss.Order).ToList(),
+                set.CreatedDate,
+                set.UpdatedDate
+            );
+
+            return new ApiResponse<SetDto?>(setDto);
         }
         catch (Exception ex)
         {
@@ -222,24 +228,25 @@ public class SetRepository : ISetRepository
                 .Include(s => s.SetSongs)
                     .ThenInclude(ss => ss.Song)
                 .Where(s => s.GigId == gigId)
-                .Select(s => new SetDto(
-                    s.Id,
-                    s.Name,
-                    s.GigId,
-                    s.Notes,
-                    s.SetSongs.Select(ss => new SetSongDto(
-                        ss.SongId,
-                        ss.Song.Name,
-                        ss.Song.Artist,
-                        ss.Song.DurationSeconds,
-                        ss.Order
-                    )).OrderBy(ss => ss.Order).ToList(),
-                    s.CreatedDate,
-                    s.UpdatedDate
-                ))
                 .ToListAsync();
 
-            return new ApiResponse<List<SetDto>>(sets);
+            var setDtos = sets.Select(s => new SetDto(
+                s.Id,
+                s.Name,
+                s.GigId,
+                s.Notes,
+                s.SetSongs.Select(ss => new SetSongDto(
+                    ss.SongId,
+                    ss.Song.Name,
+                    ss.Song.Artist,
+                    ss.Song.DurationSeconds,
+                    ss.Order
+                )).OrderBy(ss => ss.Order).ToList(),
+                s.CreatedDate,
+                s.UpdatedDate
+            )).ToList();
+
+            return new ApiResponse<List<SetDto>>(setDtos);
         }
         catch (Exception ex)
         {

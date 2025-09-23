@@ -20,40 +20,46 @@ public class GigRepository : IGigRepository
         try
         {
             var totalCount = await _context.Gigs.CountAsync();
-            var gigs = await _context.Gigs
+
+            // First, get the gigs with their sets and related data
+            var gigsWithSets = await _context.Gigs
                 .Include(g => g.Sets)
+                    .ThenInclude(s => s.SetSongs)
+                        .ThenInclude(ss => ss.Song)
                 .OrderByDescending(g => g.Date)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .Select(g => new GigDto(
-                    g.Id,
-                    g.Name,
-                    g.Date,
-                    g.Venue,
-                    g.Notes,
-                    g.Sets.Select(s => new SetDto(
-                        s.Id,
-                        s.Name,
-                        s.GigId,
-                        s.Notes,
-                        s.SetSongs.Select(ss => new SetSongDto(
-                            ss.SongId,
-                            ss.Song.Name,
-                            ss.Song.Artist,
-                            ss.Song.DurationSeconds,
-                            ss.Order
-                        )).OrderBy(ss => ss.Order).ToList(),
-                        s.CreatedDate,
-                        s.UpdatedDate
-                    )).ToList(),
-                    g.CreatedDate,
-                    g.UpdatedDate
-                ))
                 .ToListAsync();
+
+            // Then project to DTOs in memory
+            var gigDtos = gigsWithSets.Select(g => new GigDto(
+                g.Id,
+                g.Name,
+                g.Date,
+                g.Venue,
+                g.Notes,
+                g.Sets.Select(s => new SetDto(
+                    s.Id,
+                    s.Name,
+                    s.GigId,
+                    s.Notes,
+                    s.SetSongs.Select(ss => new SetSongDto(
+                        ss.SongId,
+                        ss.Song.Name,
+                        ss.Song.Artist,
+                        ss.Song.DurationSeconds,
+                        ss.Order
+                    )).OrderBy(ss => ss.Order).ToList(),
+                    s.CreatedDate,
+                    s.UpdatedDate
+                )).ToList(),
+                g.CreatedDate,
+                g.UpdatedDate
+            )).ToList();
 
             var result = new PaginatedResult<GigDto>
             {
-                Items = gigs,
+                Items = gigDtos,
                 TotalCount = totalCount,
                 Page = page,
                 PageSize = pageSize,
@@ -75,38 +81,43 @@ public class GigRepository : IGigRepository
     {
         try
         {
-            var gig = await _context.Gigs
+            // First, get the gig with its sets and related data
+            var gigEntity = await _context.Gigs
                 .Include(g => g.Sets)
                     .ThenInclude(s => s.SetSongs)
                         .ThenInclude(ss => ss.Song)
-                .Where(g => g.Id == id)
-                .Select(g => new GigDto(
-                    g.Id,
-                    g.Name,
-                    g.Date,
-                    g.Venue,
-                    g.Notes,
-                    g.Sets.Select(s => new SetDto(
-                        s.Id,
-                        s.Name,
-                        s.GigId,
-                        s.Notes,
-                        s.SetSongs.Select(ss => new SetSongDto(
-                            ss.SongId,
-                            ss.Song.Name,
-                            ss.Song.Artist,
-                            ss.Song.DurationSeconds,
-                            ss.Order
-                        )).OrderBy(ss => ss.Order).ToList(),
-                        s.CreatedDate,
-                        s.UpdatedDate
-                    )).ToList(),
-                    g.CreatedDate,
-                    g.UpdatedDate
-                ))
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(g => g.Id == id);
 
-            return new ApiResponse<GigDto?>(gig);
+            if (gigEntity == null)
+                return new ApiResponse<GigDto?>(null);
+
+            // Then project to DTO in memory
+            var gigDto = new GigDto(
+                gigEntity.Id,
+                gigEntity.Name,
+                gigEntity.Date,
+                gigEntity.Venue,
+                gigEntity.Notes,
+                gigEntity.Sets.Select(s => new SetDto(
+                    s.Id,
+                    s.Name,
+                    s.GigId,
+                    s.Notes,
+                    s.SetSongs.Select(ss => new SetSongDto(
+                        ss.SongId,
+                        ss.Song.Name,
+                        ss.Song.Artist,
+                        ss.Song.DurationSeconds,
+                        ss.Order
+                    )).OrderBy(ss => ss.Order).ToList(),
+                    s.CreatedDate,
+                    s.UpdatedDate
+                )).ToList(),
+                gigEntity.CreatedDate,
+                gigEntity.UpdatedDate
+            );
+
+            return new ApiResponse<GigDto?>(gigDto);
         }
         catch (Exception ex)
         {
@@ -248,39 +259,43 @@ public class GigRepository : IGigRepository
         try
         {
             var now = DateTime.UtcNow;
+
+            // First, get the gigs with their sets and related data
             var gigs = await _context.Gigs
                 .Include(g => g.Sets)
                     .ThenInclude(s => s.SetSongs)
                         .ThenInclude(ss => ss.Song)
                 .Where(g => g.Date >= now)
                 .OrderBy(g => g.Date)
-                .Select(g => new GigDto(
-                    g.Id,
-                    g.Name,
-                    g.Date,
-                    g.Venue,
-                    g.Notes,
-                    g.Sets.Select(s => new SetDto(
-                        s.Id,
-                        s.Name,
-                        s.GigId,
-                        s.Notes,
-                        s.SetSongs.Select(ss => new SetSongDto(
-                            ss.SongId,
-                            ss.Song.Name,
-                            ss.Song.Artist,
-                            ss.Song.DurationSeconds,
-                            ss.Order
-                        )).OrderBy(ss => ss.Order).ToList(),
-                        s.CreatedDate,
-                        s.UpdatedDate
-                    )).ToList(),
-                    g.CreatedDate,
-                    g.UpdatedDate
-                ))
                 .ToListAsync();
 
-            return new ApiResponse<List<GigDto>>(gigs);
+            // Then project to DTOs in memory
+            var gigDtos = gigs.Select(g => new GigDto(
+                g.Id,
+                g.Name,
+                g.Date,
+                g.Venue,
+                g.Notes,
+                g.Sets.Select(s => new SetDto(
+                    s.Id,
+                    s.Name,
+                    s.GigId,
+                    s.Notes,
+                    s.SetSongs.Select(ss => new SetSongDto(
+                        ss.SongId,
+                        ss.Song.Name,
+                        ss.Song.Artist,
+                        ss.Song.DurationSeconds,
+                        ss.Order
+                    )).OrderBy(ss => ss.Order).ToList(),
+                    s.CreatedDate,
+                    s.UpdatedDate
+                )).ToList(),
+                g.CreatedDate,
+                g.UpdatedDate
+            )).ToList();
+
+            return new ApiResponse<List<GigDto>>(gigDtos);
         }
         catch (Exception ex)
         {
