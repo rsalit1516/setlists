@@ -100,7 +100,7 @@ A web application for band setlist management that allows band members to organi
 
 - **Framework**: Angular 18+ (latest version)
 - **UI Library**: Angular Material or Bootstrap
-- **State Management**: NgRx (if complexity grows)
+- **State Management**: Signals where possible, NgRx (if complexity grows)
 - **Testing**: Jasmine/Karma for unit tests
 
 ### 2. Backend
