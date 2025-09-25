@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Text.Json.Serialization;
 using Setlist.Data.Context;
 using Setlist.Data.Repositories;
 using Setlist.Core.Interfaces;
@@ -9,6 +10,18 @@ using Microsoft.OpenApi.Models;
 using Setlist.Api.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure JSON serialization
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
+
+// Configure minimal API JSON options
+builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(options =>
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 
 // Add services to the container
 builder.Services.AddDbContext<SetlistDbContext>(options =>

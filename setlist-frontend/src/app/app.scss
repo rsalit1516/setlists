@@ -1,0 +1,25 @@
+.spacer {
+  flex: 1 1 auto;
+}
+
+.sidenav-container {
+  height: calc(100vh - 64px); // Subtract toolbar height
+}
+
+.sidenav {
+  width: 250px;
+
+  .mat-list-item.active {
+    background-color: rgba(var(--mat-color-primary-rgb), 0.1);
+  }
+}
+
+.main-content {
+  padding: 1rem;
+}
+
+@media (max-width: 768px) {
+  .sidenav {
+    width: 100%;
+  }
+}

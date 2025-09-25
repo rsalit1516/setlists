@@ -1,0 +1,37 @@
+<mat-toolbar color="primary">
+  <button
+    mat-icon-button
+    (click)="toggleSidenav()"
+    aria-label="Toggle navigation"
+  >
+    <mat-icon>menu</mat-icon>
+  </button>
+  <span>Setlist Manager</span>
+  <span class="spacer"></span>
+  <button mat-icon-button aria-label="Settings">
+    <mat-icon>settings</mat-icon>
+  </button>
+</mat-toolbar>
+
+<mat-sidenav-container class="sidenav-container">
+  <mat-sidenav #sidenav mode="side" opened="true" class="sidenav">
+    <mat-nav-list>
+      <a mat-list-item routerLink="/songs" routerLinkActive="active">
+        <mat-icon matListItemIcon>music_note</mat-icon>
+        <span matListItemTitle>Songs</span>
+      </a>
+      <a mat-list-item routerLink="/gigs" routerLinkActive="active">
+        <mat-icon matListItemIcon>event</mat-icon>
+        <span matListItemTitle>Gigs</span>
+      </a>
+      <a mat-list-item routerLink="/sets" routerLinkActive="active">
+        <mat-icon matListItemIcon>queue_music</mat-icon>
+        <span matListItemTitle>Sets</span>
+      </a>
+    </mat-nav-list>
+  </mat-sidenav>
+
+  <mat-sidenav-content class="main-content">
+    <router-outlet />
+  </mat-sidenav-content>
+</mat-sidenav-container>
