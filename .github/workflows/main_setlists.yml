@@ -23,18 +23,23 @@ jobs:
         with:
           node-version: '24.x'
 
-      - name: npm install, build, and test
+      - name: npm install and build
         run: |
-          npm install
-          npm run build --if-present
+          npm ci
+          npm run build
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Prepare standalone package
+        run: |
+          cp -r public .next/standalone/public
+          cp -r .next/static .next/standalone/.next/static
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: .
+          path: .next/standalone
 
   deploy:
     runs-on: ubuntu-latest
