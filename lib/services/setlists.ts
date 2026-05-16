@@ -3,7 +3,7 @@ import type { SetlistSummary, SetlistWithItems } from '@/lib/types'
 
 export async function getSetlists(): Promise<SetlistSummary[]> {
   return prisma.setlist.findMany({
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ gig: { date: 'desc' } }, { createdAt: 'desc' }],
     include: {
       gig: { include: { venue: true } },
       _count: { select: { items: true } },

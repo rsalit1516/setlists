@@ -129,32 +129,32 @@
 }
 
 /* Print setlist layout — used by app/gigs/[id]/page.tsx */
-.print-layout      { font-family: Georgia, serif; }
-.print-header      { text-align: center; margin-bottom: 0.6in; }
-.print-venue       { font-size: 28pt; font-weight: bold; line-height: 1.1; }
-.print-date        { font-size: 18pt; margin-top: 0.1in; }
-.print-columns     { display: flex; gap: 0.3in; align-items: flex-start; }
-.print-column      { flex: 1; }
-.print-sc-block    { margin-bottom: 0.2in; }
-.print-set-block   { margin-bottom: 0.15in; }
-.print-encore-block{ margin-top: 0.15in; }
+.print-layout      { font-family: Calibri, 'Gill Sans MT', Arial, sans-serif; }
+.print-header      { text-align: center; margin-bottom: 0.35in; }
+.print-venue       { font-size: 34pt; font-weight: bold; line-height: 1.1; }
+.print-date        { font-size: 22pt; margin-top: 0.08in; }
+.print-columns     { display: flex; gap: 0.25in; align-items: flex-start; }
+.print-column      { flex: 1; min-width: 0; }
+.print-sc-block    { margin-bottom: 0.15in; }
+.print-set-block   { margin-bottom: 0.1in; }
+.print-encore-block{ margin-top: 0.12in; }
 .print-sec-label   {
-  font-size: 13pt; font-weight: bold;
-  text-transform: uppercase; letter-spacing: 0.08em;
-  border-bottom: 1.5pt solid black;
-  padding-bottom: 2pt; margin-bottom: 4pt;
+  font-size: 14pt; font-weight: bold;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 2pt solid black;
+  padding-bottom: 1pt; margin-bottom: 3pt;
 }
 .print-sec-label-sm {
-  font-size: 11pt; font-weight: bold;
-  text-transform: uppercase; letter-spacing: 0.08em;
+  font-size: 12pt; font-weight: bold;
+  text-transform: uppercase; letter-spacing: 0.06em;
   border-bottom: 1.5pt solid black;
-  padding-bottom: 2pt; margin-bottom: 4pt;
+  padding-bottom: 1pt; margin-bottom: 3pt;
 }
-.print-song        { font-size: 14pt; line-height: 1.35; display: flex; gap: 4pt; }
-.print-song-sm     { font-size: 12pt; line-height: 1.35; display: flex; gap: 4pt; }
-.print-num         { min-width: 20pt; text-align: right; color: #666; }
-.print-num-sm      { min-width: 18pt; text-align: right; color: #666; }
-.print-key         { margin-left: auto; color: #666; font-size: 11pt; }
+.print-song        { font-size: 20pt; line-height: 1.25; display: flex; gap: 4pt; }
+.print-song-sm     { font-size: 18pt; line-height: 1.25; display: flex; gap: 4pt; }
+.print-num         { min-width: 24pt; text-align: right; color: #555; flex-shrink: 0; }
+.print-num-sm      { min-width: 20pt; text-align: right; color: #555; flex-shrink: 0; }
+.print-key         { margin-left: auto; color: #555; font-size: 14pt; flex-shrink: 0; padding-left: 4pt; }
 
 @layer base {
   * {
