@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,36 +6,106 @@ datasource db {
   provider = "postgresql"
 }
 
+enum SongStatus {
+  READY
+  IN_PROGRESS
+  WISH
+}
+
+enum SetSection {
+  SOUNDCHECK
+  MAIN
+  ENCORE
+}
+
 model Song {
-  id        String   @id @default(cuid())
-  title     String
-  artist    String?
-  key       String?
-  bpm       Int?
-  lyricsUrl String?
-  chartsUrl String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String     @id @default(cuid())
+  title            String
+  artist           String?
+  key              String?
+  singer           String?
+  status           SongStatus @default(WISH)
+  keyboardRequired Boolean    @default(false)
+  durationSeconds  Int?
+  orientation      String?
+  bpm              Int?
+  lyricsUrl        String?
+  chartsUrl        String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
   setlistItems SetlistItem[]
 }
 
-model Setlist {
-  id        String        @id @default(cuid())
+model Venue {
+  id        String   @id @default(cuid())
   name      String
-  date      DateTime?
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  address   String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  gigs Gig[]
+}
+
+model Setlist {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   items SetlistItem[]
+  gig   Gig?
 }
 
 model SetlistItem {
-  id        String   @id @default(cuid())
-  order     Int
-  songId    String
-  setlistId String
+  id          String     @id @default(cuid())
+  order       Int
+  section     SetSection @default(MAIN)
+  setNumber   Int        @default(1)
+  wasPlayed   Boolean?
+  isUnplanned Boolean    @default(false)
+  songId      String
+  setlistId   String
 
   song    Song    @relation(fields: [songId], references: [id])
   setlist Setlist @relation(fields: [setlistId], references: [id])
+}
+
+model Gig {
+  id               String   @id @default(cuid())
+  date             DateTime
+  notes            String?
+  amountContracted Decimal?
+  amountPaid       Decimal?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  venueId   String
+  setlistId String @unique
+
+  venue     Venue         @relation(fields: [venueId], references: [id])
+  setlist   Setlist       @relation(fields: [setlistId], references: [id])
+  expenses  Expense[]
+  musicians GigMusician[]
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  description String
+  amount      Decimal
+  createdAt   DateTime @default(now())
+
+  gigId String
+  gig   Gig    @relation(fields: [gigId], references: [id])
+}
+
+model GigMusician {
+  id        String   @id @default(cuid())
+  name      String
+  share     Decimal?
+  createdAt DateTime @default(now())
+
+  gigId String
+  gig   Gig    @relation(fields: [gigId], references: [id])
 }
