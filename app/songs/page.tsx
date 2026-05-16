@@ -1,9 +1,17 @@
 import Link from 'next/link'
-import { getSongs } from '@/lib/services/songs'
+import { getSongs, getSongStatusCounts } from '@/lib/services/songs'
 import { SongStatusBadge } from '@/components/songs/song-status-badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { deleteSong } from './actions'
 import { cn } from '@/lib/utils'
+import type { SongStatus } from '@/lib/types'
+
+const STATUS_FILTERS: { label: string; value: SongStatus | 'ALL' }[] = [
+  { label: 'All', value: 'ALL' },
+  { label: 'Ready', value: 'READY' },
+  { label: 'In Progress', value: 'IN_PROGRESS' },
+  { label: 'Wish', value: 'WISH' },
+]
 
 function formatDuration(seconds: number | null): string {
   if (!seconds) return '—'
@@ -12,16 +20,52 @@ function formatDuration(seconds: number | null): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-export default async function SongsPage() {
-  const songs = await getSongs()
+export default async function SongsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>
+}) {
+  const { status: statusParam } = await searchParams
+  const activeStatus = STATUS_FILTERS.find((f) => f.value === statusParam)?.value ?? 'ALL'
+  const statusFilter = activeStatus === 'ALL' ? undefined : (activeStatus as SongStatus)
+
+  const [songs, counts] = await Promise.all([
+    getSongs(statusFilter),
+    getSongStatusCounts(),
+  ])
+
+  const total = Object.values(counts).reduce((s, n) => s + n, 0)
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Songs</h1>
         <Link href="/songs/new" className={buttonVariants()}>
           + Add Song
         </Link>
+      </div>
+
+      {/* Status filter pills */}
+      <div className="mb-5 flex flex-wrap gap-2">
+        {STATUS_FILTERS.map(({ label, value }) => {
+          const count = value === 'ALL' ? total : (counts[value] ?? 0)
+          const isActive = value === activeStatus
+          const href = value === 'ALL' ? '/songs' : `/songs?status=${value}`
+          return (
+            <Link
+              key={value}
+              href={href}
+              className={cn(
+                buttonVariants({ variant: isActive ? 'default' : 'outline', size: 'sm' }),
+              )}
+            >
+              {label}
+              <span className={cn('ml-1.5 tabular-nums', isActive ? 'opacity-75' : 'text-muted-foreground')}>
+                {count}
+              </span>
+            </Link>
+          )
+        })}
       </div>
 
       {songs.length === 0 ? (
