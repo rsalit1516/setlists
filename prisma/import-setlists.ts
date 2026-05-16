@@ -1,9 +1,12 @@
 // Run after import.ts: npx tsx prisma/import-setlists.ts
+import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
 import fs from 'fs'
 import path from 'path'
 
-const prisma = new PrismaClient()
+if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not set')
+const adapter = new PrismaPg(process.env.DATABASE_URL)
+const prisma = new PrismaClient({ adapter })
 
 const VENUE_MAP: Record<string, string> = {
   'sharkeys': "Sharkey's",
