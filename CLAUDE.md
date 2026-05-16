@@ -80,7 +80,7 @@ prisma/
 - Install components with `npx shadcn@latest add <component>` — they land in `components/ui/`.
 - Import from `@/components/ui/<component>`.
 - Do not edit generated shadcn files directly unless customizing for this app specifically.
-- Compose shadcn primitives with Tailwind classes; avoid inline styles.
+- Compose shadcn primitives with Tailwind classes.
 
 ## Testing
 
@@ -110,3 +110,4 @@ prisma/
 - No `any` — use proper types or `unknown`.
 - Prefer named exports over default exports for components (shadcn components are the exception).
 - Sort Tailwind classes with Prettier's tailwind plugin (if added).
+- **No inline `style` props.** Use Tailwind classes for all styling. When Tailwind can't express a value (e.g. print-specific `pt` units, `@page` rules), add a named class to `app/globals.css` instead.

@@ -89,6 +89,15 @@ export type GigSummary = {
   _count: { musicians: number }
 }
 
+export type GigSetlistItem = {
+  id: string
+  order: number
+  section: SetSection
+  setNumber: number
+  wasPlayed: boolean | null
+  song: { title: string; key: string | null; singer: string | null }
+}
+
 export type GigWithDetails = {
   id: string
   date: Date
@@ -98,7 +107,7 @@ export type GigWithDetails = {
   venueId: string
   setlistId: string
   venue: Venue
-  setlist: { id: string; name: string }
+  setlist: { id: string; name: string; items: GigSetlistItem[] }
   expenses: Expense[]
   musicians: GigMusician[]
   createdAt: Date
