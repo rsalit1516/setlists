@@ -47,6 +47,8 @@ jobs:
     permissions:
       id-token: write #This is required for requesting the JWT
       contents: read #This is required for actions/checkout
+    env:
+      WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
 
     steps:
       - name: Download artifact from build job
@@ -67,7 +69,7 @@ jobs:
           inlineScript: |
             set -euo pipefail
 
-            APP_NAME="Setlists"
+            APP_NAME="$WEBAPP_NAME"
             RESOURCE_GROUP=$(az webapp list --query "[?name=='$APP_NAME'].resourceGroup | [0]" -o tsv)
 
             if [ -z "$RESOURCE_GROUP" ]; then
@@ -81,7 +83,6 @@ jobs:
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: "Setlists"
-          slot-name: "Production"
+          app-name: ${{ env.WEBAPP_NAME }}
           package: .
           startup-command: "HOSTNAME=0.0.0.0 node server.js"
