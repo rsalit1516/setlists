@@ -61,6 +61,22 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_DF9C4ECB9DC54A4F8A48866325F5E0BB }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_C931D2FDEC1E47B7912B405079823138 }}
 
+      - name: Ensure Web App is running
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            set -euo pipefail
+
+            APP_NAME="Setlists"
+            RESOURCE_GROUP=$(az webapp list --query "[?name=='$APP_NAME'].resourceGroup | [0]" -o tsv)
+
+            if [ -z "$RESOURCE_GROUP" ]; then
+              echo "Could not find web app '$APP_NAME' in current subscription."
+              exit 1
+            fi
+
+            az webapp start --name "$APP_NAME" --resource-group "$RESOURCE_GROUP"
+
       - name: "Deploy to Azure Web App"
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
