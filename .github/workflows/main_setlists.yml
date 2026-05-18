@@ -35,12 +35,20 @@ jobs:
           cp -r public .next/standalone/public
           cp -r .next/static .next/standalone/.next/static
 
+      - name: Archive standalone package
+        run: |
+          cd .next/standalone
+          zip -r ../../node-app.zip .
+
+      - name: Validate standalone archive contents
+        run: |
+          unzip -l node-app.zip | grep ' .next/BUILD_ID$'
+
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: .next/standalone
-          include-hidden-files: true
+          path: node-app.zip
 
   deploy:
     runs-on: ubuntu-latest
@@ -93,5 +101,5 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.WEBAPP_NAME }}
-          package: .
+          package: node-app.zip
           startup-command: "HOSTNAME=0.0.0.0 node server.js"
