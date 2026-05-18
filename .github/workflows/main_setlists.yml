@@ -54,6 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     permissions:
+      id-token: write # Required for GitHub OIDC to Azure
       contents: read #This is required for actions/checkout
     env:
       WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
@@ -71,27 +72,17 @@ jobs:
           test -f node-app.zip
           unzip -l node-app.zip | grep ' .next/BUILD_ID$'
 
-      - name: Validate publish profile secret
-        env:
-          AZURE_WEBAPP_PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        run: |
-          set -euo pipefail
-
-          if [ -z "${AZURE_WEBAPP_PUBLISH_PROFILE:-}" ]; then
-            echo "AZURE_WEBAPP_PUBLISH_PROFILE is missing or empty."
-            exit 1
-          fi
-
-          echo "$AZURE_WEBAPP_PUBLISH_PROFILE" | grep -q '<publishData' || {
-            echo "AZURE_WEBAPP_PUBLISH_PROFILE does not look like a valid publish profile XML."
-            exit 1
-          }
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_AFF22712C5094169B9A84645196E3070 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_DF9C4ECB9DC54A4F8A48866325F5E0BB }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_C931D2FDEC1E47B7912B405079823138 }}
 
       - name: "Deploy to Azure Web App"
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: node-app.zip
           startup-command: "HOSTNAME=0.0.0.0 node server.js"
