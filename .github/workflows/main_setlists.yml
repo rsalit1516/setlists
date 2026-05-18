@@ -71,6 +71,22 @@ jobs:
           test -f node-app.zip
           unzip -l node-app.zip | grep ' .next/BUILD_ID$'
 
+      - name: Validate publish profile secret
+        env:
+          AZURE_WEBAPP_PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${AZURE_WEBAPP_PUBLISH_PROFILE:-}" ]; then
+            echo "AZURE_WEBAPP_PUBLISH_PROFILE is missing or empty."
+            exit 1
+          fi
+
+          echo "$AZURE_WEBAPP_PUBLISH_PROFILE" | grep -q '<publishData' || {
+            echo "AZURE_WEBAPP_PUBLISH_PROFILE does not look like a valid publish profile XML."
+            exit 1
+          }
+
       - name: "Deploy to Azure Web App"
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
