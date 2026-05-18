@@ -54,7 +54,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     permissions:
-      id-token: write #This is required for requesting the JWT
       contents: read #This is required for actions/checkout
     env:
       WEBAPP_NAME: ${{ secrets.AZURE_WEBAPP_NAME }}
@@ -72,41 +71,11 @@ jobs:
           test -f node-app.zip
           unzip -l node-app.zip | grep ' .next/BUILD_ID$'
 
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_AFF22712C5094169B9A84645196E3070 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_DF9C4ECB9DC54A4F8A48866325F5E0BB }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_C931D2FDEC1E47B7912B405079823138 }}
-
-      - name: Ensure Web App is enabled and running
-        uses: azure/cli@v2
-        with:
-          inlineScript: |
-            set -euo pipefail
-
-            APP_NAME="$WEBAPP_NAME"
-            RESOURCE_GROUP=$(az webapp list --query "[?name=='$APP_NAME'].resourceGroup | [0]" -o tsv)
-
-            if [ -z "$RESOURCE_GROUP" ]; then
-              echo "Could not find web app '$APP_NAME' in current subscription."
-              exit 1
-            fi
-
-            # Site Disabled (403) happens when properties.enabled=false.
-            az resource update \
-              --resource-group "$RESOURCE_GROUP" \
-              --resource-type "Microsoft.Web/sites" \
-              --name "$APP_NAME" \
-              --set properties.enabled=true 1>/dev/null
-
-            az webapp start --name "$APP_NAME" --resource-group "$RESOURCE_GROUP"
-            az webapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query "{state:state, enabled:enabled, defaultHostName:defaultHostName}" -o table
-
       - name: "Deploy to Azure Web App"
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: node-app.zip
           startup-command: "HOSTNAME=0.0.0.0 node server.js"
