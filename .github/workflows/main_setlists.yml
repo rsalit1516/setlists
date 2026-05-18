@@ -63,7 +63,7 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_DF9C4ECB9DC54A4F8A48866325F5E0BB }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_C931D2FDEC1E47B7912B405079823138 }}
 
-      - name: Ensure Web App is running
+      - name: Ensure Web App is enabled and running
         uses: azure/cli@v2
         with:
           inlineScript: |
@@ -77,7 +77,15 @@ jobs:
               exit 1
             fi
 
+            # Site Disabled (403) happens when properties.enabled=false.
+            az resource update \
+              --resource-group "$RESOURCE_GROUP" \
+              --resource-type "Microsoft.Web/sites" \
+              --name "$APP_NAME" \
+              --set properties.enabled=true 1>/dev/null
+
             az webapp start --name "$APP_NAME" --resource-group "$RESOURCE_GROUP"
+            az webapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query "{state:state, enabled:enabled, defaultHostName:defaultHostName}" -o table
 
       - name: "Deploy to Azure Web App"
         id: deploy-to-webapp
