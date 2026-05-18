@@ -65,6 +65,13 @@ jobs:
         with:
           name: node-app
 
+      - name: Verify downloaded package
+        run: |
+          pwd
+          ls -la
+          test -f node-app.zip
+          unzip -l node-app.zip | grep ' .next/BUILD_ID$'
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
