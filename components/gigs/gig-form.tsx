@@ -4,6 +4,7 @@ import { useActionState } from 'react'
 import Link from 'next/link'
 import { createGig } from '@/app/gigs/actions'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import type { Venue } from '@/lib/types'
 
@@ -43,6 +44,18 @@ export function GigForm({
             <option key={v.id} value={v.id}>{v.name}</option>
           ))}
         </select>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="createSetlist"
+          name="createSetlist"
+          value="true"
+          defaultChecked={!defaultSetlistId}
+        />
+        <label htmlFor="createSetlist" className="cursor-pointer text-sm font-medium">
+          Create setlist
+        </label>
       </div>
 
       <div>

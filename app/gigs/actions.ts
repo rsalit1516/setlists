@@ -9,6 +9,7 @@ export type GigActionState = { error: string } | { success: true } | null
 export async function createGig(_state: GigActionState, formData: FormData): Promise<GigActionState> {
   const venueId = formData.get('venueId') as string
   const existingSetlistId = (formData.get('setlistId') as string) || null
+  const shouldCreateSetlist = formData.get('createSetlist') === 'true'
   const dateStr = formData.get('date') as string
   const amountContractedStr = formData.get('amountContracted') as string
   const notes = formData.get('notes') as string
@@ -20,12 +21,17 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
   if (isNaN(date.getTime())) return { error: 'Invalid date.' }
 
   let setlistId = existingSetlistId
-  if (!setlistId) {
+  if (shouldCreateSetlist) {
     const venue = await prisma.venue.findUnique({ where: { id: venueId }, select: { name: true } })
-    const dateLabel = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    const setlist = await prisma.setlist.create({ data: { name: venue ? `${venue.name} — ${dateLabel}` : dateLabel } })
+    const mm = String(date.getMonth() + 1).padStart(2, '0')
+    const dd = String(date.getDate()).padStart(2, '0')
+    const yy = String(date.getFullYear()).slice(2)
+    const name = venue ? `${venue.name} - ${mm}-${dd}-${yy}` : `${mm}-${dd}-${yy}`
+    const setlist = await prisma.setlist.create({ data: { name } })
     setlistId = setlist.id
   }
+
+  if (!setlistId) return { error: 'Please check "Create setlist" or link an existing one.' }
 
   const gig = await prisma.gig.create({
     data: {
