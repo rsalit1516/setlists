@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { createGig } from '@/app/gigs/actions'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import type { Venue, SetlistSummary } from '@/lib/types'
+import type { Venue } from '@/lib/types'
 
 const selectClass =
   'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
@@ -15,11 +15,9 @@ const textareaClass =
 
 export function GigForm({
   venues,
-  setlists,
   defaultSetlistId,
 }: {
   venues: Venue[]
-  setlists: SetlistSummary[]
   defaultSetlistId?: string
 }) {
   const [state, formAction, pending] = useActionState(createGig, null)
@@ -29,6 +27,8 @@ export function GigForm({
       {state && 'error' in state && (
         <p className="text-sm text-destructive">{state.error}</p>
       )}
+
+      {defaultSetlistId && <input type="hidden" name="setlistId" value={defaultSetlistId} />}
 
       <div>
         <label className="mb-1 block text-sm font-medium">Date</label>
@@ -41,16 +41,6 @@ export function GigForm({
           <option value="">Select venue…</option>
           {venues.map((v) => (
             <option key={v.id} value={v.id}>{v.name}</option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium">Setlist</label>
-        <select name="setlistId" required title="Setlist" defaultValue={defaultSetlistId ?? ''} className={selectClass}>
-          <option value="">Select setlist…</option>
-          {setlists.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
       </div>

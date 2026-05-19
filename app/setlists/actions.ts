@@ -34,6 +34,31 @@ export async function deleteSetlist(id: string): Promise<void> {
   revalidatePath('/setlists')
 }
 
+export async function copySetlist(id: string): Promise<void> {
+  const source = await prisma.setlist.findUnique({
+    where: { id },
+    include: { items: { orderBy: [{ section: 'asc' }, { setNumber: 'asc' }, { order: 'asc' }] } },
+  })
+  if (!source) return
+
+  const copy = await prisma.setlist.create({
+    data: {
+      name: `Copy of ${source.name}`,
+      items: {
+        create: source.items.map((item) => ({
+          songId: item.songId,
+          section: item.section as SetSection,
+          setNumber: item.setNumber,
+          order: item.order,
+        })),
+      },
+    },
+  })
+
+  revalidatePath('/setlists')
+  redirect(`/setlists/${copy.id}`)
+}
+
 // ── Items ─────────────────────────────────────────────────────────────────────
 
 export async function addItem(formData: FormData): Promise<void> {

@@ -5,6 +5,7 @@ import { getSongs } from '@/lib/services/songs'
 import { SetlistSection } from '@/components/setlists/setlist-section'
 import { RenameForm } from '@/components/setlists/rename-form'
 import { buttonVariants } from '@/components/ui/button'
+import { copySetlist } from '@/app/setlists/actions'
 import type { SetlistItem } from '@/lib/types'
 
 function groupBySection(items: SetlistItem[]) {
@@ -74,6 +75,11 @@ export default async function SetlistPage({
               Schedule Gig
             </Link>
           )}
+          <form action={copySetlist.bind(null, setlist.id)}>
+            <button type="submit" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              Copy
+            </button>
+          </form>
           <Link
             href={revision ? `/setlists/${id}` : `/setlists/${id}?revision=1`}
             className={buttonVariants({ variant: revision ? 'default' : 'outline', size: 'sm' })}

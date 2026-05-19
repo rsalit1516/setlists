@@ -9,21 +9,17 @@ if (!connectionString) {
 
 const globalForPrisma = globalThis as typeof globalThis & {
   prisma?: PrismaClient;
-  prismaAdapter?: PrismaPg;
 };
-
-const adapter = globalForPrisma.prismaAdapter ?? new PrismaPg(connectionString);
 
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    adapter,
-    log: ["query"],
+    adapter: new PrismaPg(connectionString),
+    log: process.env.NODE_ENV === "development" ? ["query"] : [],
   });
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
-  globalForPrisma.prismaAdapter = adapter;
 }
 
 export default prisma;
