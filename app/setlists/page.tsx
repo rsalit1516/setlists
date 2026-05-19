@@ -90,15 +90,18 @@ export default async function SetlistsPage() {
                           >
                             Edit
                           </Link>
-                          <form action={deleteAction}>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive hover:text-destructive"
-                            >
-                              Delete
-                            </Button>
-                          </form>
+                          {!sl.gig && (
+                            <form action={deleteAction}>
+                              <Button
+                                type="submit"
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
+                              >
+                                Delete
+                              </Button>
+                            </form>
+                          )}
                         </div>
                       </li>
                     )
