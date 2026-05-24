@@ -148,8 +148,8 @@ export function SetlistSection({
         </ul>
       )}
 
-      {/* Add song */}
-      <div className="px-4 pb-3 pt-2">
+      {/* Add song — hidden on tablet/desktop where the side panel is used */}
+      <div className="px-4 pb-3 pt-2 md:hidden">
         <AddSongForm
           setlistId={setlistId}
           section={section}

@@ -1,6 +1,22 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 @AGENTS.md
 
 # Setlists App — Project Conventions
+
+## Commands
+
+```bash
+npm run dev          # start dev server
+npm run build        # production build
+npm run lint         # ESLint
+npm test             # run all tests (vitest)
+npx vitest run lib/services/songs.test.ts   # run a single test file
+npx prisma migrate dev    # apply schema changes
+npx prisma generate       # regenerate Prisma client after schema changes
+```
 
 ## Tech Stack
 
@@ -14,14 +30,16 @@
 | Component library | shadcn/ui (Base UI primitives — `@base-ui/react`) |
 | Testing | Vitest + React Testing Library |
 
-## Responsive Design
+## Architecture Overview
 
-This app must work on **desktop, tablet, and phone**. Always design mobile-first:
+The app manages band setlists, songs, venues, and gigs. The core data model:
+- **Song** — catalog of all songs (status: READY / IN_PROGRESS / WISH)
+- **Setlist** → **SetlistItem** → **Song** — ordered list of songs with sections (SOUNDCHECK / MAIN / ENCORE) and set numbers
+- **Gig** — a dated performance at a **Venue**, linked 1:1 to a **Setlist**, with expenses and musicians
 
-- Default styles target mobile (small screens).
-- Use Tailwind responsive prefixes to scale up: `sm:`, `md:`, `lg:`.
-- Touch targets must be at least 44×44px.
-- Test layouts at 375px (phone), 768px (tablet), and 1280px (desktop).
+Data flows: `lib/services/*.ts` (Prisma queries) → async Server Components → `components/**` (UI) → `app/**/actions.ts` (mutations).
+
+All shared TypeScript types live in **`lib/types.ts`** — import from there, not from `@prisma/client` (see Prisma enum note below).
 
 ## File & Folder Structure
 
@@ -36,15 +54,29 @@ app/
   setlists/
   venues/
   gigs/
-components/            # shared UI components (root level, managed by shadcn)
+components/            # shared UI components, organized by domain
   ui/                  # shadcn/ui components — do not edit directly
+  setlists/            # setlist-specific components
+  songs/
+  gigs/
+  venues/
 lib/
   db.ts                # Prisma singleton
+  types.ts             # all shared TypeScript types
   utils.ts             # shadcn cn() helper
   services/            # pure query functions (server-only, no "use server")
 prisma/
   schema.prisma
 ```
+
+## Responsive Design
+
+This app must work on **desktop, tablet, and phone**. Always design mobile-first:
+
+- Default styles target mobile (small screens).
+- Use Tailwind responsive prefixes to scale up: `sm:`, `md:`, `lg:`.
+- Touch targets must be at least 44×44px.
+- Test layouts at 375px (phone), 768px (tablet), and 1280px (desktop).
 
 ## Server vs Client Components
 
@@ -56,10 +88,17 @@ prisma/
 ## Data Fetching
 
 - Fetch data in **async Server Components** by calling service functions directly (no API layer needed).
-- In dynamic routes, `params` is a **Promise** — always `await` it:
+- In dynamic routes, both `params` and `searchParams` are **Promises** — always `await` them:
   ```ts
-  export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  export default async function Page({
+    params,
+    searchParams,
+  }: {
+    params: Promise<{ id: string }>
+    searchParams: Promise<{ revision?: string }>
+  }) {
     const { id } = await params
+    const { revision } = await searchParams
   ```
 - Use `<Suspense>` with a skeleton fallback around slow data; add a `loading.tsx` in the route folder for full-page loading states.
 - For parallel independent queries, initiate them without `await`, then `Promise.all`:
@@ -88,15 +127,16 @@ prisma/
 - **Location**: co-locate test files alongside the code they test — `songs.test.ts` next to `songs.ts`.
 - **What to test**: service functions (unit), Server Actions (unit with mocked Prisma), and key interactive Client Components.
 - **What not to test**: plain layout/display Server Components that are just data → JSX — they have no logic to test.
-- Run tests with `npm test`.
-- Aim for tests that cover the critical business rules (ordering, status transitions, financial calculations).
+- Mock the Prisma singleton with `vi.mock('@/lib/db', () => ({ default: { song: { findMany: vi.fn(), ... } } }))`.
+- Run tests with `npm test`; run a single file with `npx vitest run <path>`.
 
 ## Database / Prisma
 
 - Schema lives in `prisma/schema.prisma`. Always run `npx prisma migrate dev` after schema changes.
 - The Prisma client is a singleton in `lib/db.ts` — import `db` from there, never create a new `PrismaClient` elsewhere.
 - Generate types after schema changes: `npx prisma generate`.
-- **Prisma enum imports don't resolve via `@prisma/client`** due to a TypeScript path resolution quirk with this adapter setup. Define enum types locally as string unions (e.g. `type SongStatus = 'READY' | 'IN_PROGRESS' | 'WISH'`) and cast FormData values to them. They match at runtime.
+- **Prisma enum imports don't resolve via `@prisma/client`** due to a TypeScript path resolution quirk with this adapter setup. Define enum types locally as string unions (e.g. `type SongStatus = 'READY' | 'IN_PROGRESS' | 'WISH'`) and cast FormData values to them. They match at runtime. All such types are already defined in `lib/types.ts`.
+- **`Decimal` fields** (`amountContracted`, `amountPaid`, `amount`, `share`) are not JSON-serializable. Service functions convert them to `string | null` via a `toStr()` helper before returning. The corresponding types in `lib/types.ts` use `string | null`.
 
 ## Environment Variables
 
