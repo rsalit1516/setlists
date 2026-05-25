@@ -8,6 +8,7 @@ import { SongPickerPanel } from '@/components/setlists/song-picker-panel'
 import { buttonVariants } from '@/components/ui/button'
 import { copySetlist } from '@/app/setlists/actions'
 import type { SetlistItem } from '@/lib/types'
+import { requireBandId } from '@/lib/auth-helpers'
 
 function groupBySection(items: SetlistItem[]) {
   const soundcheck = items.filter((i) => i.section === 'SOUNDCHECK')
@@ -34,7 +35,8 @@ export default async function SetlistPage({
   const { revision: revParam, sets: setsParam } = await searchParams
   const revision = revParam === '1'
 
-  const [setlist, allSongs] = await Promise.all([getSetlist(id), getSongs()])
+  const bandId = await requireBandId()
+  const [setlist, allSongs] = await Promise.all([getSetlist(id, bandId), getSongs(bandId)])
   if (!setlist) notFound()
 
   const allExistingIds = new Set(setlist.items.map((i) => i.songId))

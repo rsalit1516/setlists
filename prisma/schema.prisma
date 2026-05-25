@@ -3,8 +3,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
+  directUrl = env("DIRECT_URL")
 }
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
 
 enum SongStatus {
   READY
@@ -17,6 +20,101 @@ enum SetSection {
   MAIN
   ENCORE
 }
+
+enum MemberRole {
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+// ─── Auth.js models ───────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  activeBandId  String?
+
+  accounts    Account[]
+  sessions    Session[]
+  bandMembers BandMember[]
+
+  activeBand Band? @relation("ActiveBand", fields: [activeBandId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Band / multi-tenancy ─────────────────────────────────────────────────────
+
+model Band {
+  id   String @id @default(cuid())
+  name String
+
+  members       BandMember[]
+  songs         Song[]
+  setlists      Setlist[]
+  venues        Venue[]
+  gigs          Gig[]
+  activeForUsers User[] @relation("ActiveBand")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BandMember {
+  id     String     @id @default(cuid())
+  userId String
+  bandId String
+  role   MemberRole @default(MEMBER)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  band Band @relation(fields: [bandId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, bandId])
+}
+
+// ─── Domain models ────────────────────────────────────────────────────────────
 
 model Song {
   id               String     @id @default(cuid())
@@ -31,9 +129,11 @@ model Song {
   bpm              Int?
   lyricsUrl        String?
   chartsUrl        String?
+  bandId           String?
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
+  band         Band?         @relation(fields: [bandId], references: [id])
   setlistItems SetlistItem[]
 }
 
@@ -42,18 +142,22 @@ model Venue {
   name      String
   address   String?
   notes     String?
+  bandId    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  band Band?  @relation(fields: [bandId], references: [id])
   gigs Gig[]
 }
 
 model Setlist {
   id        String   @id @default(cuid())
   name      String
+  bandId    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  band  Band?          @relation(fields: [bandId], references: [id])
   items SetlistItem[]
   gig   Gig?
 }
@@ -78,12 +182,14 @@ model Gig {
   notes            String?
   amountContracted Decimal?
   amountPaid       Decimal?
+  bandId           String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   venueId   String
   setlistId String @unique
 
+  band      Band?         @relation(fields: [bandId], references: [id])
   venue     Venue         @relation(fields: [venueId], references: [id])
   setlist   Setlist       @relation(fields: [setlistId], references: [id])
   expenses  Expense[]
@@ -104,6 +210,7 @@ model GigMusician {
   id        String   @id @default(cuid())
   name      String
   share     Decimal?
+  userId    String?
   createdAt DateTime @default(now())
 
   gigId String

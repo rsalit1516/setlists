@@ -6,6 +6,7 @@ import { EditFinancialsForm } from '@/components/gigs/edit-financials-form'
 import { PrintButton } from '@/components/gigs/print-button'
 import { buttonVariants } from '@/components/ui/button'
 import type { GigSetlistItem } from '@/lib/types'
+import { requireBandId } from '@/lib/auth-helpers'
 
 const inputClass =
   'flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
@@ -35,7 +36,8 @@ export default async function GigPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const gig = await getGig(id)
+  const bandId = await requireBandId()
+  const gig = await getGig(id, bandId)
   if (!gig) notFound()
 
   const totalExpenses = gig.expenses.reduce((sum, e) => sum + parseFloat(e.amount), 0)

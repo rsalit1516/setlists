@@ -1,5 +1,6 @@
 import { getVenues } from '@/lib/services/venues'
 import { GigForm } from '@/components/gigs/gig-form'
+import { requireBandId } from '@/lib/auth-helpers'
 
 export default async function NewGigPage({
   searchParams,
@@ -7,7 +8,8 @@ export default async function NewGigPage({
   searchParams: Promise<{ setlistId?: string }>
 }) {
   const { setlistId } = await searchParams
-  const venues = await getVenues()
+  const bandId = await requireBandId()
+  const venues = await getVenues(bandId)
 
   return (
     <div className="mx-auto max-w-lg px-4 py-6">

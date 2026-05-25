@@ -2,13 +2,15 @@ import Link from 'next/link'
 import { getSetlists } from '@/lib/services/setlists'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { deleteSetlist } from './actions'
+import { requireBandId } from '@/lib/auth-helpers'
 
 function formatDate(d: Date) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export default async function SetlistsPage() {
-  const setlists = await getSetlists()
+  const bandId = await requireBandId()
+  const setlists = await getSetlists(bandId)
 
   const currentYear = new Date().getFullYear()
 

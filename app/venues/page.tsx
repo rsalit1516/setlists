@@ -2,9 +2,11 @@ import Link from 'next/link'
 import { getVenues } from '@/lib/services/venues'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { deleteVenue } from './actions'
+import { requireBandId } from '@/lib/auth-helpers'
 
 export default async function VenuesPage() {
-  const venues = await getVenues()
+  const bandId = await requireBandId()
+  const venues = await getVenues(bandId)
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">

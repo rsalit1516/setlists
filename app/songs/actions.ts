@@ -3,6 +3,7 @@
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { auth } from '@/auth'
 
 export type SongActionState = { error: string } | null
 
@@ -34,15 +35,23 @@ function parseSongFormData(formData: FormData) {
   }
 }
 
+async function getBandId(): Promise<string | null> {
+  const session = await auth()
+  return session?.user?.activeBandId ?? null
+}
+
 export async function createSong(
   _state: SongActionState,
   formData: FormData
 ): Promise<SongActionState> {
+  const bandId = await getBandId()
+  if (!bandId) return { error: 'Not authenticated.' }
+
   const data = parseSongFormData(formData)
   if (!data.title) return { error: 'Title is required.' }
 
   try {
-    await prisma.song.create({ data })
+    await prisma.song.create({ data: { ...data, bandId } })
   } catch {
     return { error: 'Failed to create song.' }
   }
@@ -55,12 +64,16 @@ export async function updateSong(
   _state: SongActionState,
   formData: FormData
 ): Promise<SongActionState> {
+  const bandId = await getBandId()
+  if (!bandId) return { error: 'Not authenticated.' }
+
   const id = formData.get('id') as string
   const data = parseSongFormData(formData)
   if (!data.title) return { error: 'Title is required.' }
 
   try {
-    await prisma.song.update({ where: { id }, data })
+    const count = await prisma.song.updateMany({ where: { id, bandId }, data })
+    if (count.count === 0) return { error: 'Song not found.' }
   } catch {
     return { error: 'Failed to update song.' }
   }
@@ -70,6 +83,8 @@ export async function updateSong(
 }
 
 export async function deleteSong(id: string): Promise<void> {
-  await prisma.song.delete({ where: { id } })
+  const bandId = await getBandId()
+  if (!bandId) return
+  await prisma.song.deleteMany({ where: { id, bandId } })
   revalidatePath('/songs')
 }

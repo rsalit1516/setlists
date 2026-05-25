@@ -4,6 +4,7 @@ import { SongStatusBadge } from '@/components/songs/song-status-badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { deleteSong } from './actions'
 import { cn } from '@/lib/utils'
+import { requireBandId } from '@/lib/auth-helpers'
 
 function formatDuration(seconds: number | null): string {
   if (!seconds) return '—'
@@ -13,7 +14,8 @@ function formatDuration(seconds: number | null): string {
 }
 
 export default async function SongsPage() {
-  const songs = await getSongs()
+  const bandId = await requireBandId()
+  const songs = await getSongs(bandId)
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">

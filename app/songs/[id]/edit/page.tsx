@@ -4,6 +4,7 @@ import { getSong } from '@/lib/services/songs'
 import { SongForm } from '@/components/songs/song-form'
 import { updateSong } from '../../actions'
 import type { SongStatus } from '@/lib/types'
+import { requireBandId } from '@/lib/auth-helpers'
 
 export default async function EditSongPage({
   params,
@@ -11,7 +12,8 @@ export default async function EditSongPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const song = await getSong(id)
+  const bandId = await requireBandId()
+  const song = await getSong(id, bandId)
 
   if (!song) notFound()
 

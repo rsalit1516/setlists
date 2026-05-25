@@ -6,8 +6,9 @@ function toStr(d: unknown): string | null {
   return String(d)
 }
 
-export async function getGigs(): Promise<GigSummary[]> {
+export async function getGigs(bandId: string): Promise<GigSummary[]> {
   const rows: any[] = await prisma.gig.findMany({
+    where: { bandId },
     orderBy: { date: 'desc' },
     include: {
       venue: { select: { name: true } },
@@ -22,19 +23,19 @@ export async function getGigs(): Promise<GigSummary[]> {
   }))
 }
 
-export async function getGig(id: string): Promise<GigWithDetails | null> {
-  const row: any = await prisma.gig.findUnique({
-    where: { id },
+export async function getGig(id: string, bandId: string): Promise<GigWithDetails | null> {
+  const row: any = await prisma.gig.findFirst({
+    where: { id, bandId },
     include: {
       venue: true,
       setlist: {
-          include: {
-            items: {
-              include: { song: { select: { title: true, key: true, singer: true } } },
-              orderBy: [{ setNumber: 'asc' }, { order: 'asc' }],
-            },
+        include: {
+          items: {
+            include: { song: { select: { title: true, key: true, singer: true } } },
+            orderBy: [{ setNumber: 'asc' }, { order: 'asc' }],
           },
         },
+      },
       expenses: { orderBy: { createdAt: 'asc' } },
       musicians: { orderBy: { createdAt: 'asc' } },
     },

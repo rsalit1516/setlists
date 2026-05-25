@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getGigs } from '@/lib/services/gigs'
 import { deleteGig } from './actions'
 import { buttonVariants } from '@/components/ui/button'
+import { requireBandId } from '@/lib/auth-helpers'
 
 function formatDate(d: Date) {
   return new Date(d).toLocaleDateString('en-US', {
@@ -10,7 +11,8 @@ function formatDate(d: Date) {
 }
 
 export default async function GigsPage() {
-  const gigs = await getGigs()
+  const bandId = await requireBandId()
+  const gigs = await getGigs(bandId)
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">

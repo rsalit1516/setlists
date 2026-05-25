@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getVenue } from '@/lib/services/venues'
 import { VenueForm } from '@/components/venues/venue-form'
 import { updateVenue } from '../../actions'
+import { requireBandId } from '@/lib/auth-helpers'
 
 export default async function EditVenuePage({
   params,
@@ -10,7 +11,8 @@ export default async function EditVenuePage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const venue = await getVenue(id)
+  const bandId = await requireBandId()
+  const venue = await getVenue(id, bandId)
 
   if (!venue) notFound()
 
