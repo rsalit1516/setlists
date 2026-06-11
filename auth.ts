@@ -1,7 +1,7 @@
 import NextAuth from 'next-auth'
-import MicrosoftEntraId from 'next-auth/providers/microsoft-entra-id'
 import { PrismaAdapter } from '@auth/prisma-adapter'
 import prisma from '@/lib/db'
+import { authConfig } from '@/auth.config'
 
 declare module 'next-auth' {
   interface Session {
@@ -16,17 +16,8 @@ declare module 'next-auth' {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  ...authConfig,
   adapter: PrismaAdapter(prisma),
-  providers: [
-    MicrosoftEntraId({
-      clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID!,
-      clientSecret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET!,
-      tenantId: process.env.AUTH_MICROSOFT_ENTRA_ID_TENANT_ID ?? 'consumers',
-    }),
-  ],
-  pages: {
-    signIn: '/auth/signin',
-  },
   callbacks: {
     async session({ session, user }) {
       const dbUser = await prisma.user.findUnique({
