@@ -109,6 +109,15 @@ export async function moveItem(itemId: string, direction: 'up' | 'down'): Promis
   revalidatePath(`/setlists/${item.setlistId}`)
 }
 
+export async function reorderItems(setlistId: string, orderedItemIds: string[]): Promise<void> {
+  await prisma.$transaction(
+    orderedItemIds.map((id, index) =>
+      prisma.setlistItem.update({ where: { id }, data: { order: index } })
+    )
+  )
+  revalidatePath(`/setlists/${setlistId}`)
+}
+
 export async function togglePlayed(
   itemId: string,
   current: boolean | null
