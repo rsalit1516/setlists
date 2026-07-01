@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { getSetlists } from '@/lib/services/setlists'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
+import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
 import { deleteSetlist } from './actions'
 
 function formatDate(d: Date) {
@@ -91,16 +92,10 @@ export default async function SetlistsPage() {
                             Edit
                           </Link>
                           {!sl.gig && (
-                            <form action={deleteAction}>
-                              <Button
-                                type="submit"
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive hover:text-destructive"
-                              >
-                                Delete
-                              </Button>
-                            </form>
+                            <DeleteConfirmButton
+                              action={deleteAction}
+                              description={`Remove "${sl.name}" and all its songs?`}
+                            />
                           )}
                         </div>
                       </li>

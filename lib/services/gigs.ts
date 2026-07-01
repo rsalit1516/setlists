@@ -8,11 +8,12 @@ function toStr(d: unknown): string | null {
 
 export async function getGigs(): Promise<GigSummary[]> {
   const rows: any[] = await prisma.gig.findMany({
+    where: { isActive: true },
     orderBy: { date: 'desc' },
     include: {
       venue: { select: { name: true } },
       setlist: { select: { name: true } },
-      _count: { select: { musicians: true } },
+      _count: { select: { musicians: { where: { isActive: true } } } },
     },
   })
   return rows.map((r) => ({
@@ -35,8 +36,8 @@ export async function getGig(id: string): Promise<GigWithDetails | null> {
             },
           },
         },
-      expenses: { orderBy: { createdAt: 'asc' } },
-      musicians: { orderBy: { createdAt: 'asc' } },
+      expenses: { where: { isActive: true }, orderBy: { createdAt: 'asc' } },
+      musicians: { where: { isActive: true }, orderBy: { createdAt: 'asc' } },
     },
   })
   if (!row) return null

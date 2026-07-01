@@ -30,7 +30,7 @@ describe('getSetlists', () => {
     const result = await getSetlists()
     expect(result).toHaveLength(1)
     expect(prisma.setlist.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: { createdAt: 'desc' } })
+      expect.objectContaining({ where: { isActive: true } })
     )
   })
 

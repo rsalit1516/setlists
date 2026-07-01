@@ -1,6 +1,6 @@
 import { moveItem, removeItem, togglePlayed } from '@/app/setlists/actions'
 import { AddSongForm } from './add-song-form'
-import { Button } from '@/components/ui/button'
+import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
 import type { SetlistItem, Song, SetSection } from '@/lib/types'
 
 function formatDuration(s: number | null) {
@@ -133,23 +133,20 @@ export function SetlistSection({
                 )}
 
                 {/* Remove */}
-                <form action={removeAction}>
-                  <button
-                    type="submit"
-                    className="text-muted-foreground hover:text-destructive"
-                    aria-label="Remove song"
-                  >
-                    ×
-                  </button>
-                </form>
+                <DeleteConfirmButton
+                  action={removeAction}
+                  variant="icon"
+                  ariaLabel="Remove song"
+                  description={`Remove "${item.song.title}" from this setlist?`}
+                />
               </li>
             )
           })}
         </ul>
       )}
 
-      {/* Add song */}
-      <div className="px-4 pb-3 pt-2">
+      {/* Add song — hidden on tablet/desktop where the side panel is used */}
+      <div className="px-4 pb-3 pt-2 md:hidden">
         <AddSongForm
           setlistId={setlistId}
           section={section}

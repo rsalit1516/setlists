@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getGigs } from '@/lib/services/gigs'
 import { deleteGig } from './actions'
 import { buttonVariants } from '@/components/ui/button'
+import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
 
 function formatDate(d: Date) {
   return new Date(d).toLocaleDateString('en-US', {
@@ -46,15 +47,12 @@ export default async function GigsPage() {
                         </span>
                       ) : null}
                     </div>
-                    <form action={deleteAction}>
-                      <button
-                        type="submit"
-                        className="text-muted-foreground hover:text-destructive"
-                        aria-label="Delete gig"
-                      >
-                        ×
-                      </button>
-                    </form>
+                    <DeleteConfirmButton
+                      action={deleteAction}
+                      variant="icon"
+                      ariaLabel="Delete gig"
+                      description={`Remove the gig at ${gig.venue.name} on ${formatDate(gig.date)}?`}
+                    />
                   </div>
                 </div>
                 <div className="mt-1 text-sm text-muted-foreground">

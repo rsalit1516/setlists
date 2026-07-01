@@ -28,7 +28,7 @@ describe('getVenues', () => {
     vi.mocked(prisma.venue.findMany).mockResolvedValue([mockVenue])
     const result = await getVenues()
     expect(result).toEqual([mockVenue])
-    expect(prisma.venue.findMany).toHaveBeenCalledWith({ orderBy: { name: 'asc' } })
+    expect(prisma.venue.findMany).toHaveBeenCalledWith({ where: { isActive: true }, orderBy: { name: 'asc' } })
   })
 
   it('returns empty array when no venues exist', async () => {

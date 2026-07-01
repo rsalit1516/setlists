@@ -9,6 +9,11 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // The Prisma CLI (migrate/db push/studio) needs a connection that supports advisory
+    // locks, which Supabase's transaction-mode pooler (DATABASE_URL, port 6543) doesn't
+    // support. DIRECT_URL (session-mode pooler, port 5432) is used here instead. The
+    // running app never reads this file — it builds its own client from DATABASE_URL
+    // in lib/db.ts.
+    url: process.env["DIRECT_URL"],
   },
 });

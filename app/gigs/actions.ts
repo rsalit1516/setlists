@@ -69,9 +69,9 @@ export async function updateGig(_state: GigActionState, formData: FormData): Pro
 }
 
 export async function deleteGig(id: string): Promise<void> {
-  await prisma.expense.deleteMany({ where: { gigId: id } })
-  await prisma.gigMusician.deleteMany({ where: { gigId: id } })
-  await prisma.gig.delete({ where: { id } })
+  await prisma.expense.updateMany({ where: { gigId: id }, data: { isActive: false } })
+  await prisma.gigMusician.updateMany({ where: { gigId: id }, data: { isActive: false } })
+  await prisma.gig.update({ where: { id }, data: { isActive: false } })
   revalidatePath('/gigs')
   redirect('/gigs')
 }
@@ -88,9 +88,7 @@ export async function addExpense(formData: FormData): Promise<void> {
 }
 
 export async function removeExpense(expenseId: string): Promise<void> {
-  const expense: any = await prisma.expense.findUnique({ where: { id: expenseId } })
-  if (!expense) return
-  await prisma.expense.delete({ where: { id: expenseId } })
+  const expense = await prisma.expense.update({ where: { id: expenseId }, data: { isActive: false } })
   revalidatePath(`/gigs/${expense.gigId}`)
 }
 
@@ -105,8 +103,6 @@ export async function addMusician(formData: FormData): Promise<void> {
 }
 
 export async function removeMusician(musicianId: string): Promise<void> {
-  const musician: any = await prisma.gigMusician.findUnique({ where: { id: musicianId } })
-  if (!musician) return
-  await prisma.gigMusician.delete({ where: { id: musicianId } })
+  const musician = await prisma.gigMusician.update({ where: { id: musicianId }, data: { isActive: false } })
   revalidatePath(`/gigs/${musician.gigId}`)
 }

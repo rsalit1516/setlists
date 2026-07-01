@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { getSongs } from '@/lib/services/songs'
 import { SongStatusBadge } from '@/components/songs/song-status-badge'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
+import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
 import { deleteSong } from './actions'
 import { cn } from '@/lib/utils'
 
@@ -73,15 +74,10 @@ export default async function SongsPage() {
                           >
                             Edit
                           </Link>
-                          <form action={deleteAction}>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive hover:text-destructive"
-                            >
-                              Delete
-                            </Button>
-                          </form>
+                          <DeleteConfirmButton
+                            action={deleteAction}
+                            description={`Remove "${song.title}" from your song catalog?`}
+                          />
                         </div>
                       </td>
                     </tr>
@@ -119,15 +115,10 @@ export default async function SongsPage() {
                     >
                       Edit
                     </Link>
-                    <form action={deleteAction}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                      >
-                        Delete
-                      </Button>
-                    </form>
+                    <DeleteConfirmButton
+                      action={deleteAction}
+                      description={`Remove "${song.title}" from your song catalog?`}
+                    />
                   </div>
                 </li>
               )

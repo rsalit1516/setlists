@@ -70,6 +70,6 @@ export async function updateSong(
 }
 
 export async function deleteSong(id: string): Promise<void> {
-  await prisma.song.delete({ where: { id } })
+  await prisma.song.update({ where: { id }, data: { isActive: false } })
   revalidatePath('/songs')
 }

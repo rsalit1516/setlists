@@ -29,8 +29,8 @@ export async function createSetlist(
 }
 
 export async function deleteSetlist(id: string): Promise<void> {
-  await prisma.setlistItem.deleteMany({ where: { setlistId: id } })
-  await prisma.setlist.delete({ where: { id } })
+  await prisma.setlistItem.updateMany({ where: { setlistId: id }, data: { isActive: false } })
+  await prisma.setlist.update({ where: { id }, data: { isActive: false } })
   revalidatePath('/setlists')
 }
 
@@ -81,7 +81,7 @@ export async function addItem(formData: FormData): Promise<void> {
 }
 
 export async function removeItem(itemId: string): Promise<void> {
-  const item = await prisma.setlistItem.delete({ where: { id: itemId } })
+  const item = await prisma.setlistItem.update({ where: { id: itemId }, data: { isActive: false } })
   revalidatePath(`/setlists/${item.setlistId}`)
 }
 
