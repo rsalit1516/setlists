@@ -50,6 +50,6 @@ export async function updateVenue(
 }
 
 export async function deleteVenue(id: string): Promise<void> {
-  await prisma.venue.delete({ where: { id } })
+  await prisma.venue.update({ where: { id }, data: { isActive: false } })
   revalidatePath('/venues')
 }

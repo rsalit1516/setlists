@@ -142,7 +142,9 @@ This app must work on **desktop, tablet, and phone**. Always design mobile-first
 
 - Server-side secrets go in `.env` (never commit this file).
 - Client-accessible vars must be prefixed `NEXT_PUBLIC_`.
-- `DATABASE_URL` is the only required variable for local dev.
+- `DATABASE_URL` and `DIRECT_URL` are the required variables for local dev.
+- `DATABASE_URL` is Supabase's **transaction-mode pooler** (port 6543, `pgbouncer=true`) — used by the running app (`lib/db.ts`).
+- `DIRECT_URL` is Supabase's **session-mode pooler** (port 5432, no `pgbouncer` flag) — used only by the Prisma CLI via `prisma.config.ts`. Transaction-mode pooling doesn't support the advisory locks `prisma migrate`/`db push` need, so CLI commands hang indefinitely (no error, just stalls after "Datasource ... loaded") if pointed at `DATABASE_URL`. If that happens, confirm `prisma.config.ts`'s `datasource.url` reads `DIRECT_URL`, not `DATABASE_URL`.
 
 ## Code Style
 

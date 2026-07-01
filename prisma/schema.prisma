@@ -31,6 +31,7 @@ model Song {
   bpm              Int?
   lyricsUrl        String?
   chartsUrl        String?
+  isActive         Boolean    @default(true)
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
@@ -42,6 +43,7 @@ model Venue {
   name      String
   address   String?
   notes     String?
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -51,6 +53,7 @@ model Venue {
 model Setlist {
   id        String   @id @default(cuid())
   name      String
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -65,6 +68,7 @@ model SetlistItem {
   setNumber   Int        @default(1)
   wasPlayed   Boolean?
   isUnplanned Boolean    @default(false)
+  isActive    Boolean    @default(true)
   songId      String
   setlistId   String
 
@@ -78,6 +82,7 @@ model Gig {
   notes            String?
   amountContracted Decimal?
   amountPaid       Decimal?
+  isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -94,6 +99,7 @@ model Expense {
   id          String   @id @default(cuid())
   description String
   amount      Decimal
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
 
   gigId String
@@ -104,6 +110,7 @@ model GigMusician {
   id        String   @id @default(cuid())
   name      String
   share     Decimal?
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
   gigId String

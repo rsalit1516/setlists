@@ -5,6 +5,7 @@ import { addExpense, removeExpense, addMusician, removeMusician } from '@/app/gi
 import { EditFinancialsForm } from '@/components/gigs/edit-financials-form'
 import { PrintButton } from '@/components/gigs/print-button'
 import { buttonVariants } from '@/components/ui/button'
+import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
 import type { GigSetlistItem } from '@/lib/types'
 
 const inputClass =
@@ -252,15 +253,12 @@ export default async function GigPage({
                     <span className="tabular-nums text-muted-foreground">
                       ${parseFloat(expense.amount).toFixed(2)}
                     </span>
-                    <form action={removeAction}>
-                      <button
-                        type="submit"
-                        className="text-muted-foreground hover:text-destructive"
-                        aria-label="Remove expense"
-                      >
-                        ×
-                      </button>
-                    </form>
+                    <DeleteConfirmButton
+                      action={removeAction}
+                      variant="icon"
+                      ariaLabel="Remove expense"
+                      description={`Remove expense "${expense.description}"?`}
+                    />
                   </li>
                 )
               })}
@@ -315,15 +313,12 @@ export default async function GigPage({
                         ${perMusician.toFixed(2)}
                       </span>
                     )}
-                    <form action={removeAction}>
-                      <button
-                        type="submit"
-                        className="text-muted-foreground hover:text-destructive"
-                        aria-label="Remove musician"
-                      >
-                        ×
-                      </button>
-                    </form>
+                    <DeleteConfirmButton
+                      action={removeAction}
+                      variant="icon"
+                      ariaLabel="Remove musician"
+                      description={`Remove ${musician.name} from this gig?`}
+                    />
                   </li>
                 )
               })}

@@ -12,6 +12,7 @@ export type Venue = {
   name: string
   address: string | null
   notes: string | null
+  isActive: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -23,6 +24,7 @@ export type SetlistItem = {
   setNumber: number
   wasPlayed: boolean | null
   isUnplanned: boolean
+  isActive: boolean
   songId: string
   setlistId: string
   song: Song
@@ -58,6 +60,7 @@ export type Song = {
   bpm: number | null
   lyricsUrl: string | null
   chartsUrl: string | null
+  isActive: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -67,6 +70,7 @@ export type Expense = {
   description: string
   amount: string
   gigId: string
+  isActive: boolean
   createdAt: Date
 }
 
@@ -75,6 +79,7 @@ export type GigMusician = {
   name: string
   share: string | null
   gigId: string
+  isActive: boolean
   createdAt: Date
 }
 

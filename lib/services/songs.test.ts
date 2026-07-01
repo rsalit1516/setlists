@@ -38,7 +38,7 @@ describe('getSongs', () => {
     vi.mocked(prisma.song.findMany).mockResolvedValue([mockSong])
     const result = await getSongs()
     expect(result).toEqual([mockSong])
-    expect(prisma.song.findMany).toHaveBeenCalledWith({ orderBy: { title: 'asc' } })
+    expect(prisma.song.findMany).toHaveBeenCalledWith({ where: { isActive: true }, orderBy: { title: 'asc' } })
   })
 
   it('returns empty array when no songs exist', async () => {

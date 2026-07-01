@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { getVenues } from '@/lib/services/venues'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
+import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
 import { deleteVenue } from './actions'
 
 export default async function VenuesPage() {
@@ -39,15 +40,10 @@ export default async function VenuesPage() {
                   >
                     Edit
                   </Link>
-                  <form action={deleteAction}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                    >
-                      Delete
-                    </Button>
-                  </form>
+                  <DeleteConfirmButton
+                    action={deleteAction}
+                    description={`Remove "${venue.name}" from your venues?`}
+                  />
                 </div>
               </li>
             )
