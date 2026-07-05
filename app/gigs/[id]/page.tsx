@@ -361,7 +361,7 @@ export default async function GigPage({
         </div>
 
         {/* Set columns */}
-        <div className="print-columns">
+        <div className={`print-columns print-columns-cols-${printLayout.columns.length}`}>
           {printLayout.columns.map((column, colIndex) => {
             const isFirst = colIndex === 0
             const isLast = colIndex === printLayout.columns.length - 1

@@ -65,6 +65,13 @@ describe('getGig', () => {
     )
   })
 
+  it('only fetches active (non-removed) setlist items', async () => {
+    vi.mocked(prisma.gig.findUnique).mockResolvedValue(mockGig as never)
+    await getGig('gig-1')
+    const call = vi.mocked(prisma.gig.findUnique).mock.calls[0][0] as any
+    expect(call.include.setlist.include.items.where).toEqual({ isActive: true })
+  })
+
   it('returns null when gig does not exist', async () => {
     vi.mocked(prisma.gig.findUnique).mockResolvedValue(null)
     expect(await getGig('nonexistent')).toBeNull()

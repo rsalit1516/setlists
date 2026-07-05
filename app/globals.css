@@ -133,8 +133,20 @@
 .print-header      { text-align: center; margin-bottom: 0.35in; }
 .print-venue       { font-size: 34pt; font-weight: bold; line-height: 1.1; }
 .print-date        { font-size: 22pt; margin-top: 0.08in; }
-.print-columns     { display: flex; gap: 0.25in; align-items: flex-start; }
-.print-column      { flex: 1; min-width: 0; }
+/*
+ * Columns use floats, not flexbox/grid: browsers refuse to fragment a flex or
+ * grid container across a page break, so if the whole row didn't fit in the
+ * remaining space on page 1 it got pushed to page 2 in one piece, stranding
+ * the header alone. Floated columns are normal block flow and paginate fine.
+ */
+.print-columns     { display: block; }
+.print-columns::after { content: ''; display: table; clear: both; }
+.print-column      { float: left; box-sizing: border-box; padding-right: 0.2in; width: 100%; }
+.print-column:last-child { padding-right: 0; }
+.print-columns-cols-1 .print-column { width: 100%; }
+.print-columns-cols-2 .print-column { width: 50%; }
+.print-columns-cols-3 .print-column { width: 33.334%; }
+.print-columns-cols-4 .print-column { width: 25%; }
 .print-sc-block    { margin-bottom: 0.15in; }
 .print-set-block   { margin-bottom: 0.1in; }
 .print-encore-block{ margin-top: 0.12in; }

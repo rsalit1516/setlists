@@ -31,6 +31,7 @@ export async function getGig(id: string): Promise<GigWithDetails | null> {
       setlist: {
           include: {
             items: {
+              where: { isActive: true },
               include: { song: { select: { title: true, key: true, singer: true } } },
               orderBy: [{ setNumber: 'asc' }, { order: 'asc' }],
             },
