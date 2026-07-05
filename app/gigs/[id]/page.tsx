@@ -6,6 +6,7 @@ import { EditFinancialsForm } from '@/components/gigs/edit-financials-form'
 import { PrintButton } from '@/components/gigs/print-button'
 import { buttonVariants } from '@/components/ui/button'
 import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
+import { buildPrintLayout } from '@/lib/setlist-print'
 import type { GigSetlistItem } from '@/lib/types'
 
 const inputClass =
@@ -46,6 +47,7 @@ export default async function GigPage({
 
   const { soundcheck, main, encore, numCols } = groupItems(gig.setlist.items)
   const columns = Array.from({ length: numCols }, (_, i) => i + 1)
+  const printLayout = buildPrintLayout(gig.setlist.items)
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
@@ -74,6 +76,12 @@ export default async function GigPage({
             Edit Setlist
           </Link>
           <PrintButton />
+          <a
+            href={`/gigs/${gig.id}/pdf`}
+            className={buttonVariants({ variant: 'outline', size: 'sm' })}
+          >
+            Download PDF
+          </a>
           <a
             href="#financials"
             className={buttonVariants({ variant: 'outline', size: 'sm' })}
@@ -354,21 +362,20 @@ export default async function GigPage({
 
         {/* Set columns */}
         <div className="print-columns">
-          {columns.map((setNum) => {
-            const setItems = main.filter((i) => i.setNumber === setNum)
-            const isFirst = setNum === 1
-            const isLast = setNum === numCols
+          {printLayout.columns.map((column, colIndex) => {
+            const isFirst = colIndex === 0
+            const isLast = colIndex === printLayout.columns.length - 1
 
             return (
-              <div key={setNum} className="print-column">
+              <div key={column.label} className="print-column">
                 {/* Soundcheck (column 1 only) */}
-                {isFirst && soundcheck.length > 0 && (
+                {isFirst && printLayout.soundcheck.length > 0 && (
                   <div className="print-sc-block">
                     <div className="print-sec-label-sm">Soundcheck</div>
-                    {soundcheck.map((item, i) => (
-                      <div key={item.id} className="print-song-sm">
-                        <span className="print-num-sm">{i + 1}.</span>
-                        <span>{item.song.title}</span>
+                    {printLayout.soundcheck.map((song) => (
+                      <div key={song.displayNumber} className="print-song-sm">
+                        <span className="print-num-sm">{song.displayNumber}.</span>
+                        <span>{song.title}</span>
                       </div>
                     ))}
                   </div>
@@ -376,26 +383,24 @@ export default async function GigPage({
 
                 {/* Set */}
                 <div className="print-set-block">
-                  <div className="print-sec-label">Set {setNum}</div>
-                  {setItems.map((item, i) => (
-                    <div key={item.id} className="print-song">
-                      <span className="print-num">{i + 1}.</span>
-                      <span>{item.song.title}</span>
-                      {item.song.key && (
-                        <span className="print-key">{item.song.key}</span>
-                      )}
+                  <div className="print-sec-label">{column.label}</div>
+                  {column.songs.map((song) => (
+                    <div key={song.displayNumber} className="print-song">
+                      <span className="print-num">{song.displayNumber}.</span>
+                      <span>{song.title}</span>
+                      {song.key && <span className="print-key">{song.key}</span>}
                     </div>
                   ))}
                 </div>
 
                 {/* Encore (last column only) */}
-                {isLast && encore.length > 0 && (
+                {isLast && printLayout.encore.length > 0 && (
                   <div className="print-encore-block">
                     <div className="print-sec-label">Encore</div>
-                    {encore.map((item, i) => (
-                      <div key={item.id} className="print-song">
-                        <span className="print-num">{i + 1}.</span>
-                        <span>{item.song.title}</span>
+                    {printLayout.encore.map((song) => (
+                      <div key={song.displayNumber} className="print-song">
+                        <span className="print-num">{song.displayNumber}.</span>
+                        <span>{song.title}</span>
                       </div>
                     ))}
                   </div>
