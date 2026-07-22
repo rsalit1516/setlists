@@ -25,6 +25,7 @@ const mockSong = {
   bpm: 120,
   lyricsUrl: null,
   chartsUrl: null,
+  isActive: true,
   createdAt: new Date(),
   updatedAt: new Date(),
 }
@@ -45,6 +46,16 @@ describe('getSongs', () => {
     vi.mocked(prisma.song.findMany).mockResolvedValue([])
     const result = await getSongs()
     expect(result).toEqual([])
+  })
+
+  it('filters by status when provided', async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([mockSong])
+    const result = await getSongs('READY')
+    expect(result).toEqual([mockSong])
+    expect(prisma.song.findMany).toHaveBeenCalledWith({
+      where: { isActive: true, status: 'READY' },
+      orderBy: { title: 'asc' },
+    })
   })
 })
 

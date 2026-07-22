@@ -1,8 +1,11 @@
 import prisma from '@/lib/db'
-import type { Song } from '@/lib/types'
+import type { Song, SongStatus } from '@/lib/types'
 
-export async function getSongs(): Promise<Song[]> {
-  return prisma.song.findMany({ where: { isActive: true }, orderBy: { title: 'asc' } }) as Promise<Song[]>
+export async function getSongs(status?: SongStatus): Promise<Song[]> {
+  return prisma.song.findMany({
+    where: { isActive: true, ...(status ? { status } : {}) },
+    orderBy: { title: 'asc' },
+  }) as Promise<Song[]>
 }
 
 export async function getSong(id: string): Promise<Song | null> {

@@ -5,6 +5,9 @@ import { buttonVariants } from '@/components/ui/button'
 import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
 import { deleteSong } from './actions'
 import { cn } from '@/lib/utils'
+import { SONG_STATUS_LABELS, type SongStatus } from '@/lib/types'
+
+const STATUS_FILTERS = Object.keys(SONG_STATUS_LABELS) as SongStatus[]
 
 function formatDuration(seconds: number | null): string {
   if (!seconds) return '—'
@@ -13,8 +16,18 @@ function formatDuration(seconds: number | null): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-export default async function SongsPage() {
-  const songs = await getSongs()
+function isSongStatus(value: string | undefined): value is SongStatus {
+  return STATUS_FILTERS.includes(value as SongStatus)
+}
+
+export default async function SongsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>
+}) {
+  const { status: statusParam } = await searchParams
+  const status = isSongStatus(statusParam) ? statusParam : undefined
+  const songs = await getSongs(status)
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
@@ -25,8 +38,31 @@ export default async function SongsPage() {
         </Link>
       </div>
 
+      <div className="mb-6 flex flex-wrap gap-2">
+        <Link
+          href="/songs"
+          className={cn(
+            buttonVariants({ variant: status === undefined ? 'default' : 'outline' }),
+            'h-11 px-4'
+          )}
+        >
+          All
+        </Link>
+        {STATUS_FILTERS.map((s) => (
+          <Link
+            key={s}
+            href={`/songs?status=${s}`}
+            className={cn(buttonVariants({ variant: status === s ? 'default' : 'outline' }), 'h-11 px-4')}
+          >
+            {SONG_STATUS_LABELS[s]}
+          </Link>
+        ))}
+      </div>
+
       {songs.length === 0 ? (
-        <p className="text-muted-foreground">No songs yet. Add your first one!</p>
+        <p className="text-muted-foreground">
+          {status ? 'No songs match this filter.' : 'No songs yet. Add your first one!'}
+        </p>
       ) : (
         <>
           {/* Desktop table */}
