@@ -82,6 +82,12 @@ export default async function GigPage({
           >
             Download PDF
           </a>
+          <Link
+            href={`/gigs/${gig.id}/perform`}
+            className={buttonVariants({ variant: 'default', size: 'sm' })}
+          >
+            Start Performance Mode
+          </Link>
           <a
             href="#financials"
             className={buttonVariants({ variant: 'outline', size: 'sm' })}

@@ -60,6 +60,10 @@ export type Song = {
   bpm: number | null
   lyricsUrl: string | null
   chartsUrl: string | null
+  lyrics: string | null
+  chartFileUrl: string | null
+  chartFileType: string | null
+  chartFileName: string | null
   isActive: boolean
   createdAt: Date
   updatedAt: Date
@@ -101,6 +105,27 @@ export type GigSetlistItem = {
   setNumber: number
   wasPlayed: boolean | null
   song: { title: string; key: string | null; singer: string | null }
+}
+
+export type PerformanceSong = {
+  id: string
+  order: number
+  section: SetSection
+  setNumber: number
+  song: {
+    title: string
+    key: string | null
+    lyrics: string | null
+    chartFileUrl: string | null
+    chartFileType: string | null
+  }
+}
+
+export type GigPerformanceData = {
+  id: string
+  date: Date
+  venue: { name: string }
+  items: PerformanceSong[]
 }
 
 export type GigWithDetails = {

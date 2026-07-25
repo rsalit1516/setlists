@@ -1,5 +1,5 @@
 import prisma from '@/lib/db'
-import type { GigSummary, GigWithDetails } from '@/lib/types'
+import type { GigSummary, GigWithDetails, GigPerformanceData } from '@/lib/types'
 
 function toStr(d: unknown): string | null {
   if (d === null || d === undefined) return null
@@ -21,6 +21,41 @@ export async function getGigs(): Promise<GigSummary[]> {
     amountContracted: toStr(r.amountContracted),
     amountPaid: toStr(r.amountPaid),
   }))
+}
+
+export async function getGigForPerformance(id: string): Promise<GigPerformanceData | null> {
+  return prisma.gig.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      date: true,
+      venue: { select: { name: true } },
+      setlist: {
+        select: {
+          items: {
+            where: { isActive: true },
+            select: {
+              id: true,
+              order: true,
+              section: true,
+              setNumber: true,
+              song: {
+                select: { title: true, key: true, lyrics: true, chartFileUrl: true, chartFileType: true },
+              },
+            },
+            orderBy: [{ setNumber: 'asc' }, { order: 'asc' }],
+          },
+        },
+      },
+    },
+  }).then((row) => {
+    if (!row) return null
+    const items = row.setlist.items
+    const soundcheck = items.filter((i) => i.section === 'SOUNDCHECK')
+    const main = items.filter((i) => i.section === 'MAIN')
+    const encore = items.filter((i) => i.section === 'ENCORE')
+    return { id: row.id, date: row.date, venue: row.venue, items: [...soundcheck, ...main, ...encore] }
+  })
 }
 
 export async function getGig(id: string): Promise<GigWithDetails | null> {

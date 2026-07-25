@@ -25,6 +25,11 @@ const mockSong = {
   bpm: 120,
   lyricsUrl: null,
   chartsUrl: null,
+  lyrics: null,
+  chartFileUrl: null,
+  chartFileType: null,
+  chartFileName: null,
+  isActive: true,
   createdAt: new Date(),
   updatedAt: new Date(),
 }

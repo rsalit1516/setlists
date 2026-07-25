@@ -3,6 +3,7 @@
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { uploadChartFile, deleteChartFile } from '@/lib/services/azure-blob'
 
 export type SongActionState = { error: string } | null
 
@@ -29,9 +30,30 @@ function parseSongFormData(formData: FormData) {
     durationSeconds: parseDuration(formData.get('duration') as string | null),
     orientation: (formData.get('orientation') as string).trim() || null,
     bpm: formData.get('bpm') ? parseInt(formData.get('bpm') as string) || null : null,
-    lyricsUrl: (formData.get('lyricsUrl') as string).trim() || null,
-    chartsUrl: (formData.get('chartsUrl') as string).trim() || null,
+    lyrics: (formData.get('lyrics') as string).trim() || null,
   }
+}
+
+async function resolveChartFile(
+  formData: FormData,
+  songId: string,
+  currentChartFileUrl: string | null
+): Promise<{ chartFileUrl: string | null; chartFileType: string | null; chartFileName: string | null } | null> {
+  const file = formData.get('chartFile') as File | null
+  const shouldRemove = formData.get('removeChartFile') === 'true'
+
+  if (file && file.size > 0) {
+    if (currentChartFileUrl) await deleteChartFile(currentChartFileUrl).catch(() => {})
+    const { url, type, name } = await uploadChartFile(songId, file)
+    return { chartFileUrl: url, chartFileType: type, chartFileName: name }
+  }
+
+  if (shouldRemove && currentChartFileUrl) {
+    await deleteChartFile(currentChartFileUrl).catch(() => {})
+    return { chartFileUrl: null, chartFileType: null, chartFileName: null }
+  }
+
+  return null
 }
 
 export async function createSong(
@@ -42,7 +64,11 @@ export async function createSong(
   if (!data.title) return { error: 'Title is required.' }
 
   try {
-    await prisma.song.create({ data })
+    const song = await prisma.song.create({ data })
+    const chartUpdate = await resolveChartFile(formData, song.id, null)
+    if (chartUpdate) {
+      await prisma.song.update({ where: { id: song.id }, data: chartUpdate })
+    }
   } catch {
     return { error: 'Failed to create song.' }
   }
@@ -60,7 +86,9 @@ export async function updateSong(
   if (!data.title) return { error: 'Title is required.' }
 
   try {
-    await prisma.song.update({ where: { id }, data })
+    const current = await prisma.song.findUnique({ where: { id }, select: { chartFileUrl: true } })
+    const chartUpdate = await resolveChartFile(formData, id, current?.chartFileUrl ?? null)
+    await prisma.song.update({ where: { id }, data: { ...data, ...chartUpdate } })
   } catch {
     return { error: 'Failed to update song.' }
   }
