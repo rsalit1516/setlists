@@ -9,6 +9,9 @@ import { cn } from '@/lib/utils'
 import type { SongActionState } from '@/app/songs/actions'
 import type { Song } from '@/lib/types'
 
+const textareaClass =
+  'flex min-h-32 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
+
 type FormAction = (state: SongActionState, formData: FormData) => Promise<SongActionState>
 
 function formatDuration(seconds: number | null): string {
@@ -29,7 +32,7 @@ export function SongForm({
   const [keyboardRequired, setKeyboardRequired] = useState(song?.keyboardRequired ?? false)
 
   return (
-    <form action={formAction} className="space-y-5">
+    <form action={formAction} encType="multipart/form-data" className="space-y-5">
       {song && <input type="hidden" name="id" value={song.id} />}
       <input type="hidden" name="keyboardRequired" value={keyboardRequired ? 'true' : 'false'} />
 
@@ -143,16 +146,38 @@ export function SongForm({
         </span>
       </div>
 
-      {/* Row 5: URLs */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="lyricsUrl">Lyrics URL</Label>
-          <Input id="lyricsUrl" name="lyricsUrl" type="url" defaultValue={song?.lyricsUrl ?? ''} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="chartsUrl">Charts URL</Label>
-          <Input id="chartsUrl" name="chartsUrl" type="url" defaultValue={song?.chartsUrl ?? ''} />
-        </div>
+      {/* Lyrics */}
+      <div className="space-y-1.5">
+        <Label htmlFor="lyrics">Lyrics</Label>
+        <textarea
+          id="lyrics"
+          name="lyrics"
+          className={textareaClass}
+          placeholder="Paste or type lyrics here…"
+          defaultValue={song?.lyrics ?? ''}
+        />
+      </div>
+
+      {/* Chart file */}
+      <div className="space-y-1.5">
+        <Label htmlFor="chartFile">Chart / Sheet Music (PDF, JPEG, or PNG)</Label>
+        {song?.chartFileUrl && (
+          <div className="flex min-h-[44px] items-center gap-3 text-sm">
+            <a
+              href={song.chartFileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="truncate underline"
+            >
+              {song.chartFileName ?? 'Current file'}
+            </a>
+            <label className="flex items-center gap-1.5 text-muted-foreground">
+              <input type="checkbox" name="removeChartFile" value="true" />
+              Remove
+            </label>
+          </div>
+        )}
+        <Input id="chartFile" name="chartFile" type="file" accept=".pdf,.jpg,.jpeg,.png" />
       </div>
 
       {/* Actions */}
