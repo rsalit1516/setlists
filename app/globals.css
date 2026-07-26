@@ -118,6 +118,13 @@
 }
 
 @media print {
+  /*
+   * `size: landscape` is a hint, not a guarantee — some browsers/print
+   * drivers (notably mobile print-to-PDF) ignore it and default to
+   * portrait regardless. The "Download PDF" path in lib/pdf/gig-setlist-pdf.tsx
+   * sets orientation="landscape" explicitly at the document level instead,
+   * so it's the reliable path when this @page hint isn't honored.
+   */
   @page {
     size: landscape;
     margin: 0.5in;
