@@ -1,80 +1,92 @@
-'use client'
+"use client";
 
-import { useActionState, useEffect, useState } from 'react'
-import { updateGig } from '@/app/gigs/actions'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { useFormState } from "react-dom";
+import { updateGig } from "@/app/gigs/actions";
 
-const textareaClass =
-  'flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none'
+interface EditFinancialsFormProps {
+  gigId: string;
+  amountPaid: number;
+  paidAt?: string; // ISO string
+  tips?: number;
+  otherRevenue?: number;
+}
 
-export function EditFinancialsForm({
-  id,
-  amountContracted,
+export default function EditFinancialsForm({
+  gigId,
   amountPaid,
-  notes,
-}: {
-  id: string
-  amountContracted: string | null
-  amountPaid: string | null
-  notes: string | null
-}) {
-  const [editing, setEditing] = useState(false)
-  const [state, formAction, pending] = useActionState(updateGig, null)
-
-  useEffect(() => {
-    if (state && 'success' in state) setEditing(false)
-  }, [state])
-
-  if (!editing) {
-    return (
-      <button
-        onClick={() => setEditing(true)}
-        className="text-xs text-muted-foreground hover:underline"
-      >
-        ✎ Edit
-      </button>
-    )
-  }
+  paidAt,
+  tips,
+  otherRevenue,
+}: EditFinancialsFormProps) {
+  const [formState, formAction] = useFormState(updateGig, null);
 
   return (
-    <form action={formAction} className="mb-4 space-y-3">
-      <input type="hidden" name="id" value={id} />
-      {state && 'error' in state && (
-        <p className="text-sm text-destructive">{state.error}</p>
-      )}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="mb-1 block text-xs text-muted-foreground">Contracted ($)</label>
-          <Input
-            name="amountContracted"
-            type="number"
-            step="0.01"
-            min="0"
-            defaultValue={amountContracted ?? ''}
-            placeholder="0.00"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs text-muted-foreground">Paid ($)</label>
-          <Input
-            name="amountPaid"
-            type="number"
-            step="0.01"
-            min="0"
-            defaultValue={amountPaid ?? ''}
-            placeholder="0.00"
-          />
-        </div>
-      </div>
+    <form action={formAction} className="space-y-4">
+      <input type="hidden" name="gigId" value={gigId} />
+
       <div>
-        <label className="mb-1 block text-xs text-muted-foreground">Notes</label>
-        <textarea name="notes" rows={2} defaultValue={notes ?? ''} className={textareaClass} />
+        <label className="block font-medium mb-1" htmlFor="amountPaid">
+          Paid by venue
+        </label>
+        <input
+          id="amountPaid"
+          name="amountPaid"
+          type="number"
+          step="0.01"
+          defaultValue={amountPaid}
+          required
+          className="w-full border rounded p-2"
+        />
       </div>
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={pending}>Save</Button>
-        <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+
+      <div>
+        <label className="block font-medium mb-1" htmlFor="paidAt">
+          Paid at
+        </label>
+        <input
+          id="paidAt"
+          name="paidAt"
+          type="date"
+          defaultValue={paidAt ? paidAt.split("T")[0] : ""}
+          className="w-full border rounded p-2"
+        />
       </div>
+
+      <div>
+        <label className="block font-medium mb-1" htmlFor="tips">
+          Tips ($)
+        </label>
+        <input
+          id="tips"
+          name="tips"
+          type="number"
+          step="0.01"
+          defaultValue={tips ?? 0}
+          className="w-full border rounded p-2"
+        />
+      </div>
+
+      <div>
+        <label className="block font-medium mb-1" htmlFor="otherRevenue">
+          Other revenue ($)
+        </label>
+        <input
+          id="otherRevenue"
+          name="otherRevenue"
+          type="number"
+          step="0.01"
+          defaultValue={otherRevenue ?? 0}
+          className="w-full border rounded p-2"
+        />
+      </div>
+
+      <button type="submit" className="bg-blue-600 text-white py-2 px-4 rounded">
+        Save
+      </button>
+
+      {formState?.error && (
+        <p className="text-red-600 mt-2">{formState.error}</p>
+      )}
     </form>
-  )
+  );
 }
