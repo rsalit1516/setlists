@@ -207,9 +207,10 @@ export function PerformanceView({ gig }: { gig: GigPerformanceData }) {
         {view === 'lyrics' || !hasChart ? (
           hasLyrics ? (
             <div className="h-full overflow-y-auto px-6 py-8">
-              <p className="mx-auto max-w-2xl whitespace-pre-wrap text-2xl leading-relaxed sm:text-3xl">
-                {current.song.lyrics}
-              </p>
+              <div
+                className="rich-text-content mx-auto max-w-2xl text-2xl leading-relaxed sm:text-3xl"
+                dangerouslySetInnerHTML={{ __html: current.song.lyrics! }}
+              />
             </div>
           ) : (
             <div className="flex h-full items-center justify-center text-white/40">

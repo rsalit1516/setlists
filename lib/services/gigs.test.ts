@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getGigs, getGig } from './gigs'
+import { getGigs, getGig, getGigForPerformance } from './gigs'
 
 vi.mock('@/lib/db', () => ({
   default: {
@@ -75,5 +75,57 @@ describe('getGig', () => {
   it('returns null when gig does not exist', async () => {
     vi.mocked(prisma.gig.findUnique).mockResolvedValue(null)
     expect(await getGig('nonexistent')).toBeNull()
+  })
+})
+
+describe('getGigForPerformance', () => {
+  const mockPerformanceGig = {
+    id: 'gig-1',
+    date: new Date('2026-05-15'),
+    venue: { name: 'The Jazz Club' },
+    setlist: {
+      items: [
+        {
+          id: 'item-1',
+          order: 0,
+          section: 'MAIN',
+          setNumber: 1,
+          song: {
+            title: 'Friend of the Devil',
+            key: 'G',
+            lyrics: 'Line one\nLine two',
+            chartFileUrl: null,
+            chartFileType: null,
+          },
+        },
+      ],
+    },
+  }
+
+  it('sanitizes each song\'s lyrics into safe HTML, converting legacy plain text', async () => {
+    vi.mocked(prisma.gig.findUnique).mockResolvedValue(mockPerformanceGig as never)
+    const result = await getGigForPerformance('gig-1')
+    expect(result?.items[0].song.lyrics).toBe('<p>Line one</p><p>Line two</p>')
+  })
+
+  it('strips disallowed tags out of previously-stored rich text', async () => {
+    vi.mocked(prisma.gig.findUnique).mockResolvedValue({
+      ...mockPerformanceGig,
+      setlist: {
+        items: [
+          {
+            ...mockPerformanceGig.setlist.items[0],
+            song: { ...mockPerformanceGig.setlist.items[0].song, lyrics: '<p>Hi <script>alert(1)</script></p>' },
+          },
+        ],
+      },
+    } as never)
+    const result = await getGigForPerformance('gig-1')
+    expect(result?.items[0].song.lyrics).toBe('<p>Hi </p>')
+  })
+
+  it('returns null when gig does not exist', async () => {
+    vi.mocked(prisma.gig.findUnique).mockResolvedValue(null)
+    expect(await getGigForPerformance('nonexistent')).toBeNull()
   })
 })

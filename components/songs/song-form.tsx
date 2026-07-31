@@ -5,12 +5,10 @@ import Link from 'next/link'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { LyricsEditor } from '@/components/songs/lyrics-editor'
 import { cn } from '@/lib/utils'
 import type { SongActionState } from '@/app/songs/actions'
 import type { Song } from '@/lib/types'
-
-const textareaClass =
-  'flex min-h-32 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
 
 type FormAction = (state: SongActionState, formData: FormData) => Promise<SongActionState>
 
@@ -146,16 +144,10 @@ export function SongForm({
         </span>
       </div>
 
-      {/* Lyrics */}
+      {/* Lyrics / notes */}
       <div className="space-y-1.5">
-        <Label htmlFor="lyrics">Lyrics</Label>
-        <textarea
-          id="lyrics"
-          name="lyrics"
-          className={textareaClass}
-          placeholder="Paste or type lyrics here…"
-          defaultValue={song?.lyrics ?? ''}
-        />
+        <Label htmlFor="lyrics-editor">Lyrics / Notes</Label>
+        <LyricsEditor id="lyrics-editor" name="lyrics" defaultValue={song?.lyrics ?? ''} />
       </div>
 
       {/* Chart file */}

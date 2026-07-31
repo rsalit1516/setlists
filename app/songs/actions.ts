@@ -4,6 +4,7 @@ import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { uploadChartFile, deleteChartFile } from '@/lib/services/azure-blob'
+import { sanitizeLyricsHtml } from '@/lib/services/sanitize-lyrics'
 
 export type SongActionState = { error: string } | null
 
@@ -30,7 +31,7 @@ function parseSongFormData(formData: FormData) {
     durationSeconds: parseDuration(formData.get('duration') as string | null),
     orientation: (formData.get('orientation') as string).trim() || null,
     bpm: formData.get('bpm') ? parseInt(formData.get('bpm') as string) || null : null,
-    lyrics: (formData.get('lyrics') as string).trim() || null,
+    lyrics: sanitizeLyricsHtml(formData.get('lyrics') as string | null),
   }
 }
 

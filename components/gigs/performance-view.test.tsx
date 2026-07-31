@@ -16,7 +16,9 @@ const gig: GigPerformanceData = {
       song: {
         title: 'Friend of the Devil',
         key: 'G',
-        lyrics: 'She\'s got a "cheap sunglasses" line\nAnd a second line, don\'t stop',
+        // Mirrors what getGigForPerformance actually hands this component:
+        // already-sanitized HTML (see lib/services/gigs.ts), one <p> per line.
+        lyrics: '<p>She\'s got a "cheap sunglasses" line</p><p>And a second line, don\'t stop</p>',
         chartFileUrl: null,
         chartFileType: null,
       },
@@ -57,6 +59,15 @@ describe('PerformanceView', () => {
     expect(await screen.findByText('Friend of the Devil')).toBeInTheDocument()
     expect(screen.getByText(/cheap sunglasses/)).toBeInTheDocument()
     expect(screen.getByText(/don't stop/)).toBeInTheDocument()
+  })
+
+  it('renders sanitized lyrics HTML as real markup, not escaped text', async () => {
+    const { container } = render(<PerformanceView gig={gig} />)
+    await screen.findByText('Friend of the Devil')
+    const paragraphs = container.querySelectorAll('.rich-text-content p')
+    expect(paragraphs).toHaveLength(2)
+    expect(paragraphs[0].textContent).toContain('cheap sunglasses')
+    expect(paragraphs[1].textContent).toContain("don't stop")
   })
 
   it('disables Prev on the first song and advances to the next song on Next', async () => {

@@ -175,6 +175,32 @@
 .print-num-sm      { min-width: 20pt; text-align: right; color: #555; flex-shrink: 0; }
 .print-key         { margin-left: auto; color: #555; font-size: 14pt; flex-shrink: 0; padding-left: 4pt; }
 
+/*
+ * Rich text lyrics/notes — shared by the Tiptap editor (components/songs/lyrics-editor.tsx)
+ * and the read-only display in gig performance mode (components/gigs/performance-view.tsx).
+ * Plain CSS instead of Tailwind utilities because this styles arbitrary HTML coming from
+ * dangerouslySetInnerHTML / a contenteditable region, not elements we apply classes to directly.
+ * No color is set on the container itself so it inherits the surrounding theme (dark on stage,
+ * default elsewhere) — only `mark` gets a fixed background since it must contrast in both.
+ */
+.rich-text-content p { margin: 0 0 0.6em; }
+.rich-text-content p:last-child { margin-bottom: 0; }
+.rich-text-content h2 { margin: 0.9em 0 0.3em; font-size: 1.2em; font-weight: 700; }
+.rich-text-content h2:first-child { margin-top: 0; }
+.rich-text-content ul { margin: 0 0 0.6em; padding-left: 1.4em; list-style: disc; }
+.rich-text-content ol { margin: 0 0 0.6em; padding-left: 1.4em; list-style: decimal; }
+.rich-text-content li { margin: 0.2em 0; }
+.rich-text-content li > ul,
+.rich-text-content li > ol { margin-top: 0.2em; }
+.rich-text-content mark { background: #fde047; color: #111; border-radius: 0.15em; padding: 0 0.15em; }
+.rich-text-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--muted-foreground);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

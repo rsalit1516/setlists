@@ -1,5 +1,6 @@
 import prisma from '@/lib/db'
 import type { GigSummary, GigWithDetails, GigPerformanceData } from '@/lib/types'
+import { sanitizeLyricsHtml } from '@/lib/services/sanitize-lyrics'
 
 function toStr(d: unknown): string | null {
   if (d === null || d === undefined) return null
@@ -50,7 +51,10 @@ export async function getGigForPerformance(id: string): Promise<GigPerformanceDa
     },
   }).then((row) => {
     if (!row) return null
-    const items = row.setlist.items
+    const items = row.setlist.items.map((i) => ({
+      ...i,
+      song: { ...i.song, lyrics: sanitizeLyricsHtml(i.song.lyrics) },
+    }))
     const soundcheck = items.filter((i) => i.section === 'SOUNDCHECK')
     const main = items.filter((i) => i.section === 'MAIN')
     const encore = items.filter((i) => i.section === 'ENCORE')
