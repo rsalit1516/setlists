@@ -57,6 +57,10 @@ async function resolveChartFile(
   return null
 }
 
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error ? err.message : fallback
+}
+
 export async function createSong(
   _state: SongActionState,
   formData: FormData
@@ -64,14 +68,21 @@ export async function createSong(
   const data = parseSongFormData(formData)
   if (!data.title) return { error: 'Title is required.' }
 
+  let song
   try {
-    const song = await prisma.song.create({ data })
+    song = await prisma.song.create({ data })
+  } catch {
+    return { error: 'Failed to create song.' }
+  }
+
+  try {
     const chartUpdate = await resolveChartFile(formData, song.id, null)
     if (chartUpdate) {
       await prisma.song.update({ where: { id: song.id }, data: chartUpdate })
     }
-  } catch {
-    return { error: 'Failed to create song.' }
+  } catch (err) {
+    await prisma.song.delete({ where: { id: song.id } }).catch(() => {})
+    return { error: errorMessage(err, 'Failed to upload chart file.') }
   }
 
   revalidatePath('/songs')
@@ -86,9 +97,15 @@ export async function updateSong(
   const data = parseSongFormData(formData)
   if (!data.title) return { error: 'Title is required.' }
 
+  let chartUpdate
   try {
     const current = await prisma.song.findUnique({ where: { id }, select: { chartFileUrl: true } })
-    const chartUpdate = await resolveChartFile(formData, id, current?.chartFileUrl ?? null)
+    chartUpdate = await resolveChartFile(formData, id, current?.chartFileUrl ?? null)
+  } catch (err) {
+    return { error: errorMessage(err, 'Failed to upload chart file.') }
+  }
+
+  try {
     await prisma.song.update({ where: { id }, data: { ...data, ...chartUpdate } })
   } catch {
     return { error: 'Failed to update song.' }
