@@ -21,6 +21,8 @@ export async function getGigs(): Promise<GigSummary[]> {
     ...r,
     amountContracted: toStr(r.amountContracted),
     amountPaid: toStr(r.amountPaid),
+    tips: toStr(r.tips),
+    otherRevenue: toStr(r.otherRevenue),
   }))
 }
 
@@ -85,7 +87,9 @@ export async function getGig(id: string): Promise<GigWithDetails | null> {
     ...row,
     amountContracted: toStr(row.amountContracted),
     amountPaid: toStr(row.amountPaid),
+    tips: toStr(row.tips),
+    otherRevenue: toStr(row.otherRevenue),
     expenses: row.expenses.map((e: any) => ({ ...e, amount: toStr(e.amount)! })),
-    musicians: row.musicians.map((m: any) => ({ ...m, share: toStr(m.share) })),
+    musicians: row.musicians.map((m: any) => ({ ...m, amountPaid: toStr(m.amountPaid) })),
   }
 }

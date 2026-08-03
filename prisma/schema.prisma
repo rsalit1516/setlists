@@ -82,14 +82,17 @@ model SetlistItem {
 }
 
 model Gig {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   date             DateTime
   notes            String?
   amountContracted Decimal?
   amountPaid       Decimal?
-  isActive         Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  paidAt           DateTime?
+  tips             Decimal?
+  otherRevenue     Decimal?
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   venueId   String
   setlistId String @unique
@@ -112,11 +115,12 @@ model Expense {
 }
 
 model GigMusician {
-  id        String   @id @default(cuid())
-  name      String
-  share     Decimal?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id         String    @id @default(cuid())
+  name       String
+  amountPaid Decimal?
+  paidAt     DateTime?
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
 
   gigId String
   gig   Gig    @relation(fields: [gigId], references: [id])
