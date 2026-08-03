@@ -81,7 +81,8 @@ export type Expense = {
 export type GigMusician = {
   id: string
   name: string
-  share: string | null
+  amountPaid: string | null
+  paidAt: Date | null
   gigId: string
   isActive: boolean
   createdAt: Date
@@ -93,6 +94,9 @@ export type GigSummary = {
   notes: string | null
   amountContracted: string | null
   amountPaid: string | null
+  paidAt: Date | null
+  tips: string | null
+  otherRevenue: string | null
   venue: { name: string }
   setlist: { name: string }
   _count: { musicians: number }
@@ -134,6 +138,9 @@ export type GigWithDetails = {
   notes: string | null
   amountContracted: string | null
   amountPaid: string | null
+  paidAt: Date | null
+  tips: string | null
+  otherRevenue: string | null
   venueId: string
   setlistId: string
   venue: Venue

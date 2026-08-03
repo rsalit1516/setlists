@@ -18,12 +18,17 @@ const mockGig = {
   notes: null,
   amountContracted: '800.00',
   amountPaid: null,
+  paidAt: null,
+  tips: '50.00',
+  otherRevenue: null,
   venueId: 'v-1',
   setlistId: 'sl-1',
   venue: { id: 'v-1', name: 'The Jazz Club', address: null, notes: null, createdAt: new Date(), updatedAt: new Date() },
   setlist: { id: 'sl-1', name: 'Friday Night' },
   expenses: [],
-  musicians: [],
+  musicians: [
+    { id: 'm-1', name: 'Drummer', amountPaid: '200.00', paidAt: new Date('2026-05-16'), gigId: 'gig-1', isActive: true, createdAt: new Date('2026-05-15') },
+  ],
   createdAt: new Date('2026-05-15'),
   updatedAt: new Date('2026-05-15'),
 }
@@ -51,6 +56,13 @@ describe('getGigs', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([])
     expect(await getGigs()).toEqual([])
   })
+
+  it('converts tips and otherRevenue to strings', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([mockGigSummary] as never)
+    const [result] = await getGigs()
+    expect(result.tips).toBe('50.00')
+    expect(result.otherRevenue).toBeNull()
+  })
 })
 
 describe('getGig', () => {
@@ -70,6 +82,22 @@ describe('getGig', () => {
     await getGig('gig-1')
     const call = vi.mocked(prisma.gig.findUnique).mock.calls[0][0] as any
     expect(call.include.setlist.include.items.where).toEqual({ isActive: true })
+  })
+
+  it('converts tips and otherRevenue to strings', async () => {
+    vi.mocked(prisma.gig.findUnique).mockResolvedValue(mockGig as never)
+    const result = await getGig('gig-1')
+    expect(result?.tips).toBe('50.00')
+    expect(result?.otherRevenue).toBeNull()
+    expect(result?.paidAt).toBeNull()
+  })
+
+  it('converts each musician amountPaid to a string and passes paidAt through', async () => {
+    vi.mocked(prisma.gig.findUnique).mockResolvedValue(mockGig as never)
+    const result = await getGig('gig-1')
+    expect(result?.musicians[0].amountPaid).toBe('200.00')
+    expect(result?.musicians[0].paidAt).toEqual(new Date('2026-05-16'))
+    expect(result?.musicians[0]).not.toHaveProperty('share')
   })
 
   it('returns null when gig does not exist', async () => {
