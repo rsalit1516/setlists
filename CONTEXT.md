@@ -11,4 +11,6 @@ the `Musician` table first; there is no free-text fallback.
 ## GigMusician
 
 The assignment of a roster `Musician` to a specific `Gig`, carrying that musician's payout
-share for that gig.
+(`amountPaid`) and when it was paid (`paidAt`) for that gig. `paidAt` is what "paid" means —
+there's no separate stored status field; per-gig payout status (all/some/none paid) is derived
+by checking `paidAt` across the gig's active musicians.

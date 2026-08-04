@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getGigs, getGig, getGigForPerformance } from './gigs'
+import {
+  getGigs,
+  getGig,
+  getGigForPerformance,
+  calculateTotalExpenses,
+  calculateGigNet,
+  deriveMusicianPayoutStatus,
+} from './gigs'
 
 vi.mock('@/lib/db', () => ({
   default: {
@@ -31,7 +38,8 @@ const mockGig = {
       id: 'm-1',
       musicianId: 'musician-1',
       musician: { id: 'musician-1', name: 'Drummer' },
-      share: '200.00',
+      amountPaid: '200.00',
+      paidAt: null,
       gigId: 'gig-1',
       isActive: true,
       createdAt: new Date('2026-05-15'),
@@ -111,12 +119,12 @@ describe('getGig', () => {
     expect(result?.paidAt).toBeNull()
   })
 
-  it('converts each musician share to a string and passes the roster musician through', async () => {
+  it('converts each musician amountPaid to a string and passes the roster musician through', async () => {
     vi.mocked(prisma.gig.findUnique).mockResolvedValue(mockGig as never)
     const result = await getGig('gig-1')
-    expect(result?.musicians[0].share).toBe('200.00')
+    expect(result?.musicians[0].amountPaid).toBe('200.00')
     expect(result?.musicians[0].musician).toEqual({ id: 'musician-1', name: 'Drummer' })
-    expect(result?.musicians[0]).not.toHaveProperty('amountPaid')
+    expect(result?.musicians[0]).not.toHaveProperty('share')
   })
 
   it('returns null when gig does not exist', async () => {
@@ -174,5 +182,48 @@ describe('getGigForPerformance', () => {
   it('returns null when gig does not exist', async () => {
     vi.mocked(prisma.gig.findUnique).mockResolvedValue(null)
     expect(await getGigForPerformance('nonexistent')).toBeNull()
+  })
+})
+
+describe('calculateTotalExpenses', () => {
+  it('sums expense amounts', () => {
+    expect(calculateTotalExpenses([{ amount: '50.00' }, { amount: '25.50' }])).toBe(75.5)
+  })
+
+  it('returns 0 for no expenses', () => {
+    expect(calculateTotalExpenses([])).toBe(0)
+  })
+})
+
+describe('calculateGigNet', () => {
+  it('sums amountPaid, tips, and otherRevenue, then subtracts expenses', () => {
+    const net = calculateGigNet(
+      { amountPaid: '400.00', tips: '50.00', otherRevenue: '10.00' },
+      100
+    )
+    expect(net).toBe(360)
+  })
+
+  it('treats null revenue fields as 0', () => {
+    const net = calculateGigNet({ amountPaid: null, tips: null, otherRevenue: null }, 20)
+    expect(net).toBe(-20)
+  })
+})
+
+describe('deriveMusicianPayoutStatus', () => {
+  it('returns null when there are no musicians', () => {
+    expect(deriveMusicianPayoutStatus([])).toBeNull()
+  })
+
+  it('returns "none" when no musician has been paid', () => {
+    expect(deriveMusicianPayoutStatus([{ paidAt: null }, { paidAt: null }])).toBe('none')
+  })
+
+  it('returns "some" when only some musicians have been paid', () => {
+    expect(deriveMusicianPayoutStatus([{ paidAt: new Date() }, { paidAt: null }])).toBe('some')
+  })
+
+  it('returns "all" when every musician has been paid', () => {
+    expect(deriveMusicianPayoutStatus([{ paidAt: new Date() }, { paidAt: new Date() }])).toBe('all')
   })
 })

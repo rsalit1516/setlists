@@ -1,10 +1,26 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { getGig } from '@/lib/services/gigs'
+import {
+  getGig,
+  calculateTotalExpenses,
+  calculateGigNet,
+  deriveMusicianPayoutStatus,
+} from '@/lib/services/gigs'
 import { getMusicians } from '@/lib/services/musicians'
-import { addExpense, removeExpense, addMusician, removeMusician } from '@/app/gigs/actions'
+import {
+  addExpense,
+  removeExpense,
+  addMusician,
+  removeMusician,
+  updateGig,
+  updateMusicianPayment,
+  markAllMusiciansPaid,
+} from '@/app/gigs/actions'
+import { EditFinancialsForm } from '@/components/gigs/edit-financials-form'
 import { PrintButton } from '@/components/gigs/print-button'
-import { buttonVariants } from '@/components/ui/button'
+import { buttonVariants, Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
 import { buildPrintLayout } from '@/lib/setlist-print'
 import type { GigSetlistItem } from '@/lib/types'
@@ -37,6 +53,26 @@ function fmt(amount: string | null) {
   return `$${parseFloat(amount).toFixed(2)}`
 }
 
+function toDateInputValue(d: Date | null) {
+  if (!d) return ''
+  return new Date(d).toISOString().slice(0, 10)
+}
+
+const PAYOUT_BADGE: Record<'all' | 'some' | 'none', { label: string; className: string }> = {
+  all: {
+    label: 'All musicians paid',
+    className: 'border-green-600/30 bg-green-600/10 text-green-700 dark:text-green-400',
+  },
+  some: {
+    label: 'Some musicians paid',
+    className: 'border-amber-600/30 bg-amber-600/10 text-amber-700 dark:text-amber-400',
+  },
+  none: {
+    label: 'No musicians paid',
+    className: 'border-border text-muted-foreground',
+  },
+}
+
 function groupItems(items: GigSetlistItem[]) {
   const soundcheck = items.filter((i) => i.section === 'SOUNDCHECK')
   const main = items.filter((i) => i.section === 'MAIN')
@@ -57,10 +93,12 @@ export default async function GigPage({
   const addedMusicianIds = new Set(gig.musicians.map((m) => m.musicianId))
   const availableMusicians = roster.filter((m) => !addedMusicianIds.has(m.id))
 
-  const totalExpenses = gig.expenses.reduce((sum, e) => sum + parseFloat(e.amount), 0)
-  const paid = gig.amountPaid ? parseFloat(gig.amountPaid) : 0
-  const net = paid - totalExpenses
+  const totalExpenses = calculateTotalExpenses(gig.expenses)
+  const net = calculateGigNet(gig, totalExpenses)
+  const hasRevenue = Boolean(gig.amountPaid || gig.tips || gig.otherRevenue)
   const perMusician = gig.musicians.length > 0 ? net / gig.musicians.length : null
+  const payoutStatus = deriveMusicianPayoutStatus(gig.musicians)
+  const today = toDateInputValue(new Date())
 
   const { soundcheck, main, encore, numCols } = groupItems(gig.setlist.items)
   const columns = Array.from({ length: numCols }, (_, i) => i + 1)
@@ -244,8 +282,16 @@ export default async function GigPage({
               <span>{fmt(gig.amountContracted)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Paid</span>
+              <span className="text-muted-foreground">Paid by venue</span>
               <span>{fmt(gig.amountPaid)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Tips</span>
+              <span>{fmt(gig.tips)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Other revenue</span>
+              <span>{fmt(gig.otherRevenue)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Expenses</span>
@@ -256,17 +302,18 @@ export default async function GigPage({
             <div className="flex justify-between border-t pt-1 font-medium">
               <span>Net</span>
               <span>
-                {gig.amountPaid
-                  ? `${net < 0 ? '−' : ''}$${Math.abs(net).toFixed(2)}`
-                  : '—'}
+                {hasRevenue ? `${net < 0 ? '−' : ''}$${Math.abs(net).toFixed(2)}` : '—'}
               </span>
             </div>
-            {perMusician !== null && gig.amountPaid && (
+            {perMusician !== null && hasRevenue && (
               <div className="flex justify-between text-muted-foreground">
-                <span>Per musician ({gig.musicians.length})</span>
+                <span>Suggested per musician ({gig.musicians.length})</span>
                 <span>${perMusician.toFixed(2)}</span>
               </div>
             )}
+          </div>
+          <div className="border-t px-4 py-3">
+            <EditFinancialsForm gig={gig} action={updateGig} />
           </div>
         </div>
 
@@ -330,10 +377,15 @@ export default async function GigPage({
 
         {/* Musicians */}
         <div className="rounded-lg border">
-          <div className="border-b bg-muted/40 px-4 py-2">
+          <div className="border-b bg-muted/40 px-4 py-2 flex items-center justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Musicians
             </span>
+            {payoutStatus && (
+              <Badge variant="outline" className={PAYOUT_BADGE[payoutStatus].className}>
+                {PAYOUT_BADGE[payoutStatus].label}
+              </Badge>
+            )}
           </div>
           {gig.musicians.length === 0 ? (
             <p className="px-4 py-3 text-sm italic text-muted-foreground">No musicians added yet</p>
@@ -341,14 +393,36 @@ export default async function GigPage({
             <ul className="divide-y">
               {gig.musicians.map((musician) => {
                 const removeAction = removeMusician.bind(null, musician.id)
+                const suggested = perMusician !== null ? perMusician.toFixed(2) : ''
                 return (
-                  <li key={musician.id} className="flex items-center gap-2 px-4 py-2.5 text-sm">
-                    <span className="flex-1 font-medium">{musician.musician.name}</span>
-                    {perMusician !== null && gig.amountPaid && (
-                      <span className="tabular-nums text-muted-foreground">
-                        ${perMusician.toFixed(2)}
-                      </span>
-                    )}
+                  <li key={musician.id} className="flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
+                    <span className="min-w-[8rem] flex-1 font-medium">{musician.musician.name}</span>
+                    <form
+                      action={updateMusicianPayment}
+                      className="flex flex-wrap items-center gap-2"
+                    >
+                      <input type="hidden" name="gigMusicianId" value={musician.id} />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        name="amountPaid"
+                        placeholder="0.00"
+                        title={`Amount paid to ${musician.musician.name}`}
+                        defaultValue={musician.amountPaid ?? suggested}
+                        className="w-24"
+                      />
+                      <Input
+                        type="date"
+                        name="paidAt"
+                        title={`Date paid to ${musician.musician.name}`}
+                        defaultValue={toDateInputValue(musician.paidAt)}
+                        className="w-[9.5rem]"
+                      />
+                      <Button type="submit" variant="outline" size="sm">
+                        Save
+                      </Button>
+                    </form>
                     <DeleteConfirmButton
                       action={removeAction}
                       variant="icon"
@@ -359,6 +433,20 @@ export default async function GigPage({
                 )
               })}
             </ul>
+          )}
+          {gig.musicians.length > 0 && (
+            <div className="border-t px-4 py-3">
+              <form action={markAllMusiciansPaid} className="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="gigId" value={gig.id} />
+                <div>
+                  <label className="mb-1 block text-xs text-muted-foreground">Paid on</label>
+                  <Input type="date" name="paidAt" defaultValue={today} required className="w-[9.5rem]" />
+                </div>
+                <Button type="submit" variant="outline" size="sm">
+                  Mark all musicians paid
+                </Button>
+              </form>
+            </div>
           )}
           <div className="px-4 pb-3 pt-2">
             {availableMusicians.length === 0 ? (

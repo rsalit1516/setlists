@@ -90,7 +90,8 @@ export type GigMusician = {
   id: string
   musicianId: string
   musician: { id: string; name: string }
-  share: string | null
+  amountPaid: string | null
+  paidAt: Date | null
   gigId: string
   isActive: boolean
   createdAt: Date

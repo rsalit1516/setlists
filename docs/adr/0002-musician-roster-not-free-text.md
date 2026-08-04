@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Accepted. The `amountPaid`/`paidAt` → `share` swap described below was superseded by
+[0003](0003-restore-per-musician-amount-paid-and-date.md) — the roster-vs-free-text decision
+itself stands.
 
 ## Context
 

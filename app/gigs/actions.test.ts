@@ -5,6 +5,7 @@ vi.mock('@/lib/db', () => ({
     gig: {
       create: vi.fn(),
       update: vi.fn(),
+      findUnique: vi.fn(),
     },
     venue: {
       findUnique: vi.fn(),
@@ -19,6 +20,7 @@ vi.mock('@/lib/db', () => ({
       upsert: vi.fn(),
       createMany: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }))
@@ -36,7 +38,13 @@ vi.mock('next/navigation', () => ({
 
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { createGig, updateGig, addMusician } from './actions'
+import {
+  createGig,
+  updateGig,
+  addMusician,
+  updateMusicianPayment,
+  markAllMusiciansPaid,
+} from './actions'
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -49,6 +57,9 @@ function buildFormData(overrides: Record<string, string> = {}): FormData {
     endTime: '',
     amountContracted: '',
     amountPaid: '',
+    paidAt: '',
+    tips: '',
+    otherRevenue: '',
     notes: '',
     ...overrides,
   }
@@ -68,6 +79,9 @@ describe('updateGig', () => {
       endTime: '22:30',
       amountContracted: '500',
       amountPaid: '250',
+      paidAt: '2026-08-16',
+      tips: '40',
+      otherRevenue: '15',
       notes: 'Bring extra cables',
     })
 
@@ -82,6 +96,9 @@ describe('updateGig', () => {
         venueId: 'venue-1',
         amountContracted: 500,
         amountPaid: 250,
+        paidAt: new Date('2026-08-16T12:00:00'),
+        tips: 40,
+        otherRevenue: 15,
         notes: 'Bring extra cables',
       },
     })
@@ -100,6 +117,9 @@ describe('updateGig', () => {
         endTime: null,
         amountContracted: null,
         amountPaid: null,
+        paidAt: null,
+        tips: null,
+        otherRevenue: null,
         notes: null,
       }),
     })
@@ -233,5 +253,122 @@ describe('addMusician', () => {
     await addMusician(fd)
 
     expect(prisma.gigMusician.upsert).not.toHaveBeenCalled()
+  })
+})
+
+describe('updateMusicianPayment', () => {
+  beforeEach(() => {
+    vi.mocked(prisma.gigMusician.update).mockResolvedValue({ gigId: 'gig-1' } as never)
+  })
+
+  it('writes amountPaid and paidAt for the given GigMusician row', async () => {
+    const fd = new FormData()
+    fd.set('gigMusicianId', 'gm-1')
+    fd.set('amountPaid', '150')
+    fd.set('paidAt', '2026-08-20')
+
+    await updateMusicianPayment(fd)
+
+    expect(prisma.gigMusician.update).toHaveBeenCalledWith({
+      where: { id: 'gm-1' },
+      data: { amountPaid: 150, paidAt: new Date('2026-08-20T12:00:00') },
+    })
+    expect(revalidatePath).toHaveBeenCalledWith('/gigs/gig-1')
+  })
+
+  it('stores null for blank amount and date instead of empty strings', async () => {
+    const fd = new FormData()
+    fd.set('gigMusicianId', 'gm-1')
+    fd.set('amountPaid', '')
+    fd.set('paidAt', '')
+
+    await updateMusicianPayment(fd)
+
+    expect(prisma.gigMusician.update).toHaveBeenCalledWith({
+      where: { id: 'gm-1' },
+      data: { amountPaid: null, paidAt: null },
+    })
+  })
+
+  it('does nothing when gigMusicianId is missing', async () => {
+    const fd = new FormData()
+    fd.set('amountPaid', '150')
+
+    await updateMusicianPayment(fd)
+
+    expect(prisma.gigMusician.update).not.toHaveBeenCalled()
+  })
+})
+
+describe('markAllMusiciansPaid', () => {
+  const mockGigRow = {
+    id: 'gig-1',
+    date: new Date('2026-08-15'),
+    notes: null,
+    amountContracted: '500.00',
+    amountPaid: '400.00',
+    paidAt: null,
+    tips: '50.00',
+    otherRevenue: null,
+    venueId: 'venue-1',
+    setlistId: 'setlist-1',
+    venue: { id: 'venue-1', name: 'Test Venue', address: null, notes: null, createdAt: new Date(), updatedAt: new Date() },
+    setlist: { id: 'setlist-1', name: 'Test Setlist', items: [] },
+    expenses: [{ id: 'e-1', description: 'Gas', amount: '50.00', gigId: 'gig-1', isActive: true, createdAt: new Date() }],
+    musicians: [
+      { id: 'gm-1', musicianId: 'm-1', musician: { id: 'm-1', name: 'A' }, amountPaid: null, paidAt: null, gigId: 'gig-1', isActive: true, createdAt: new Date() },
+      { id: 'gm-2', musicianId: 'm-2', musician: { id: 'm-2', name: 'B' }, amountPaid: null, paidAt: null, gigId: 'gig-1', isActive: true, createdAt: new Date() },
+    ],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  }
+
+  it("splits the gig's current net evenly across active musicians and stamps the chosen date", async () => {
+    // net = amountPaid(400) + tips(50) + otherRevenue(0) - expenses(50) = 400, split across 2 musicians = 200
+    vi.mocked(prisma.gig.findUnique).mockResolvedValue(mockGigRow as never)
+    vi.mocked(prisma.gigMusician.updateMany).mockResolvedValue({ count: 2 } as never)
+    const fd = new FormData()
+    fd.set('gigId', 'gig-1')
+    fd.set('paidAt', '2026-08-20')
+
+    await markAllMusiciansPaid(fd)
+
+    expect(prisma.gigMusician.updateMany).toHaveBeenCalledWith({
+      where: { gigId: 'gig-1', isActive: true },
+      data: { amountPaid: 200, paidAt: new Date('2026-08-20T12:00:00') },
+    })
+    expect(revalidatePath).toHaveBeenCalledWith('/gigs/gig-1')
+  })
+
+  it('does nothing when the gig has no active musicians', async () => {
+    vi.mocked(prisma.gig.findUnique).mockResolvedValue({ ...mockGigRow, musicians: [] } as never)
+    const fd = new FormData()
+    fd.set('gigId', 'gig-1')
+    fd.set('paidAt', '2026-08-20')
+
+    await markAllMusiciansPaid(fd)
+
+    expect(prisma.gigMusician.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when paidAt is missing', async () => {
+    const fd = new FormData()
+    fd.set('gigId', 'gig-1')
+
+    await markAllMusiciansPaid(fd)
+
+    expect(prisma.gig.findUnique).not.toHaveBeenCalled()
+    expect(prisma.gigMusician.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when the gig does not exist', async () => {
+    vi.mocked(prisma.gig.findUnique).mockResolvedValue(null)
+    const fd = new FormData()
+    fd.set('gigId', 'nonexistent')
+    fd.set('paidAt', '2026-08-20')
+
+    await markAllMusiciansPaid(fd)
+
+    expect(prisma.gigMusician.updateMany).not.toHaveBeenCalled()
   })
 })

@@ -127,11 +127,12 @@ model Expense {
 }
 
 model GigMusician {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   musicianId String
-  share      Decimal?
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
+  amountPaid Decimal?
+  paidAt     DateTime?
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
 
   gigId    String
   gig      Gig      @relation(fields: [gigId], references: [id])

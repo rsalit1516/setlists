@@ -1,10 +1,40 @@
 import prisma from '@/lib/db'
-import type { GigSummary, GigWithDetails, GigPerformanceData } from '@/lib/types'
+import type { GigSummary, GigWithDetails, GigPerformanceData, GigMusician } from '@/lib/types'
 import { sanitizeLyricsHtml } from '@/lib/services/sanitize-lyrics'
 
 function toStr(d: unknown): string | null {
   if (d === null || d === undefined) return null
   return String(d)
+}
+
+export function calculateTotalExpenses(expenses: { amount: string }[]): number {
+  return expenses.reduce((sum, e) => sum + parseFloat(e.amount), 0)
+}
+
+// Net = everything the band actually received for the gig, minus what it spent.
+// Musician payouts aren't subtracted here — they're paid out of this net, not on top of it.
+export function calculateGigNet(
+  gig: { amountPaid: string | null; tips: string | null; otherRevenue: string | null },
+  totalExpenses: number
+): number {
+  const paid = gig.amountPaid ? parseFloat(gig.amountPaid) : 0
+  const tips = gig.tips ? parseFloat(gig.tips) : 0
+  const other = gig.otherRevenue ? parseFloat(gig.otherRevenue) : 0
+  return paid + tips + other - totalExpenses
+}
+
+export type MusicianPayoutStatus = 'all' | 'some' | 'none'
+
+// Derived, never stored — per #19, a gig's musician-payout status always comes
+// from each GigMusician's paidAt, not a separate gig-level column.
+export function deriveMusicianPayoutStatus(
+  musicians: Pick<GigMusician, 'paidAt'>[]
+): MusicianPayoutStatus | null {
+  if (musicians.length === 0) return null
+  const paidCount = musicians.filter((m) => m.paidAt !== null).length
+  if (paidCount === 0) return 'none'
+  if (paidCount === musicians.length) return 'all'
+  return 'some'
 }
 
 export async function getGigs(): Promise<GigSummary[]> {
@@ -94,6 +124,6 @@ export async function getGig(id: string): Promise<GigWithDetails | null> {
     tips: toStr(row.tips),
     otherRevenue: toStr(row.otherRevenue),
     expenses: row.expenses.map((e: any) => ({ ...e, amount: toStr(e.amount)! })),
-    musicians: row.musicians.map((m: any) => ({ ...m, share: toStr(m.share) })),
+    musicians: row.musicians.map((m: any) => ({ ...m, amountPaid: toStr(m.amountPaid) })),
   }
 }

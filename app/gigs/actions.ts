@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import prisma from '@/lib/db'
+import { getGig, calculateTotalExpenses, calculateGigNet } from '@/lib/services/gigs'
 
 export type GigActionState = { error: string } | null
 
@@ -70,6 +71,9 @@ export async function updateGig(_state: GigActionState, formData: FormData): Pro
   const endTime = (formData.get('endTime') as string) || null
   const amountContractedStr = formData.get('amountContracted') as string
   const amountPaidStr = formData.get('amountPaid') as string
+  const paidAtStr = formData.get('paidAt') as string
+  const tipsStr = formData.get('tips') as string
+  const otherRevenueStr = formData.get('otherRevenue') as string
   const notes = formData.get('notes') as string
 
   if (!id) return { error: 'Gig not found.' }
@@ -88,6 +92,9 @@ export async function updateGig(_state: GigActionState, formData: FormData): Pro
       venueId,
       amountContracted: amountContractedStr ? parseFloat(amountContractedStr) : null,
       amountPaid: amountPaidStr ? parseFloat(amountPaidStr) : null,
+      paidAt: paidAtStr ? new Date(paidAtStr + 'T12:00:00') : null,
+      tips: tipsStr ? parseFloat(tipsStr) : null,
+      otherRevenue: otherRevenueStr ? parseFloat(otherRevenueStr) : null,
       notes: notes || null,
     },
   })
@@ -140,4 +147,41 @@ export async function addMusician(formData: FormData): Promise<void> {
 export async function removeMusician(musicianId: string): Promise<void> {
   const musician = await prisma.gigMusician.update({ where: { id: musicianId }, data: { isActive: false } })
   revalidatePath(`/gigs/${musician.gigId}`)
+}
+
+export async function updateMusicianPayment(formData: FormData): Promise<void> {
+  const gigMusicianId = formData.get('gigMusicianId') as string
+  const amountPaidStr = formData.get('amountPaid') as string
+  const paidAtStr = formData.get('paidAt') as string
+
+  if (!gigMusicianId) return
+
+  const musician = await prisma.gigMusician.update({
+    where: { id: gigMusicianId },
+    data: {
+      amountPaid: amountPaidStr ? parseFloat(amountPaidStr) : null,
+      paidAt: paidAtStr ? new Date(paidAtStr + 'T12:00:00') : null,
+    },
+  })
+  revalidatePath(`/gigs/${musician.gigId}`)
+}
+
+export async function markAllMusiciansPaid(formData: FormData): Promise<void> {
+  const gigId = formData.get('gigId') as string
+  const paidAtStr = formData.get('paidAt') as string
+
+  if (!gigId || !paidAtStr) return
+
+  const gig = await getGig(gigId)
+  if (!gig || gig.musicians.length === 0) return
+
+  const totalExpenses = calculateTotalExpenses(gig.expenses)
+  const net = calculateGigNet(gig, totalExpenses)
+  const splitAmount = net / gig.musicians.length
+
+  await prisma.gigMusician.updateMany({
+    where: { gigId, isActive: true },
+    data: { amountPaid: splitAmount, paidAt: new Date(paidAtStr + 'T12:00:00') },
+  })
+  revalidatePath(`/gigs/${gigId}`)
 }

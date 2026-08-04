@@ -33,6 +33,21 @@ export function GigForm({
     <form action={formAction} className="space-y-4">
       {gig && <input type="hidden" name="id" value={gig.id} />}
 
+      {/* Financials are edited on the gig detail page (EditFinancialsForm), not here —
+          updateGig writes every field each submit, so carry these through unchanged. */}
+      {gig && (
+        <>
+          <input type="hidden" name="amountPaid" value={gig.amountPaid ?? ''} />
+          <input
+            type="hidden"
+            name="paidAt"
+            value={gig.paidAt ? new Date(gig.paidAt).toISOString().slice(0, 10) : ''}
+          />
+          <input type="hidden" name="tips" value={gig.tips ?? ''} />
+          <input type="hidden" name="otherRevenue" value={gig.otherRevenue ?? ''} />
+        </>
+      )}
+
       {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
 
       {!gig && defaultSetlistId && (
@@ -98,31 +113,16 @@ export function GigForm({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="mb-1 block text-sm font-medium">Amount Contracted ($)</label>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            name="amountContracted"
-            placeholder="0.00"
-            defaultValue={gig?.amountContracted ?? ''}
-          />
-        </div>
-        {gig && (
-          <div>
-            <label className="mb-1 block text-sm font-medium">Amount Paid ($)</label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              name="amountPaid"
-              placeholder="0.00"
-              defaultValue={gig.amountPaid ?? ''}
-            />
-          </div>
-        )}
+      <div>
+        <label className="mb-1 block text-sm font-medium">Amount Contracted ($)</label>
+        <Input
+          type="number"
+          step="0.01"
+          min="0"
+          name="amountContracted"
+          placeholder="0.00"
+          defaultValue={gig?.amountContracted ?? ''}
+        />
       </div>
 
       <div>
