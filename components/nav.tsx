@@ -9,6 +9,7 @@ const links = [
   { href: '/songs', label: 'Songs' },
   { href: '/venues', label: 'Venues' },
   { href: '/gigs', label: 'Gigs' },
+  { href: '/musicians', label: 'Musicians' },
 ]
 
 export function Nav() {

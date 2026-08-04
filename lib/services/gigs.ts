@@ -79,7 +79,11 @@ export async function getGig(id: string): Promise<GigWithDetails | null> {
           },
         },
       expenses: { where: { isActive: true }, orderBy: { createdAt: 'asc' } },
-      musicians: { where: { isActive: true }, orderBy: { createdAt: 'asc' } },
+      musicians: {
+        where: { isActive: true },
+        orderBy: { createdAt: 'asc' },
+        include: { musician: true },
+      },
     },
   })
   if (!row) return null
@@ -90,6 +94,6 @@ export async function getGig(id: string): Promise<GigWithDetails | null> {
     tips: toStr(row.tips),
     otherRevenue: toStr(row.otherRevenue),
     expenses: row.expenses.map((e: any) => ({ ...e, amount: toStr(e.amount)! })),
-    musicians: row.musicians.map((m: any) => ({ ...m, amountPaid: toStr(m.amountPaid) })),
+    musicians: row.musicians.map((m: any) => ({ ...m, share: toStr(m.share) })),
   }
 }

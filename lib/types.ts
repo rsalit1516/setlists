@@ -17,6 +17,14 @@ export type Venue = {
   updatedAt: Date
 }
 
+export type Musician = {
+  id: string
+  name: string
+  isActive: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
 export type SetlistItem = {
   id: string
   order: number
@@ -80,9 +88,9 @@ export type Expense = {
 
 export type GigMusician = {
   id: string
-  name: string
-  amountPaid: string | null
-  paidAt: Date | null
+  musicianId: string
+  musician: { id: string; name: string }
+  share: string | null
   gigId: string
   isActive: boolean
   createdAt: Date

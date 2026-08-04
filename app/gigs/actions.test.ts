@@ -12,6 +12,14 @@ vi.mock('@/lib/db', () => ({
     setlist: {
       create: vi.fn(),
     },
+    musician: {
+      findMany: vi.fn(),
+    },
+    gigMusician: {
+      upsert: vi.fn(),
+      createMany: vi.fn(),
+      update: vi.fn(),
+    },
   },
 }))
 
@@ -28,7 +36,7 @@ vi.mock('next/navigation', () => ({
 
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { createGig, updateGig } from './actions'
+import { createGig, updateGig, addMusician } from './actions'
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -128,6 +136,7 @@ describe('updateGig', () => {
 describe('createGig', () => {
   beforeEach(() => {
     vi.mocked(prisma.gig.create).mockResolvedValue({ id: 'new-gig-1' } as never)
+    vi.mocked(prisma.musician.findMany).mockResolvedValue([])
   })
 
   it('passes startTime and endTime through to the created gig when linking an existing setlist', async () => {
@@ -158,5 +167,71 @@ describe('createGig', () => {
     expect(prisma.gig.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ startTime: null, endTime: null }),
     })
+  })
+
+  it('auto-populates the 4 canonical default musicians onto the new gig', async () => {
+    const defaults = [
+      { id: 'm-1', name: 'Richard Salit' },
+      { id: 'm-2', name: 'Jeff Zbar' },
+      { id: 'm-3', name: 'Scott Tunis' },
+      { id: 'm-4', name: 'Andrew Guerrero' },
+    ]
+    vi.mocked(prisma.musician.findMany).mockResolvedValue(defaults as never)
+    const fd = buildFormData({ setlistId: 'setlist-1', createSetlist: '' })
+
+    await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
+
+    expect(prisma.musician.findMany).toHaveBeenCalledWith({
+      where: {
+        name: { in: ['Richard Salit', 'Jeff Zbar', 'Scott Tunis', 'Andrew Guerrero'] },
+        isActive: true,
+      },
+    })
+    expect(prisma.gigMusician.createMany).toHaveBeenCalledWith({
+      data: [
+        { gigId: 'new-gig-1', musicianId: 'm-1' },
+        { gigId: 'new-gig-1', musicianId: 'm-2' },
+        { gigId: 'new-gig-1', musicianId: 'm-3' },
+        { gigId: 'new-gig-1', musicianId: 'm-4' },
+      ],
+    })
+  })
+
+  it('skips the GigMusician bulk-create when no default musicians are found', async () => {
+    const fd = buildFormData({ setlistId: 'setlist-1', createSetlist: '' })
+
+    await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
+
+    expect(prisma.gigMusician.createMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('addMusician', () => {
+  it('upserts a GigMusician linking the gig to the chosen roster musician', async () => {
+    vi.mocked(prisma.gigMusician.upsert).mockResolvedValue({} as never)
+    const fd = new FormData()
+    fd.set('gigId', 'gig-1')
+    fd.set('musicianId', 'musician-1')
+
+    await addMusician(fd)
+
+    // upsert (not create): a musician previously removed from this gig leaves an
+    // inactive row behind that still occupies the @@unique([gigId, musicianId])
+    // slot, so re-adding them must reactivate it instead of inserting a duplicate.
+    expect(prisma.gigMusician.upsert).toHaveBeenCalledWith({
+      where: { gigId_musicianId: { gigId: 'gig-1', musicianId: 'musician-1' } },
+      create: { gigId: 'gig-1', musicianId: 'musician-1' },
+      update: { isActive: true },
+    })
+    expect(revalidatePath).toHaveBeenCalledWith('/gigs/gig-1')
+  })
+
+  it('does nothing when musicianId is missing', async () => {
+    const fd = new FormData()
+    fd.set('gigId', 'gig-1')
+
+    await addMusician(fd)
+
+    expect(prisma.gigMusician.upsert).not.toHaveBeenCalled()
   })
 })

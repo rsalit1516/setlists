@@ -55,6 +55,16 @@ model Venue {
   gigs Gig[]
 }
 
+model Musician {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  gigMusicians GigMusician[]
+}
+
 model Setlist {
   id        String   @id @default(cuid())
   name      String
@@ -117,13 +127,15 @@ model Expense {
 }
 
 model GigMusician {
-  id         String    @id @default(cuid())
-  name       String
-  amountPaid Decimal?
-  paidAt     DateTime?
-  isActive   Boolean   @default(true)
-  createdAt  DateTime  @default(now())
+  id         String   @id @default(cuid())
+  musicianId String
+  share      Decimal?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
 
-  gigId String
-  gig   Gig    @relation(fields: [gigId], references: [id])
+  gigId    String
+  gig      Gig      @relation(fields: [gigId], references: [id])
+  musician Musician @relation(fields: [musicianId], references: [id])
+
+  @@unique([gigId, musicianId])
 }

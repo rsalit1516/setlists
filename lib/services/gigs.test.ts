@@ -27,7 +27,15 @@ const mockGig = {
   setlist: { id: 'sl-1', name: 'Friday Night' },
   expenses: [],
   musicians: [
-    { id: 'm-1', name: 'Drummer', amountPaid: '200.00', paidAt: new Date('2026-05-16'), gigId: 'gig-1', isActive: true, createdAt: new Date('2026-05-15') },
+    {
+      id: 'm-1',
+      musicianId: 'musician-1',
+      musician: { id: 'musician-1', name: 'Drummer' },
+      share: '200.00',
+      gigId: 'gig-1',
+      isActive: true,
+      createdAt: new Date('2026-05-15'),
+    },
   ],
   createdAt: new Date('2026-05-15'),
   updatedAt: new Date('2026-05-15'),
@@ -84,6 +92,17 @@ describe('getGig', () => {
     expect(call.include.setlist.include.items.where).toEqual({ isActive: true })
   })
 
+  it('nests the roster musician on each active GigMusician', async () => {
+    vi.mocked(prisma.gig.findUnique).mockResolvedValue(mockGig as never)
+    await getGig('gig-1')
+    const call = vi.mocked(prisma.gig.findUnique).mock.calls[0][0] as any
+    expect(call.include.musicians).toEqual({
+      where: { isActive: true },
+      orderBy: { createdAt: 'asc' },
+      include: { musician: true },
+    })
+  })
+
   it('converts tips and otherRevenue to strings', async () => {
     vi.mocked(prisma.gig.findUnique).mockResolvedValue(mockGig as never)
     const result = await getGig('gig-1')
@@ -92,12 +111,12 @@ describe('getGig', () => {
     expect(result?.paidAt).toBeNull()
   })
 
-  it('converts each musician amountPaid to a string and passes paidAt through', async () => {
+  it('converts each musician share to a string and passes the roster musician through', async () => {
     vi.mocked(prisma.gig.findUnique).mockResolvedValue(mockGig as never)
     const result = await getGig('gig-1')
-    expect(result?.musicians[0].amountPaid).toBe('200.00')
-    expect(result?.musicians[0].paidAt).toEqual(new Date('2026-05-16'))
-    expect(result?.musicians[0]).not.toHaveProperty('share')
+    expect(result?.musicians[0].share).toBe('200.00')
+    expect(result?.musicians[0].musician).toEqual({ id: 'musician-1', name: 'Drummer' })
+    expect(result?.musicians[0]).not.toHaveProperty('amountPaid')
   })
 
   it('returns null when gig does not exist', async () => {

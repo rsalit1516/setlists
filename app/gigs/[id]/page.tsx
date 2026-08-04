@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getGig } from '@/lib/services/gigs'
+import { getMusicians } from '@/lib/services/musicians'
 import { addExpense, removeExpense, addMusician, removeMusician } from '@/app/gigs/actions'
 import { PrintButton } from '@/components/gigs/print-button'
 import { buttonVariants } from '@/components/ui/button'
@@ -50,8 +51,11 @@ export default async function GigPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const gig = await getGig(id)
+  const [gig, roster] = await Promise.all([getGig(id), getMusicians()])
   if (!gig) notFound()
+
+  const addedMusicianIds = new Set(gig.musicians.map((m) => m.musicianId))
+  const availableMusicians = roster.filter((m) => !addedMusicianIds.has(m.id))
 
   const totalExpenses = gig.expenses.reduce((sum, e) => sum + parseFloat(e.amount), 0)
   const paid = gig.amountPaid ? parseFloat(gig.amountPaid) : 0
@@ -339,7 +343,7 @@ export default async function GigPage({
                 const removeAction = removeMusician.bind(null, musician.id)
                 return (
                   <li key={musician.id} className="flex items-center gap-2 px-4 py-2.5 text-sm">
-                    <span className="flex-1 font-medium">{musician.name}</span>
+                    <span className="flex-1 font-medium">{musician.musician.name}</span>
                     {perMusician !== null && gig.amountPaid && (
                       <span className="tabular-nums text-muted-foreground">
                         ${perMusician.toFixed(2)}
@@ -349,7 +353,7 @@ export default async function GigPage({
                       action={removeAction}
                       variant="icon"
                       ariaLabel="Remove musician"
-                      description={`Remove ${musician.name} from this gig?`}
+                      description={`Remove ${musician.musician.name} from this gig?`}
                     />
                   </li>
                 )
@@ -357,21 +361,37 @@ export default async function GigPage({
             </ul>
           )}
           <div className="px-4 pb-3 pt-2">
-            <form action={addMusician} className="flex gap-2">
-              <input type="hidden" name="gigId" value={gig.id} />
-              <input
-                name="name"
-                placeholder="Musician name"
-                required
-                className={`${inputClass} flex-1`}
-              />
-              <button
-                type="submit"
-                className={buttonVariants({ variant: 'outline', size: 'sm' })}
-              >
-                Add
-              </button>
-            </form>
+            {availableMusicians.length === 0 ? (
+              <p className="text-sm italic text-muted-foreground">
+                All roster musicians already added
+              </p>
+            ) : (
+              <form action={addMusician} className="flex gap-2">
+                <input type="hidden" name="gigId" value={gig.id} />
+                <select
+                  name="musicianId"
+                  required
+                  title="Musician"
+                  defaultValue=""
+                  className={`${inputClass} flex-1`}
+                >
+                  <option value="" disabled>
+                    Select musician…
+                  </option>
+                  {availableMusicians.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                >
+                  Add
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </div>

@@ -6,6 +6,8 @@ import prisma from '@/lib/db'
 
 export type GigActionState = { error: string } | null
 
+const DEFAULT_MUSICIANS = ['Richard Salit', 'Jeff Zbar', 'Scott Tunis', 'Andrew Guerrero']
+
 export async function createGig(_state: GigActionState, formData: FormData): Promise<GigActionState> {
   const venueId = formData.get('venueId') as string
   const existingSetlistId = (formData.get('setlistId') as string) || null
@@ -46,6 +48,15 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
       amountContracted: amountContractedStr ? parseFloat(amountContractedStr) : null,
     },
   })
+
+  const defaultMusicians = await prisma.musician.findMany({
+    where: { name: { in: DEFAULT_MUSICIANS }, isActive: true },
+  })
+  if (defaultMusicians.length > 0) {
+    await prisma.gigMusician.createMany({
+      data: defaultMusicians.map((m) => ({ gigId: gig.id, musicianId: m.id })),
+    })
+  }
 
   revalidatePath('/gigs')
   redirect(`/gigs/${gig.id}`)
@@ -111,11 +122,18 @@ export async function removeExpense(expenseId: string): Promise<void> {
 
 export async function addMusician(formData: FormData): Promise<void> {
   const gigId = formData.get('gigId') as string
-  const name = formData.get('name') as string
+  const musicianId = formData.get('musicianId') as string
 
-  if (!gigId || !name) return
+  if (!gigId || !musicianId) return
 
-  await prisma.gigMusician.create({ data: { gigId, name } })
+  // A musician previously removed from this gig leaves behind an inactive
+  // GigMusician row, which the @@unique([gigId, musicianId]) constraint
+  // still occupies — reactivate it instead of inserting a duplicate.
+  await prisma.gigMusician.upsert({
+    where: { gigId_musicianId: { gigId, musicianId } },
+    create: { gigId, musicianId },
+    update: { isActive: true },
+  })
   revalidatePath(`/gigs/${gigId}`)
 }
 
