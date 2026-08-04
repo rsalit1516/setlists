@@ -19,6 +19,19 @@ jobs:
         with:
           submodules: true
           lfs: false
+      - name: Set up Node.js
+        if: github.event_name == 'push'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        if: github.event_name == 'push'
+        run: npm ci
+      - name: Apply pending database migrations
+        if: github.event_name == 'push'
+        run: npx prisma migrate deploy
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
