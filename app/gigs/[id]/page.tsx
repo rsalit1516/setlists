@@ -403,6 +403,7 @@ export default async function GigPage({
                     >
                       <input type="hidden" name="gigMusicianId" value={musician.id} />
                       <Input
+                        key={musician.amountPaid ?? suggested}
                         type="number"
                         step="0.01"
                         min="0"
@@ -413,6 +414,7 @@ export default async function GigPage({
                         className="w-24"
                       />
                       <Input
+                        key={toDateInputValue(musician.paidAt)}
                         type="date"
                         name="paidAt"
                         title={`Date paid to ${musician.musician.name}`}
