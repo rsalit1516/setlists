@@ -49,6 +49,25 @@ export function GigForm({
         />
       </div>
 
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-sm font-medium">Start Time</label>
+          <Input
+            type="time"
+            name="startTime"
+            defaultValue={gig?.startTime ?? ''}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">End Time</label>
+          <Input
+            type="time"
+            name="endTime"
+            defaultValue={gig?.endTime ?? ''}
+          />
+        </div>
+      </div>
+
       <div>
         <label className="mb-1 block text-sm font-medium">Venue</label>
         <select

@@ -3,7 +3,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@/lib/db', () => ({
   default: {
     gig: {
+      create: vi.fn(),
       update: vi.fn(),
+    },
+    venue: {
+      findUnique: vi.fn(),
+    },
+    setlist: {
+      create: vi.fn(),
     },
   },
 }))
@@ -21,7 +28,7 @@ vi.mock('next/navigation', () => ({
 
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { updateGig } from './actions'
+import { createGig, updateGig } from './actions'
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -30,6 +37,8 @@ function buildFormData(overrides: Record<string, string> = {}): FormData {
     id: 'gig-1',
     date: '2026-08-15',
     venueId: 'venue-1',
+    startTime: '',
+    endTime: '',
     amountContracted: '',
     amountPaid: '',
     notes: '',
@@ -45,8 +54,10 @@ describe('updateGig', () => {
     vi.mocked(prisma.gig.update).mockResolvedValue({} as never)
   })
 
-  it('writes date and venueId along with the existing financial fields', async () => {
+  it('writes date, startTime, endTime, and venueId along with the existing financial fields', async () => {
     const fd = buildFormData({
+      startTime: '19:00',
+      endTime: '22:30',
       amountContracted: '500',
       amountPaid: '250',
       notes: 'Bring extra cables',
@@ -58,6 +69,8 @@ describe('updateGig', () => {
       where: { id: 'gig-1' },
       data: {
         date: new Date('2026-08-15T12:00:00'),
+        startTime: '19:00',
+        endTime: '22:30',
         venueId: 'venue-1',
         amountContracted: 500,
         amountPaid: 250,
@@ -67,7 +80,7 @@ describe('updateGig', () => {
     expect(revalidatePath).toHaveBeenCalledWith('/gigs')
   })
 
-  it('stores null for blank amount fields and notes instead of empty strings', async () => {
+  it('stores null for blank amount fields, notes, and time fields instead of empty strings', async () => {
     const fd = buildFormData()
 
     await expect(updateGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/gig-1')
@@ -75,6 +88,8 @@ describe('updateGig', () => {
     expect(prisma.gig.update).toHaveBeenCalledWith({
       where: { id: 'gig-1' },
       data: expect.objectContaining({
+        startTime: null,
+        endTime: null,
         amountContracted: null,
         amountPaid: null,
         notes: null,
@@ -107,5 +122,41 @@ describe('updateGig', () => {
 
     expect(result).toEqual({ error: 'Date is required.' })
     expect(prisma.gig.update).not.toHaveBeenCalled()
+  })
+})
+
+describe('createGig', () => {
+  beforeEach(() => {
+    vi.mocked(prisma.gig.create).mockResolvedValue({ id: 'new-gig-1' } as never)
+  })
+
+  it('passes startTime and endTime through to the created gig when linking an existing setlist', async () => {
+    const fd = buildFormData({
+      setlistId: 'setlist-1',
+      createSetlist: '',
+      startTime: '19:00',
+      endTime: '22:30',
+    })
+
+    await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
+
+    expect(prisma.gig.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        startTime: '19:00',
+        endTime: '22:30',
+      }),
+    })
+    expect(prisma.venue.findUnique).not.toHaveBeenCalled()
+    expect(revalidatePath).toHaveBeenCalledWith('/gigs')
+  })
+
+  it('stores null for blank start/end time instead of empty strings', async () => {
+    const fd = buildFormData({ setlistId: 'setlist-1', createSetlist: '' })
+
+    await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
+
+    expect(prisma.gig.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ startTime: null, endTime: null }),
+    })
   })
 })

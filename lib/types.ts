@@ -135,6 +135,8 @@ export type GigPerformanceData = {
 export type GigWithDetails = {
   id: string
   date: Date
+  startTime: string | null
+  endTime: string | null
   notes: string | null
   amountContracted: string | null
   amountPaid: string | null

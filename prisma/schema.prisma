@@ -84,6 +84,8 @@ model SetlistItem {
 model Gig {
   id               String    @id @default(cuid())
   date             DateTime
+  startTime        String?
+  endTime          String?
   notes            String?
   amountContracted Decimal?
   amountPaid       Decimal?

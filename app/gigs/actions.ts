@@ -11,6 +11,8 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
   const existingSetlistId = (formData.get('setlistId') as string) || null
   const shouldCreateSetlist = formData.get('createSetlist') === 'true'
   const dateStr = formData.get('date') as string
+  const startTime = (formData.get('startTime') as string) || null
+  const endTime = (formData.get('endTime') as string) || null
   const amountContractedStr = formData.get('amountContracted') as string
   const notes = formData.get('notes') as string
 
@@ -36,6 +38,8 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
   const gig = await prisma.gig.create({
     data: {
       date,
+      startTime,
+      endTime,
       venueId,
       setlistId,
       notes: notes || null,
@@ -51,6 +55,8 @@ export async function updateGig(_state: GigActionState, formData: FormData): Pro
   const id = formData.get('id') as string
   const venueId = formData.get('venueId') as string
   const dateStr = formData.get('date') as string
+  const startTime = (formData.get('startTime') as string) || null
+  const endTime = (formData.get('endTime') as string) || null
   const amountContractedStr = formData.get('amountContracted') as string
   const amountPaidStr = formData.get('amountPaid') as string
   const notes = formData.get('notes') as string
@@ -66,6 +72,8 @@ export async function updateGig(_state: GigActionState, formData: FormData): Pro
     where: { id },
     data: {
       date,
+      startTime,
+      endTime,
       venueId,
       amountContracted: amountContractedStr ? parseFloat(amountContractedStr) : null,
       amountPaid: amountPaidStr ? parseFloat(amountPaidStr) : null,

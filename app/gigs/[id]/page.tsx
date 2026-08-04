@@ -17,6 +17,20 @@ function formatDate(d: Date) {
   })
 }
 
+function formatTime(time: string) {
+  const [hours, minutes] = time.split(':').map(Number)
+  return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString('en-US', {
+    hour: 'numeric', minute: '2-digit',
+  })
+}
+
+function formatTimeRange(startTime: string | null, endTime: string | null) {
+  if (startTime && endTime) return `${formatTime(startTime)} – ${formatTime(endTime)}`
+  if (startTime) return formatTime(startTime)
+  if (endTime) return formatTime(endTime)
+  return null
+}
+
 function fmt(amount: string | null) {
   if (!amount) return '—'
   return `$${parseFloat(amount).toFixed(2)}`
@@ -62,7 +76,12 @@ export default async function GigPage({
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3 print:hidden">
         <div>
           <h1 className="text-2xl font-bold">{gig.venue.name}</h1>
-          <p className="text-muted-foreground">{formatDate(gig.date)}</p>
+          <p className="text-muted-foreground">
+            {formatDate(gig.date)}
+            {formatTimeRange(gig.startTime, gig.endTime) && (
+              <span> · {formatTimeRange(gig.startTime, gig.endTime)}</span>
+            )}
+          </p>
           {gig.notes && (
             <p className="mt-1 text-sm text-muted-foreground">{gig.notes}</p>
           )}
