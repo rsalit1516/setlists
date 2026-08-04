@@ -8,8 +8,8 @@
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "next dev",
-    "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
-    "start": "next start",
+    "build": "next build && node scripts/copy-standalone-assets.js",
+    "start": "node .next/standalone/server.js",
     "lint": "eslint",
     "test": "vitest"
   },

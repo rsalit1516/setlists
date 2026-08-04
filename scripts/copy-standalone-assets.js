@@ -1,0 +1,4 @@
+const { cpSync } = require("node:fs");
+
+cpSync(".next/static", ".next/standalone/.next/static", { recursive: true });
+cpSync("public", ".next/standalone/public", { recursive: true });
