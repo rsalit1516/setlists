@@ -2,11 +2,11 @@
 
 import { useActionState } from 'react'
 import Link from 'next/link'
-import { createGig } from '@/app/gigs/actions'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import type { Venue } from '@/lib/types'
+import type { GigActionState } from '@/app/gigs/actions'
+import type { GigWithDetails, Venue } from '@/lib/types'
 
 const selectClass =
   'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
@@ -14,31 +14,50 @@ const selectClass =
 const textareaClass =
   'flex min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none'
 
+type FormAction = (state: GigActionState, formData: FormData) => Promise<GigActionState>
+
 export function GigForm({
   venues,
+  gig,
+  action,
   defaultSetlistId,
 }: {
   venues: Venue[]
+  gig?: GigWithDetails
+  action: FormAction
   defaultSetlistId?: string
 }) {
-  const [state, formAction, pending] = useActionState(createGig, null)
+  const [state, formAction, pending] = useActionState(action, null)
 
   return (
     <form action={formAction} className="space-y-4">
-      {state && 'error' in state && (
-        <p className="text-sm text-destructive">{state.error}</p>
-      )}
+      {gig && <input type="hidden" name="id" value={gig.id} />}
 
-      {defaultSetlistId && <input type="hidden" name="setlistId" value={defaultSetlistId} />}
+      {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
+
+      {!gig && defaultSetlistId && (
+        <input type="hidden" name="setlistId" value={defaultSetlistId} />
+      )}
 
       <div>
         <label className="mb-1 block text-sm font-medium">Date</label>
-        <Input type="date" name="date" required />
+        <Input
+          type="date"
+          name="date"
+          required
+          defaultValue={gig ? new Date(gig.date).toISOString().slice(0, 10) : undefined}
+        />
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-medium">Venue</label>
-        <select name="venueId" required title="Venue" className={selectClass}>
+        <select
+          name="venueId"
+          required
+          title="Venue"
+          defaultValue={gig?.venueId ?? ''}
+          className={selectClass}
+        >
           <option value="">Select venue…</option>
           {venues.map((v) => (
             <option key={v.id} value={v.id}>{v.name}</option>
@@ -46,33 +65,63 @@ export function GigForm({
         </select>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Checkbox
-          id="createSetlist"
-          name="createSetlist"
-          value="true"
-          defaultChecked={!defaultSetlistId}
-        />
-        <label htmlFor="createSetlist" className="cursor-pointer text-sm font-medium">
-          Create setlist
-        </label>
-      </div>
+      {!gig && (
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="createSetlist"
+            name="createSetlist"
+            value="true"
+            defaultChecked={!defaultSetlistId}
+          />
+          <label htmlFor="createSetlist" className="cursor-pointer text-sm font-medium">
+            Create setlist
+          </label>
+        </div>
+      )}
 
-      <div>
-        <label className="mb-1 block text-sm font-medium">Amount Contracted ($)</label>
-        <Input type="number" step="0.01" min="0" name="amountContracted" placeholder="0.00" />
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-sm font-medium">Amount Contracted ($)</label>
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            name="amountContracted"
+            placeholder="0.00"
+            defaultValue={gig?.amountContracted ?? ''}
+          />
+        </div>
+        {gig && (
+          <div>
+            <label className="mb-1 block text-sm font-medium">Amount Paid ($)</label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              name="amountPaid"
+              placeholder="0.00"
+              defaultValue={gig.amountPaid ?? ''}
+            />
+          </div>
+        )}
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-medium">Notes</label>
-        <textarea name="notes" rows={3} className={textareaClass} placeholder="Optional notes…" />
+        <textarea
+          name="notes"
+          rows={3}
+          className={textareaClass}
+          placeholder="Optional notes…"
+          defaultValue={gig?.notes ?? ''}
+        />
       </div>
 
       <div className="flex gap-2">
         <Button type="submit" disabled={pending}>
-          {pending ? 'Creating…' : 'Create Gig'}
+          {pending ? (gig ? 'Saving…' : 'Creating…') : gig ? 'Save Changes' : 'Create Gig'}
         </Button>
-        <Link href="/gigs" className={buttonVariants({ variant: 'ghost' })}>
+        <Link href={gig ? `/gigs/${gig.id}` : '/gigs'} className={buttonVariants({ variant: 'ghost' })}>
           Cancel
         </Link>
       </div>

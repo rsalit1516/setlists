@@ -2,7 +2,6 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getGig } from '@/lib/services/gigs'
 import { addExpense, removeExpense, addMusician, removeMusician } from '@/app/gigs/actions'
-import { EditFinancialsForm } from '@/components/gigs/edit-financials-form'
 import { PrintButton } from '@/components/gigs/print-button'
 import { buttonVariants } from '@/components/ui/button'
 import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
@@ -69,6 +68,12 @@ export default async function GigPage({
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/gigs/${gig.id}/edit`}
+            className={buttonVariants({ variant: 'outline', size: 'sm' })}
+          >
+            Edit Gig
+          </Link>
           <Link
             href={`/setlists/${gig.setlist.id}`}
             className={buttonVariants({ variant: 'outline', size: 'sm' })}
@@ -205,16 +210,10 @@ export default async function GigPage({
 
         {/* Summary */}
         <div className="rounded-lg border">
-          <div className="flex items-center justify-between border-b bg-muted/40 px-4 py-2">
+          <div className="border-b bg-muted/40 px-4 py-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Summary
             </span>
-            <EditFinancialsForm
-              id={gig.id}
-              amountContracted={gig.amountContracted}
-              amountPaid={gig.amountPaid}
-              notes={gig.notes}
-            />
           </div>
           <div className="space-y-1 px-4 py-3 text-sm">
             <div className="flex justify-between">

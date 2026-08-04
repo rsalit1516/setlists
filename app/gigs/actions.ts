@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import prisma from '@/lib/db'
 
-export type GigActionState = { error: string } | { success: true } | null
+export type GigActionState = { error: string } | null
 
 export async function createGig(_state: GigActionState, formData: FormData): Promise<GigActionState> {
   const venueId = formData.get('venueId') as string
@@ -49,23 +49,32 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
 
 export async function updateGig(_state: GigActionState, formData: FormData): Promise<GigActionState> {
   const id = formData.get('id') as string
+  const venueId = formData.get('venueId') as string
+  const dateStr = formData.get('date') as string
   const amountContractedStr = formData.get('amountContracted') as string
   const amountPaidStr = formData.get('amountPaid') as string
   const notes = formData.get('notes') as string
 
   if (!id) return { error: 'Gig not found.' }
+  if (!venueId) return { error: 'Venue is required.' }
+  if (!dateStr) return { error: 'Date is required.' }
+
+  const date = new Date(dateStr + 'T12:00:00')
+  if (isNaN(date.getTime())) return { error: 'Invalid date.' }
 
   await prisma.gig.update({
     where: { id },
     data: {
+      date,
+      venueId,
       amountContracted: amountContractedStr ? parseFloat(amountContractedStr) : null,
       amountPaid: amountPaidStr ? parseFloat(amountPaidStr) : null,
       notes: notes || null,
     },
   })
 
-  revalidatePath(`/gigs/${id}`)
-  return { success: true }
+  revalidatePath('/gigs')
+  redirect(`/gigs/${id}`)
 }
 
 export async function deleteGig(id: string): Promise<void> {
