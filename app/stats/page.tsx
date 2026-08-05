@@ -1,4 +1,4 @@
-import { getMostPlayedSongs } from '@/lib/services/stats'
+import { getMostPlayedSongs, getReadySongsNeverPlayed } from '@/lib/services/stats'
 import {
   Table,
   TableBody,
@@ -9,13 +9,16 @@ import {
 } from '@/components/ui/table'
 
 export default async function StatsPage() {
-  const mostPlayed = await getMostPlayedSongs()
+  const [mostPlayed, neverPlayed] = await Promise.all([
+    getMostPlayedSongs(),
+    getReadySongsNeverPlayed(),
+  ])
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
       <h1 className="mb-6 text-2xl font-bold">Stats</h1>
 
-      <section>
+      <section className="mb-10">
         <h2 className="mb-3 text-base font-semibold uppercase tracking-wider text-muted-foreground">
           Most Played Songs
         </h2>
@@ -67,6 +70,57 @@ export default async function StatsPage() {
                 </li>
               ))}
             </ol>
+          </>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-base font-semibold uppercase tracking-wider text-muted-foreground">
+          Ready Songs Never Played
+        </h2>
+        {neverPlayed.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Every Ready song has been played.</p>
+        ) : (
+          <>
+            <div className="hidden overflow-x-auto rounded-lg border md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Artist</TableHead>
+                    <TableHead>Key</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {neverPlayed.map((s) => (
+                    <TableRow key={s.songId}>
+                      <TableCell className="font-medium">{s.title}</TableCell>
+                      <TableCell className="text-muted-foreground">{s.artist ?? '—'}</TableCell>
+                      <TableCell className="text-muted-foreground">{s.key ?? '—'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <ul className="space-y-2 md:hidden">
+              {neverPlayed.map((s) => (
+                <li
+                  key={s.songId}
+                  className="flex items-center justify-between gap-2 rounded-lg border p-3"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{s.title}</div>
+                    {s.artist && (
+                      <div className="truncate text-sm text-muted-foreground">{s.artist}</div>
+                    )}
+                  </div>
+                  {s.key && (
+                    <span className="shrink-0 text-sm text-muted-foreground">{s.key}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
           </>
         )}
       </section>
