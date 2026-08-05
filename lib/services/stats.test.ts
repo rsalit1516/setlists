@@ -6,6 +6,9 @@ import {
   DEFAULT_STALE_GIG_WINDOW,
   getStaleInProgressSongs,
   DEFAULT_STALE_DAYS_THRESHOLD,
+  getScheduleGaps,
+  DEFAULT_GAP_LOOKAHEAD_MONTHS,
+  DEFAULT_GAP_DAYS,
 } from './stats'
 
 vi.mock('@/lib/db', () => ({
@@ -58,6 +61,19 @@ function makeGigs(...playedSongIds: string[][]): MockGigRow[] {
 const NOW = new Date('2026-08-05T12:00:00')
 function daysAgo(n: number): Date {
   return new Date(NOW.getTime() - n * 24 * 60 * 60 * 1000)
+}
+function daysFromNow(n: number): Date {
+  return new Date(NOW.getTime() + n * 24 * 60 * 60 * 1000)
+}
+
+type MockUpcomingGig = { id: string; date: Date; venue: { name: string } }
+function makeUpcomingGig(overrides: Partial<MockUpcomingGig> = {}): MockUpcomingGig {
+  return {
+    id: 'gig-1',
+    date: daysFromNow(5),
+    venue: { name: 'The Jazz Club' },
+    ...overrides,
+  }
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -366,5 +382,115 @@ describe('getStaleInProgressSongs', () => {
     ] as never)
     const result = await getStaleInProgressSongs(60, NOW)
     expect(result).toEqual([])
+  })
+})
+
+describe('getScheduleGaps', () => {
+  it('only fetches active gigs from today through the lookahead window, ascending', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([])
+    await getScheduleGaps(1, 14, NOW)
+    type FindManyArgs = {
+      where: { isActive: unknown; date: { gte: unknown; lte: unknown } }
+      orderBy: { date: unknown }
+    }
+    const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as unknown as FindManyArgs
+    expect(call.where.isActive).toBe(true)
+    expect(call.where.date.gte).toBe(NOW)
+    expect(call.where.date.lte).toEqual(new Date('2026-09-05T12:00:00'))
+    expect(call.orderBy.date).toBe('asc')
+  })
+
+  it('flags an open-ended gap from today when nothing is scheduled at all', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([])
+    const result = await getScheduleGaps(1, 14, NOW)
+    expect(result).toEqual([{ from: { type: 'today' }, to: { type: 'open' }, days: 31 }])
+  })
+
+  it('flags a trailing open-ended gap after the last known gig', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([
+      makeUpcomingGig({ id: 'gig-1', date: daysFromNow(5), venue: { name: 'The Jazz Club' } }),
+    ] as never)
+    const result = await getScheduleGaps(1, 14, NOW)
+    expect(result).toEqual([
+      {
+        from: { type: 'gig', gigId: 'gig-1', venueName: 'The Jazz Club', date: daysFromNow(5) },
+        to: { type: 'open' },
+        days: 26,
+      },
+    ])
+  })
+
+  it('flags a gap between two consecutive gigs', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([
+      makeUpcomingGig({ id: 'gig-1', date: daysFromNow(2), venue: { name: 'Venue A' } }),
+      makeUpcomingGig({ id: 'gig-2', date: daysFromNow(20), venue: { name: 'Venue B' } }),
+    ] as never)
+    const result = await getScheduleGaps(1, 14, NOW)
+    expect(result).toEqual([
+      {
+        from: { type: 'gig', gigId: 'gig-1', venueName: 'Venue A', date: daysFromNow(2) },
+        to: { type: 'gig', gigId: 'gig-2', venueName: 'Venue B', date: daysFromNow(20) },
+        days: 18,
+      },
+    ])
+  })
+
+  it('flags a gap from today to the first gig when it is far out', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([
+      makeUpcomingGig({ id: 'gig-1', date: daysFromNow(20), venue: { name: 'Venue A' } }),
+    ] as never)
+    const result = await getScheduleGaps(1, 14, NOW)
+    expect(result[0]).toEqual({
+      from: { type: 'today' },
+      to: { type: 'gig', gigId: 'gig-1', venueName: 'Venue A', date: daysFromNow(20) },
+      days: 20,
+    })
+  })
+
+  it('does not flag a gap of exactly gapDays', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([
+      makeUpcomingGig({ id: 'gig-1', date: daysFromNow(5) }),
+      makeUpcomingGig({ id: 'gig-2', date: daysFromNow(19) }),
+    ] as never)
+    const result = await getScheduleGaps(1, 14, NOW)
+    expect(result).toEqual([])
+  })
+
+  it('flags a gap one day beyond gapDays', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([
+      makeUpcomingGig({ id: 'gig-1', date: daysFromNow(5) }),
+      makeUpcomingGig({ id: 'gig-2', date: daysFromNow(20) }),
+    ] as never)
+    const result = await getScheduleGaps(1, 14, NOW)
+    expect(result).toHaveLength(1)
+    expect(result[0].days).toBe(15)
+  })
+
+  it('returns no gaps when the schedule and trailing stretch are all within gapDays', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([
+      makeUpcomingGig({ id: 'gig-1', date: daysFromNow(5) }),
+      makeUpcomingGig({ id: 'gig-2', date: daysFromNow(15) }),
+      makeUpcomingGig({ id: 'gig-3', date: daysFromNow(25) }),
+    ] as never)
+    const result = await getScheduleGaps(1, 14, NOW)
+    expect(result).toEqual([])
+  })
+
+  it('lists multiple gaps chronologically, including leading and trailing', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([
+      makeUpcomingGig({ id: 'gig-1', date: daysFromNow(20), venue: { name: 'Venue A' } }),
+    ] as never)
+    // lookaheadMonths=2 -> windowEnd = 61 days out; today->gig=20 (flagged), gig->end=41 (flagged)
+    const result = await getScheduleGaps(2, 14, NOW)
+    expect(result).toHaveLength(2)
+    expect(result[0].from).toEqual({ type: 'today' })
+    expect(result[0].to).toMatchObject({ type: 'gig', gigId: 'gig-1' })
+    expect(result[1].from).toMatchObject({ type: 'gig', gigId: 'gig-1' })
+    expect(result[1].to).toEqual({ type: 'open' })
+  })
+
+  it('defaults to DEFAULT_GAP_LOOKAHEAD_MONTHS and DEFAULT_GAP_DAYS', () => {
+    expect(DEFAULT_GAP_LOOKAHEAD_MONTHS).toBe(6)
+    expect(DEFAULT_GAP_DAYS).toBe(14)
   })
 })

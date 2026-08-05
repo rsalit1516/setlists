@@ -5,11 +5,27 @@ import type {
   ReadySongNeverPlayed,
   StaleReadySong,
   StaleInProgressSong,
+  ScheduleGap,
+  ScheduleGapSide,
 } from '@/lib/types'
 
 export const DEFAULT_STALE_GIG_WINDOW = 10
 export const DEFAULT_STALE_DAYS_THRESHOLD = 60
+export const DEFAULT_GAP_LOOKAHEAD_MONTHS = 6
+export const DEFAULT_GAP_DAYS = 14
 const MS_PER_DAY = 24 * 60 * 60 * 1000
+
+function addMonths(d: Date, months: number): Date {
+  const result = new Date(d)
+  result.setMonth(result.getMonth() + months)
+  return result
+}
+
+// Math.round (not floor) so `now`'s exact time-of-day doesn't shave a day off
+// gaps measured against a gig's noon-hardcoded date.
+function daysBetween(a: Date, b: Date): number {
+  return Math.round((b.getTime() - a.getTime()) / MS_PER_DAY)
+}
 
 // Shared join: a play only counts if the SetlistItem is active, was actually
 // played, and belongs to a Setlist attached to an active Gig — a Setlist
@@ -141,4 +157,52 @@ export async function getStaleInProgressSongs(
       daysSinceUpdate: Math.floor((now.getTime() - s.updatedAt.getTime()) / MS_PER_DAY),
     }))
     .sort((a, b) => b.daysSinceUpdate - a.daysSinceUpdate)
+}
+
+// Walks active upcoming gigs (today through the lookahead window) in date
+// order, flagging any stretch longer than gapDays — including the leading
+// stretch from "today" to the first gig, and a trailing open-ended stretch
+// if nothing is scheduled between the last known gig and the end of the
+// window (or between today and the window end, if nothing is scheduled at
+// all). That trailing check is unconditional, so a fully-empty window is
+// naturally caught by the same logic rather than needing a special case.
+// `now` is injectable so tests don't depend on the real clock; callers omit it.
+export async function getScheduleGaps(
+  lookaheadMonths = DEFAULT_GAP_LOOKAHEAD_MONTHS,
+  gapDays = DEFAULT_GAP_DAYS,
+  now: Date = new Date()
+): Promise<ScheduleGap[]> {
+  const windowEnd = addMonths(now, lookaheadMonths)
+
+  const gigs = await prisma.gig.findMany({
+    where: { isActive: true, date: { gte: now, lte: windowEnd } },
+    orderBy: { date: 'asc' },
+    select: { id: true, date: true, venue: { select: { name: true } } },
+  })
+
+  const gaps: ScheduleGap[] = []
+  let prevDate = now
+  let prevSide: ScheduleGapSide = { type: 'today' }
+
+  for (const gig of gigs) {
+    const gigSide: ScheduleGapSide = {
+      type: 'gig',
+      gigId: gig.id,
+      venueName: gig.venue.name,
+      date: gig.date,
+    }
+    const gap = daysBetween(prevDate, gig.date)
+    if (gap > gapDays) {
+      gaps.push({ from: prevSide, to: gigSide, days: gap })
+    }
+    prevDate = gig.date
+    prevSide = gigSide
+  }
+
+  const trailingGap = daysBetween(prevDate, windowEnd)
+  if (trailingGap > gapDays) {
+    gaps.push({ from: prevSide, to: { type: 'open' }, days: trailingGap })
+  }
+
+  return gaps
 }

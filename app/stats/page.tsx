@@ -5,6 +5,9 @@ import {
   getStaleReadySongs,
   DEFAULT_STALE_GIG_WINDOW,
   getStaleInProgressSongs,
+  getScheduleGaps,
+  DEFAULT_GAP_LOOKAHEAD_MONTHS,
+  DEFAULT_GAP_DAYS,
 } from '@/lib/services/stats'
 import {
   Table,
@@ -16,12 +19,27 @@ import {
 } from '@/components/ui/table'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import type { ScheduleGapSide } from '@/lib/types'
 
 const WINDOW_OPTIONS = [5, 10, 20]
 
 function parseGigWindow(value: string | undefined): number {
   const n = Number(value)
   return Number.isInteger(n) && n > 0 ? n : DEFAULT_STALE_GIG_WINDOW
+}
+
+function formatDate(d: Date) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function GapSideLabel({ side }: { side: ScheduleGapSide }) {
+  if (side.type === 'today') return <>Today</>
+  if (side.type === 'open') return <>No gig scheduled yet</>
+  return (
+    <Link href={`/gigs/${side.gigId}`} className="hover:underline">
+      {side.venueName} ({formatDate(side.date)})
+    </Link>
+  )
 }
 
 export default async function StatsPage({
@@ -32,11 +50,12 @@ export default async function StatsPage({
   const { window: windowParam } = await searchParams
   const gigWindow = parseGigWindow(windowParam)
 
-  const [mostPlayed, neverPlayed, staleReady, staleInProgress] = await Promise.all([
+  const [mostPlayed, neverPlayed, staleReady, staleInProgress, scheduleGaps] = await Promise.all([
     getMostPlayedSongs(),
     getReadySongsNeverPlayed(),
     getStaleReadySongs(gigWindow),
     getStaleInProgressSongs(),
+    getScheduleGaps(),
   ])
 
   return (
@@ -279,6 +298,61 @@ export default async function StatsPage({
                   <span className="shrink-0 text-sm text-muted-foreground">
                     {s.daysSinceUpdate} days ago
                   </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-1 text-base font-semibold uppercase tracking-wider text-muted-foreground">
+          Upcoming Schedule Gaps
+        </h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Stretches longer than {DEFAULT_GAP_DAYS} days between gigs, looking{' '}
+          {DEFAULT_GAP_LOOKAHEAD_MONTHS} months ahead.
+        </p>
+        {scheduleGaps.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No gaps — the schedule looks solid for the next {DEFAULT_GAP_LOOKAHEAD_MONTHS} months.
+          </p>
+        ) : (
+          <>
+            <div className="hidden overflow-x-auto rounded-lg border md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>From</TableHead>
+                    <TableHead>To</TableHead>
+                    <TableHead className="text-right">Gap</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {scheduleGaps.map((g, i) => (
+                    <TableRow key={i}>
+                      <TableCell>
+                        <GapSideLabel side={g.from} />
+                      </TableCell>
+                      <TableCell>
+                        <GapSideLabel side={g.to} />
+                      </TableCell>
+                      <TableCell className="text-right font-medium">{g.days} days</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <ul className="space-y-2 md:hidden">
+              {scheduleGaps.map((g, i) => (
+                <li key={i} className="rounded-lg border p-3">
+                  <div className="flex flex-wrap items-center gap-x-1 text-sm">
+                    <GapSideLabel side={g.from} />
+                    <span className="text-muted-foreground">→</span>
+                    <GapSideLabel side={g.to} />
+                  </div>
+                  <div className="mt-1 text-sm font-medium">{g.days} days</div>
                 </li>
               ))}
             </ul>

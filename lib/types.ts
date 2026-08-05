@@ -225,3 +225,14 @@ export type StaleInProgressSong = {
   artist: string | null
   daysSinceUpdate: number
 }
+
+export type ScheduleGapSide =
+  | { type: 'today' }
+  | { type: 'gig'; gigId: string; venueName: string; date: Date }
+  | { type: 'open' }
+
+export type ScheduleGap = {
+  from: ScheduleGapSide
+  to: ScheduleGapSide
+  days: number
+}
