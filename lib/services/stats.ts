@@ -5,11 +5,20 @@ import type {
   ReadySongNeverPlayed,
   StaleReadySong,
   StaleInProgressSong,
+  UnpaidGig,
 } from '@/lib/types'
 
 export const DEFAULT_STALE_GIG_WINDOW = 10
 export const DEFAULT_STALE_DAYS_THRESHOLD = 60
 const MS_PER_DAY = 24 * 60 * 60 * 1000
+
+// Local to this file, matching the toStr() convention in lib/services/gigs.ts
+// and lib/services/finance.ts — Decimal fields aren't JSON-serializable, so
+// every service that reads them re-declares this rather than sharing one.
+function toStr(d: unknown): string | null {
+  if (d === null || d === undefined) return null
+  return String(d)
+}
 
 // Shared join: a play only counts if the SetlistItem is active, was actually
 // played, and belongs to a Setlist attached to an active Gig — a Setlist
@@ -141,4 +150,44 @@ export async function getStaleInProgressSongs(
       daysSinceUpdate: Math.floor((now.getTime() - s.updatedAt.getTime()) / MS_PER_DAY),
     }))
     .sort((a, b) => b.daysSinceUpdate - a.daysSinceUpdate)
+}
+
+// Column-to-column comparison (amountPaid < amountContracted) isn't
+// expressible in a Prisma `where` without raw SQL, so the "owed" filter runs
+// in JS after fetching active past gigs that have a contracted amount.
+// `now` is injectable so tests don't depend on the real clock; callers omit it.
+export async function getUnpaidGigs(now: Date = new Date()): Promise<UnpaidGig[]> {
+  const rows = await prisma.gig.findMany({
+    where: {
+      isActive: true,
+      date: { lte: now },
+      amountContracted: { not: null },
+    },
+    orderBy: { date: 'asc' },
+    select: {
+      id: true,
+      date: true,
+      amountContracted: true,
+      amountPaid: true,
+      venue: { select: { name: true } },
+    },
+  })
+
+  return rows
+    .map((r) => {
+      const amountContracted = toStr(r.amountContracted)!
+      const amountPaid = toStr(r.amountPaid)
+      const paid = amountPaid ? parseFloat(amountPaid) : 0
+      const outstandingBalance = parseFloat(amountContracted) - paid
+      return {
+        id: r.id,
+        date: r.date,
+        venueName: r.venue.name,
+        amountContracted,
+        amountPaid,
+        outstandingBalance,
+        paidStatus: (paid === 0 ? 'unpaid' : 'partial') as UnpaidGig['paidStatus'],
+      }
+    })
+    .filter((g) => g.outstandingBalance > 0)
 }

@@ -225,3 +225,13 @@ export type StaleInProgressSong = {
   artist: string | null
   daysSinceUpdate: number
 }
+
+export type UnpaidGig = {
+  id: string
+  date: Date
+  venueName: string
+  amountContracted: string
+  amountPaid: string | null
+  outstandingBalance: number
+  paidStatus: 'unpaid' | 'partial'
+}
