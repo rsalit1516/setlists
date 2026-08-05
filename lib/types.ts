@@ -161,3 +161,38 @@ export type GigWithDetails = {
   createdAt: Date
   updatedAt: Date
 }
+
+// Computed sums (totalExpenses, totalMusicianPayouts, net) are numbers, not
+// Decimal strings — they're aggregates, not raw entity fields, matching the
+// calculateTotalExpenses/calculateGigNet convention in lib/services/gigs.ts.
+export type FinanceGigRow = {
+  id: string
+  date: Date
+  venueName: string
+  amountContracted: string | null
+  amountPaid: string | null
+  tips: string | null
+  otherRevenue: string | null
+  totalExpenses: number
+  totalMusicianPayouts: number
+  net: number
+}
+
+export type FinanceYearSummary = {
+  year: number
+  gigCount: number
+  totalContracted: number
+  totalPaidByVenue: number
+  totalTips: number
+  totalOtherRevenue: number
+  totalExpenses: number
+  totalMusicianPayouts: number
+  net: number
+}
+
+export type FinanceReport = {
+  currentYear: number
+  currentYearGigs: FinanceGigRow[]
+  currentYearTotals: FinanceYearSummary
+  pastYears: FinanceYearSummary[]
+}
