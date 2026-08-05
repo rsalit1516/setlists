@@ -6,6 +6,9 @@ import {
   DEFAULT_STALE_GIG_WINDOW,
   getStaleInProgressSongs,
   getUnpaidGigs,
+  getScheduleGaps,
+  DEFAULT_GAP_LOOKAHEAD_MONTHS,
+  DEFAULT_GAP_DAYS,
 } from '@/lib/services/stats'
 import {
   Table,
@@ -18,7 +21,7 @@ import {
 import { buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import type { UnpaidGig } from '@/lib/types'
+import type { UnpaidGig, ScheduleGapSide } from '@/lib/types'
 
 const WINDOW_OPTIONS = [5, 10, 20]
 
@@ -47,6 +50,16 @@ const PAID_STATUS_BADGE: Record<UnpaidGig['paidStatus'], { label: string; classN
   },
 }
 
+function GapSideLabel({ side }: { side: ScheduleGapSide }) {
+  if (side.type === 'today') return <>Today</>
+  if (side.type === 'open') return <>No gig scheduled yet</>
+  return (
+    <Link href={`/gigs/${side.gigId}`} className="hover:underline">
+      {side.venueName} ({formatDate(side.date)})
+    </Link>
+  )
+}
+
 export default async function StatsPage({
   searchParams,
 }: {
@@ -55,13 +68,15 @@ export default async function StatsPage({
   const { window: windowParam } = await searchParams
   const gigWindow = parseGigWindow(windowParam)
 
-  const [mostPlayed, neverPlayed, staleReady, staleInProgress, unpaidGigs] = await Promise.all([
-    getMostPlayedSongs(),
-    getReadySongsNeverPlayed(),
-    getStaleReadySongs(gigWindow),
-    getStaleInProgressSongs(),
-    getUnpaidGigs(),
-  ])
+  const [mostPlayed, neverPlayed, staleReady, staleInProgress, unpaidGigs, scheduleGaps] =
+    await Promise.all([
+      getMostPlayedSongs(),
+      getReadySongsNeverPlayed(),
+      getStaleReadySongs(gigWindow),
+      getStaleInProgressSongs(),
+      getUnpaidGigs(),
+      getScheduleGaps(),
+    ])
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
@@ -253,7 +268,7 @@ export default async function StatsPage({
         )}
       </section>
 
-      <section>
+      <section className="mb-10">
         <h2 className="mb-1 text-base font-semibold uppercase tracking-wider text-muted-foreground">
           Songs Stuck In Progress
         </h2>
@@ -310,7 +325,7 @@ export default async function StatsPage({
         )}
       </section>
 
-      <section>
+      <section className="mb-10">
         <h2 className="mb-3 text-base font-semibold uppercase tracking-wider text-muted-foreground">
           Gigs Where We Haven&rsquo;t Been Paid
         </h2>
@@ -377,6 +392,61 @@ export default async function StatsPage({
                     <dt className="font-medium">Outstanding</dt>
                     <dd className="text-right font-medium">{formatMoney(g.outstandingBalance)}</dd>
                   </dl>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-1 text-base font-semibold uppercase tracking-wider text-muted-foreground">
+          Upcoming Schedule Gaps
+        </h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Stretches longer than {DEFAULT_GAP_DAYS} days between gigs, looking{' '}
+          {DEFAULT_GAP_LOOKAHEAD_MONTHS} months ahead.
+        </p>
+        {scheduleGaps.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No gaps — the schedule looks solid for the next {DEFAULT_GAP_LOOKAHEAD_MONTHS} months.
+          </p>
+        ) : (
+          <>
+            <div className="hidden overflow-x-auto rounded-lg border md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>From</TableHead>
+                    <TableHead>To</TableHead>
+                    <TableHead className="text-right">Gap</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {scheduleGaps.map((g, i) => (
+                    <TableRow key={i}>
+                      <TableCell>
+                        <GapSideLabel side={g.from} />
+                      </TableCell>
+                      <TableCell>
+                        <GapSideLabel side={g.to} />
+                      </TableCell>
+                      <TableCell className="text-right font-medium">{g.days} days</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <ul className="space-y-2 md:hidden">
+              {scheduleGaps.map((g, i) => (
+                <li key={i} className="rounded-lg border p-3">
+                  <div className="flex flex-wrap items-center gap-x-1 text-sm">
+                    <GapSideLabel side={g.from} />
+                    <span className="text-muted-foreground">→</span>
+                    <GapSideLabel side={g.to} />
+                  </div>
+                  <div className="mt-1 text-sm font-medium">{g.days} days</div>
                 </li>
               ))}
             </ul>
