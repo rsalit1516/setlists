@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getMostPlayedSongs, getReadySongsNeverPlayed } from './stats'
+import { getMostPlayedSongs, getReadySongsNeverPlayed, getStaleReadySongs, DEFAULT_STALE_GIG_WINDOW } from './stats'
 
 vi.mock('@/lib/db', () => ({
   default: {
@@ -9,20 +9,30 @@ vi.mock('@/lib/db', () => ({
     song: {
       findMany: vi.fn(),
     },
+    gig: {
+      findMany: vi.fn(),
+    },
   },
 }))
 
 import prisma from '@/lib/db'
 
 type MockSetlistItem = { songId: string }
-type MockSong = { id: string; title: string; artist: string | null; key?: string | null }
+type MockSong = { id: string; title: string; artist: string | null; key: string | null }
+type MockGigRow = { setlist: { items: MockSetlistItem[] } }
 
 function makeItem(songId = 'song-1'): MockSetlistItem {
   return { songId }
 }
 
 function makeSong(overrides: Partial<MockSong> = {}): MockSong {
-  return { id: 'song-1', title: 'Fire on the Mountain', artist: 'Grateful Dead', ...overrides }
+  return { id: 'song-1', title: 'Fire on the Mountain', artist: 'Grateful Dead', key: null, ...overrides }
+}
+
+// One row per gig, most-recent-first, matching the real orderBy: { date: 'desc' }.
+// `playedSongIds` is that gig's played songIds; pass [] for a gig with no matches.
+function makeGigs(...playedSongIds: string[][]): MockGigRow[] {
+  return playedSongIds.map((songIds) => ({ setlist: { items: songIds.map((songId) => ({ songId })) } }))
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -183,5 +193,86 @@ describe('getReadySongsNeverPlayed', () => {
       artist: 'Grateful Dead',
       key: 'F#m',
     })
+  })
+})
+
+describe('getStaleReadySongs', () => {
+  it('only considers active, past gigs, most-recent-first', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([])
+    vi.mocked(prisma.song.findMany).mockResolvedValue([])
+    await getStaleReadySongs()
+    type FindManyArgs = { where: { isActive: unknown; date: { lte: unknown } }; orderBy: { date: unknown } }
+    const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as unknown as FindManyArgs
+    expect(call.where.isActive).toBe(true)
+    expect(call.where.date.lte).toBeInstanceOf(Date)
+    expect(call.orderBy.date).toBe('desc')
+  })
+
+  it('excludes a Ready song played within the window', async () => {
+    // 10 gigs (indices 0-9); song-1 played at index 5 — inside the default window of 10.
+    vi.mocked(prisma.gig.findMany).mockResolvedValue(
+      makeGigs([], [], [], [], [], ['song-1'], [], [], [], []) as never
+    )
+    vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
+    const result = await getStaleReadySongs()
+    expect(result).toEqual([])
+  })
+
+  it('includes a Ready song last played at or beyond the window boundary', async () => {
+    // 11 gigs (indices 0-10); song-1's only play is at index 10 — outside the window of 10.
+    vi.mocked(prisma.gig.findMany).mockResolvedValue(
+      makeGigs([], [], [], [], [], [], [], [], [], [], ['song-1']) as never
+    )
+    vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
+    const result = await getStaleReadySongs()
+    expect(result).toEqual([
+      { songId: 'song-1', title: 'Fire on the Mountain', artist: 'Grateful Dead', key: null, gigsSinceLastPlayed: 10 },
+    ])
+  })
+
+  it('includes a Ready song that has never been played, with gigsSinceLastPlayed null', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue(makeGigs([], []) as never)
+    vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
+    const result = await getStaleReadySongs()
+    expect(result[0].gigsSinceLastPlayed).toBeNull()
+  })
+
+  it('sorts never-played first, then by gigsSinceLastPlayed descending', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue(
+      // index 0..14; song-a last played at index 12, song-b at index 15 (never, i.e. absent)
+      makeGigs(...Array.from({ length: 13 }, (_, i) => (i === 12 ? ['song-a'] : []))) as never
+    )
+    vi.mocked(prisma.song.findMany).mockResolvedValue([
+      makeSong({ id: 'song-a', title: 'A Song' }),
+      makeSong({ id: 'song-b', title: 'B Song' }),
+    ] as never)
+    const result = await getStaleReadySongs()
+    expect(result.map((s) => s.songId)).toEqual(['song-b', 'song-a'])
+  })
+
+  it('breaks ties by title ascending when gigsSinceLastPlayed is equal', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue(
+      makeGigs(...Array.from({ length: 13 }, (_, i) => (i === 12 ? ['song-z', 'song-a'] : []))) as never
+    )
+    vi.mocked(prisma.song.findMany).mockResolvedValue([
+      makeSong({ id: 'song-z', title: 'Zzz Song' }),
+      makeSong({ id: 'song-a', title: 'Aaa Song' }),
+    ] as never)
+    const result = await getStaleReadySongs()
+    expect(result.map((s) => s.songId)).toEqual(['song-a', 'song-z'])
+  })
+
+  it('respects a custom gigWindow parameter', async () => {
+    // 5 gigs (indices 0-4); song-1 played at index 2 — inside a window of 3, outside a window of 2.
+    vi.mocked(prisma.gig.findMany).mockResolvedValue(
+      makeGigs([], [], ['song-1'], [], []) as never
+    )
+    vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
+    expect(await getStaleReadySongs(3)).toEqual([])
+    expect((await getStaleReadySongs(2))[0]?.songId).toBe('song-1')
+  })
+
+  it('defaults gigWindow to DEFAULT_STALE_GIG_WINDOW', async () => {
+    expect(DEFAULT_STALE_GIG_WINDOW).toBe(10)
   })
 })

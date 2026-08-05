@@ -1,4 +1,10 @@
-import { getMostPlayedSongs, getReadySongsNeverPlayed } from '@/lib/services/stats'
+import Link from 'next/link'
+import {
+  getMostPlayedSongs,
+  getReadySongsNeverPlayed,
+  getStaleReadySongs,
+  DEFAULT_STALE_GIG_WINDOW,
+} from '@/lib/services/stats'
 import {
   Table,
   TableBody,
@@ -7,11 +13,28 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
-export default async function StatsPage() {
-  const [mostPlayed, neverPlayed] = await Promise.all([
+const WINDOW_OPTIONS = [5, 10, 20]
+
+function parseGigWindow(value: string | undefined): number {
+  const n = Number(value)
+  return Number.isInteger(n) && n > 0 ? n : DEFAULT_STALE_GIG_WINDOW
+}
+
+export default async function StatsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ window?: string }>
+}) {
+  const { window: windowParam } = await searchParams
+  const gigWindow = parseGigWindow(windowParam)
+
+  const [mostPlayed, neverPlayed, staleReady] = await Promise.all([
     getMostPlayedSongs(),
     getReadySongsNeverPlayed(),
+    getStaleReadySongs(gigWindow),
   ])
 
   return (
@@ -74,7 +97,7 @@ export default async function StatsPage() {
         )}
       </section>
 
-      <section>
+      <section className="mb-10">
         <h2 className="mb-3 text-base font-semibold uppercase tracking-wider text-muted-foreground">
           Ready Songs Never Played
         </h2>
@@ -118,6 +141,85 @@ export default async function StatsPage() {
                   {s.key && (
                     <span className="shrink-0 text-sm text-muted-foreground">{s.key}</span>
                   )}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+
+      <section>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold uppercase tracking-wider text-muted-foreground">
+            Ready Songs Not Played Recently
+          </h2>
+          <div className="flex gap-2">
+            {WINDOW_OPTIONS.map((w) => (
+              <Link
+                key={w}
+                href={`/stats?window=${w}`}
+                className={cn(
+                  buttonVariants({ variant: w === gigWindow ? 'default' : 'outline', size: 'sm' }),
+                  'h-9 px-3'
+                )}
+              >
+                Last {w}
+              </Link>
+            ))}
+          </div>
+        </div>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Ready songs not played in any of the last {gigWindow} gigs — distinct from songs never
+          played at all (above).
+        </p>
+        {staleReady.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Every Ready song has been played within the last {gigWindow} gigs.
+          </p>
+        ) : (
+          <>
+            <div className="hidden overflow-x-auto rounded-lg border md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Artist</TableHead>
+                    <TableHead>Key</TableHead>
+                    <TableHead className="text-right">Last Played</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {staleReady.map((s) => (
+                    <TableRow key={s.songId}>
+                      <TableCell className="font-medium">{s.title}</TableCell>
+                      <TableCell className="text-muted-foreground">{s.artist ?? '—'}</TableCell>
+                      <TableCell className="text-muted-foreground">{s.key ?? '—'}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {s.gigsSinceLastPlayed === null
+                          ? 'Never'
+                          : `${s.gigsSinceLastPlayed} gigs ago`}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <ul className="space-y-2 md:hidden">
+              {staleReady.map((s) => (
+                <li
+                  key={s.songId}
+                  className="flex items-center justify-between gap-2 rounded-lg border p-3"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{s.title}</div>
+                    {s.artist && (
+                      <div className="truncate text-sm text-muted-foreground">{s.artist}</div>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-sm text-muted-foreground">
+                    {s.gigsSinceLastPlayed === null ? 'Never' : `${s.gigsSinceLastPlayed} gigs ago`}
+                  </span>
                 </li>
               ))}
             </ul>
