@@ -210,3 +210,10 @@ export type ReadySongNeverPlayed = {
   artist: string | null
   key: string | null
 }
+
+export type StaleInProgressSong = {
+  songId: string
+  title: string
+  artist: string | null
+  daysSinceUpdate: number
+}

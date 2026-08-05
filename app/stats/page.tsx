@@ -1,4 +1,8 @@
-import { getMostPlayedSongs, getReadySongsNeverPlayed } from '@/lib/services/stats'
+import {
+  getMostPlayedSongs,
+  getReadySongsNeverPlayed,
+  getStaleInProgressSongs,
+} from '@/lib/services/stats'
 import {
   Table,
   TableBody,
@@ -9,9 +13,10 @@ import {
 } from '@/components/ui/table'
 
 export default async function StatsPage() {
-  const [mostPlayed, neverPlayed] = await Promise.all([
+  const [mostPlayed, neverPlayed, staleInProgress] = await Promise.all([
     getMostPlayedSongs(),
     getReadySongsNeverPlayed(),
+    getStaleInProgressSongs(),
   ])
 
   return (
@@ -74,7 +79,7 @@ export default async function StatsPage() {
         )}
       </section>
 
-      <section>
+      <section className="mb-10">
         <h2 className="mb-3 text-base font-semibold uppercase tracking-wider text-muted-foreground">
           Ready Songs Never Played
         </h2>
@@ -118,6 +123,63 @@ export default async function StatsPage() {
                   {s.key && (
                     <span className="shrink-0 text-sm text-muted-foreground">{s.key}</span>
                   )}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-1 text-base font-semibold uppercase tracking-wider text-muted-foreground">
+          Songs Stuck In Progress
+        </h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Based on last edited date, not time spent In Progress specifically — any field edit
+          resets the clock, so this is an approximation of &ldquo;untouched,&rdquo; not a precise measure.
+        </p>
+        {staleInProgress.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No In Progress songs have stalled.</p>
+        ) : (
+          <>
+            <div className="hidden overflow-x-auto rounded-lg border md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Artist</TableHead>
+                    <TableHead className="text-right">Last Updated</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {staleInProgress.map((s) => (
+                    <TableRow key={s.songId}>
+                      <TableCell className="font-medium">{s.title}</TableCell>
+                      <TableCell className="text-muted-foreground">{s.artist ?? '—'}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {s.daysSinceUpdate} days ago
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <ul className="space-y-2 md:hidden">
+              {staleInProgress.map((s) => (
+                <li
+                  key={s.songId}
+                  className="flex items-center justify-between gap-2 rounded-lg border p-3"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{s.title}</div>
+                    {s.artist && (
+                      <div className="truncate text-sm text-muted-foreground">{s.artist}</div>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-sm text-muted-foreground">
+                    {s.daysSinceUpdate} days ago
+                  </span>
                 </li>
               ))}
             </ul>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { getMostPlayedSongs, getReadySongsNeverPlayed } from './stats'
+import { getMostPlayedSongs, getReadySongsNeverPlayed, getStaleInProgressSongs, DEFAULT_STALE_DAYS_THRESHOLD } from './stats'
 
 vi.mock('@/lib/db', () => ({
   default: {
@@ -15,14 +15,31 @@ vi.mock('@/lib/db', () => ({
 import prisma from '@/lib/db'
 
 type MockSetlistItem = { songId: string }
-type MockSong = { id: string; title: string; artist: string | null; key?: string | null }
+type MockSong = {
+  id: string
+  title: string
+  artist: string | null
+  key?: string | null
+  updatedAt?: Date
+}
 
 function makeItem(songId = 'song-1'): MockSetlistItem {
   return { songId }
 }
 
 function makeSong(overrides: Partial<MockSong> = {}): MockSong {
-  return { id: 'song-1', title: 'Fire on the Mountain', artist: 'Grateful Dead', ...overrides }
+  return {
+    id: 'song-1',
+    title: 'Fire on the Mountain',
+    artist: 'Grateful Dead',
+    updatedAt: new Date('2026-01-01T12:00:00'),
+    ...overrides,
+  }
+}
+
+const NOW = new Date('2026-08-05T12:00:00')
+function daysAgo(n: number): Date {
+  return new Date(NOW.getTime() - n * 24 * 60 * 60 * 1000)
 }
 
 beforeEach(() => vi.clearAllMocks())
@@ -183,5 +200,72 @@ describe('getReadySongsNeverPlayed', () => {
       artist: 'Grateful Dead',
       key: 'F#m',
     })
+  })
+})
+
+describe('getStaleInProgressSongs', () => {
+  it('only fetches active IN_PROGRESS songs', async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([])
+    await getStaleInProgressSongs(DEFAULT_STALE_DAYS_THRESHOLD, NOW)
+    type FindManyArgs = { where: { isActive: unknown; status: unknown } }
+    const call = vi.mocked(prisma.song.findMany).mock.calls[0][0] as unknown as FindManyArgs
+    expect(call.where.isActive).toBe(true)
+    expect(call.where.status).toBe('IN_PROGRESS')
+  })
+
+  it('excludes a song updated within the threshold', async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([
+      makeSong({ id: 'song-1', updatedAt: daysAgo(30) }),
+    ] as never)
+    const result = await getStaleInProgressSongs(60, NOW)
+    expect(result).toEqual([])
+  })
+
+  it('includes a song updated exactly at the threshold boundary', async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([
+      makeSong({ id: 'song-1', updatedAt: daysAgo(60) }),
+    ] as never)
+    const result = await getStaleInProgressSongs(60, NOW)
+    expect(result).toHaveLength(1)
+    expect(result[0].daysSinceUpdate).toBe(60)
+  })
+
+  it('includes a song updated well before the threshold', async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([
+      makeSong({ id: 'song-1', updatedAt: daysAgo(120) }),
+    ] as never)
+    const result = await getStaleInProgressSongs(60, NOW)
+    expect(result[0].daysSinceUpdate).toBe(120)
+  })
+
+  it('sorts oldest-first', async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([
+      makeSong({ id: 'song-recent', title: 'Recent', updatedAt: daysAgo(70) }),
+      makeSong({ id: 'song-ancient', title: 'Ancient', updatedAt: daysAgo(300) }),
+      makeSong({ id: 'song-mid', title: 'Mid', updatedAt: daysAgo(150) }),
+    ] as never)
+    const result = await getStaleInProgressSongs(60, NOW)
+    expect(result.map((s) => s.songId)).toEqual(['song-ancient', 'song-mid', 'song-recent'])
+  })
+
+  it('respects a custom daysThreshold', async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([
+      makeSong({ id: 'song-1', updatedAt: daysAgo(10) }),
+    ] as never)
+    expect(await getStaleInProgressSongs(30, NOW)).toEqual([])
+    const result = await getStaleInProgressSongs(5, NOW)
+    expect(result).toHaveLength(1)
+  })
+
+  it('defaults daysThreshold to DEFAULT_STALE_DAYS_THRESHOLD', () => {
+    expect(DEFAULT_STALE_DAYS_THRESHOLD).toBe(60)
+  })
+
+  it('returns an empty list when there are no stale songs', async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([
+      makeSong({ id: 'song-1', updatedAt: daysAgo(1) }),
+    ] as never)
+    const result = await getStaleInProgressSongs(60, NOW)
+    expect(result).toEqual([])
   })
 })
