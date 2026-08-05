@@ -1,8 +1,15 @@
 import prisma from '@/lib/db'
 import { getSongs } from '@/lib/services/songs'
-import type { MostPlayedSong, ReadySongNeverPlayed, StaleReadySong } from '@/lib/types'
+import type {
+  MostPlayedSong,
+  ReadySongNeverPlayed,
+  StaleReadySong,
+  StaleInProgressSong,
+} from '@/lib/types'
 
 export const DEFAULT_STALE_GIG_WINDOW = 10
+export const DEFAULT_STALE_DAYS_THRESHOLD = 60
+const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 // Shared join: a play only counts if the SetlistItem is active, was actually
 // played, and belongs to a Setlist attached to an active Gig — a Setlist
@@ -112,4 +119,26 @@ export async function getStaleReadySongs(
       }
       return b.gigsSinceLastPlayed - a.gigsSinceLastPlayed || a.title.localeCompare(b.title)
     })
+}
+
+// `updatedAt` bumps on any field edit, not specifically a status change — this
+// is a proxy for "untouched," not a precise "time spent In Progress." No
+// dedicated statusChangedAt field, by design (decided with the user).
+// `now` is injectable so tests don't depend on the real clock; callers omit it.
+export async function getStaleInProgressSongs(
+  daysThreshold = DEFAULT_STALE_DAYS_THRESHOLD,
+  now: Date = new Date()
+): Promise<StaleInProgressSong[]> {
+  const cutoff = new Date(now.getTime() - daysThreshold * MS_PER_DAY)
+  const songs = await getSongs('IN_PROGRESS')
+
+  return songs
+    .filter((s) => s.updatedAt <= cutoff)
+    .map((s) => ({
+      songId: s.id,
+      title: s.title,
+      artist: s.artist,
+      daysSinceUpdate: Math.floor((now.getTime() - s.updatedAt.getTime()) / MS_PER_DAY),
+    }))
+    .sort((a, b) => b.daysSinceUpdate - a.daysSinceUpdate)
 }

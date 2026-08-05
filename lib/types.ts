@@ -218,3 +218,10 @@ export type StaleReadySong = {
   key: string | null
   gigsSinceLastPlayed: number | null
 }
+
+export type StaleInProgressSong = {
+  songId: string
+  title: string
+  artist: string | null
+  daysSinceUpdate: number
+}
