@@ -5,6 +5,7 @@ import {
   getStaleReadySongs,
   DEFAULT_STALE_GIG_WINDOW,
   getStaleInProgressSongs,
+  getUnpaidGigs,
 } from '@/lib/services/stats'
 import {
   Table,
@@ -15,13 +16,35 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { buttonVariants } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import type { UnpaidGig } from '@/lib/types'
 
 const WINDOW_OPTIONS = [5, 10, 20]
 
 function parseGigWindow(value: string | undefined): number {
   const n = Number(value)
   return Number.isInteger(n) && n > 0 ? n : DEFAULT_STALE_GIG_WINDOW
+}
+
+function formatDate(d: Date) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function formatMoney(amount: string | number) {
+  return `$${(typeof amount === 'string' ? parseFloat(amount) : amount).toFixed(2)}`
+}
+
+// Mirrors the PAYOUT_BADGE convention in app/gigs/[id]/page.tsx.
+const PAID_STATUS_BADGE: Record<UnpaidGig['paidStatus'], { label: string; className: string }> = {
+  unpaid: {
+    label: 'Unpaid',
+    className: 'border-red-600/30 bg-red-600/10 text-red-700 dark:text-red-400',
+  },
+  partial: {
+    label: 'Partially Paid',
+    className: 'border-amber-600/30 bg-amber-600/10 text-amber-700 dark:text-amber-400',
+  },
 }
 
 export default async function StatsPage({
@@ -32,11 +55,12 @@ export default async function StatsPage({
   const { window: windowParam } = await searchParams
   const gigWindow = parseGigWindow(windowParam)
 
-  const [mostPlayed, neverPlayed, staleReady, staleInProgress] = await Promise.all([
+  const [mostPlayed, neverPlayed, staleReady, staleInProgress, unpaidGigs] = await Promise.all([
     getMostPlayedSongs(),
     getReadySongsNeverPlayed(),
     getStaleReadySongs(gigWindow),
     getStaleInProgressSongs(),
+    getUnpaidGigs(),
   ])
 
   return (
@@ -279,6 +303,80 @@ export default async function StatsPage({
                   <span className="shrink-0 text-sm text-muted-foreground">
                     {s.daysSinceUpdate} days ago
                   </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-base font-semibold uppercase tracking-wider text-muted-foreground">
+          Gigs Where We Haven&rsquo;t Been Paid
+        </h2>
+        {unpaidGigs.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No outstanding payments.</p>
+        ) : (
+          <>
+            <div className="hidden overflow-x-auto rounded-lg border md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Venue</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Contracted</TableHead>
+                    <TableHead className="text-right">Paid</TableHead>
+                    <TableHead className="text-right">Outstanding</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {unpaidGigs.map((g) => (
+                    <TableRow key={g.id}>
+                      <TableCell>
+                        <Link href={`/gigs/${g.id}`} className="hover:underline">
+                          {formatDate(g.date)}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="font-medium">{g.venueName}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={PAID_STATUS_BADGE[g.paidStatus].className}>
+                          {PAID_STATUS_BADGE[g.paidStatus].label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">{formatMoney(g.amountContracted)}</TableCell>
+                      <TableCell className="text-right">
+                        {g.amountPaid ? formatMoney(g.amountPaid) : '—'}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatMoney(g.outstandingBalance)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <ul className="space-y-2 md:hidden">
+              {unpaidGigs.map((g) => (
+                <li key={g.id} className="rounded-lg border p-3">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <Link href={`/gigs/${g.id}`} className="font-medium hover:underline">
+                      {g.venueName}
+                    </Link>
+                    <Badge variant="outline" className={PAID_STATUS_BADGE[g.paidStatus].className}>
+                      {PAID_STATUS_BADGE[g.paidStatus].label}
+                    </Badge>
+                  </div>
+                  <div className="mb-2 text-sm text-muted-foreground">{formatDate(g.date)}</div>
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                    <dt className="text-muted-foreground">Contracted</dt>
+                    <dd className="text-right">{formatMoney(g.amountContracted)}</dd>
+                    <dt className="text-muted-foreground">Paid</dt>
+                    <dd className="text-right">{g.amountPaid ? formatMoney(g.amountPaid) : '—'}</dd>
+                    <dt className="font-medium">Outstanding</dt>
+                    <dd className="text-right font-medium">{formatMoney(g.outstandingBalance)}</dd>
+                  </dl>
                 </li>
               ))}
             </ul>
