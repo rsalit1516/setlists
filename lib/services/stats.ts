@@ -1,6 +1,8 @@
 import prisma from '@/lib/db'
 import { getSongs } from '@/lib/services/songs'
-import type { MostPlayedSong, ReadySongNeverPlayed } from '@/lib/types'
+import type { MostPlayedSong, ReadySongNeverPlayed, StaleReadySong } from '@/lib/types'
+
+export const DEFAULT_STALE_GIG_WINDOW = 10
 
 // Shared join: a play only counts if the SetlistItem is active, was actually
 // played, and belongs to a Setlist attached to an active Gig — a Setlist
@@ -48,4 +50,66 @@ export async function getReadySongsNeverPlayed(): Promise<ReadySongNeverPlayed[]
   return readySongs
     .filter((s) => !counts.has(s.id))
     .map((s) => ({ songId: s.id, title: s.title, artist: s.artist, key: s.key }))
+}
+
+// Distinct from getPlayCountsBySongId: that helper counts plays at ANY active
+// gig, all-time, with no ordering. This one needs the opposite shape — which
+// active PAST gig (date <= now) each song was most recently played at, so we
+// can tell "played, but not within the last N gigs" apart from "never
+// played." Built gig-first (not setlistItem-first) so iteration order over
+// gigs (most-recent-first) doubles as each song's "gigs since last played."
+async function getGigsSinceLastPlayedBySongId(): Promise<Map<string, number>> {
+  const gigs = await prisma.gig.findMany({
+    where: { isActive: true, date: { lte: new Date() } },
+    orderBy: { date: 'desc' },
+    select: {
+      setlist: {
+        select: {
+          items: {
+            where: { isActive: true, wasPlayed: true },
+            select: { songId: true },
+          },
+        },
+      },
+    },
+  })
+
+  const gigsSinceLastPlayed = new Map<string, number>()
+  gigs.forEach((gig, gigIndex) => {
+    for (const item of gig.setlist.items) {
+      if (!gigsSinceLastPlayed.has(item.songId)) {
+        gigsSinceLastPlayed.set(item.songId, gigIndex)
+      }
+    }
+  })
+  return gigsSinceLastPlayed
+}
+
+// Sorted by gigs since last played descending; never-played songs are
+// treated as infinitely stale and sort first (gigsSinceLastPlayed: null),
+// ahead of songs merely last played before the window.
+export async function getStaleReadySongs(
+  gigWindow = DEFAULT_STALE_GIG_WINDOW
+): Promise<StaleReadySong[]> {
+  const [gigsSinceLastPlayed, readySongs] = await Promise.all([
+    getGigsSinceLastPlayedBySongId(),
+    getSongs('READY'),
+  ])
+
+  return readySongs
+    .map((s) => ({
+      songId: s.id,
+      title: s.title,
+      artist: s.artist,
+      key: s.key,
+      gigsSinceLastPlayed: gigsSinceLastPlayed.get(s.id) ?? null,
+    }))
+    .filter((s) => s.gigsSinceLastPlayed === null || s.gigsSinceLastPlayed >= gigWindow)
+    .sort((a, b) => {
+      if (a.gigsSinceLastPlayed === null || b.gigsSinceLastPlayed === null) {
+        if (a.gigsSinceLastPlayed === b.gigsSinceLastPlayed) return a.title.localeCompare(b.title)
+        return a.gigsSinceLastPlayed === null ? -1 : 1
+      }
+      return b.gigsSinceLastPlayed - a.gigsSinceLastPlayed || a.title.localeCompare(b.title)
+    })
 }
