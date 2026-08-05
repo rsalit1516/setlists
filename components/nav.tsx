@@ -11,6 +11,7 @@ const links = [
   { href: '/gigs', label: 'Gigs' },
   { href: '/finance', label: 'Finance' },
   { href: '/musicians', label: 'Musicians' },
+  { href: '/stats', label: 'Stats' },
 ]
 
 export function Nav() {

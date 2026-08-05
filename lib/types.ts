@@ -196,3 +196,10 @@ export type FinanceReport = {
   currentYearTotals: FinanceYearSummary
   pastYears: FinanceYearSummary[]
 }
+
+export type MostPlayedSong = {
+  songId: string
+  title: string
+  artist: string | null
+  playCount: number
+}
