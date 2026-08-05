@@ -203,3 +203,10 @@ export type MostPlayedSong = {
   artist: string | null
   playCount: number
 }
+
+export type ReadySongNeverPlayed = {
+  songId: string
+  title: string
+  artist: string | null
+  key: string | null
+}
