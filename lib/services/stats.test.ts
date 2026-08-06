@@ -8,9 +8,11 @@ import {
   DEFAULT_STALE_DAYS_THRESHOLD,
   getUnpaidGigs,
   getScheduleGaps,
+  getNextGapDaysOut,
   DEFAULT_GAP_LOOKAHEAD_MONTHS,
   DEFAULT_GAP_DAYS,
 } from './stats'
+import type { ScheduleGap } from '@/lib/types'
 
 vi.mock('@/lib/db', () => ({
   default: {
@@ -598,5 +600,50 @@ describe('getScheduleGaps', () => {
   it('defaults to DEFAULT_GAP_LOOKAHEAD_MONTHS and DEFAULT_GAP_DAYS', () => {
     expect(DEFAULT_GAP_LOOKAHEAD_MONTHS).toBe(6)
     expect(DEFAULT_GAP_DAYS).toBe(14)
+  })
+})
+
+describe('getNextGapDaysOut', () => {
+  it('returns null when there are no gaps', () => {
+    expect(getNextGapDaysOut([], NOW)).toBeNull()
+  })
+
+  it('returns 0 when the next gap is already open today', () => {
+    const gaps: ScheduleGap[] = [
+      { from: { type: 'today' }, to: { type: 'open' }, days: 31 },
+    ]
+    expect(getNextGapDaysOut(gaps, NOW)).toBe(0)
+  })
+
+  it('returns days between now and the gig that precedes the next gap', () => {
+    const gaps: ScheduleGap[] = [
+      {
+        from: { type: 'gig', gigId: 'gig-1', venueName: 'Venue A', date: daysFromNow(5) },
+        to: { type: 'open' },
+        days: 26,
+      },
+    ]
+    expect(getNextGapDaysOut(gaps, NOW)).toBe(5)
+  })
+
+  it('only looks at the earliest gap when several are present', () => {
+    const gaps: ScheduleGap[] = [
+      {
+        from: { type: 'gig', gigId: 'gig-1', venueName: 'Venue A', date: daysFromNow(3) },
+        to: { type: 'gig', gigId: 'gig-2', venueName: 'Venue B', date: daysFromNow(20) },
+        days: 17,
+      },
+      {
+        from: { type: 'gig', gigId: 'gig-2', venueName: 'Venue B', date: daysFromNow(20) },
+        to: { type: 'open' },
+        days: 41,
+      },
+    ]
+    expect(getNextGapDaysOut(gaps, NOW)).toBe(3)
+  })
+
+  it('defaults now to the real clock when omitted', () => {
+    const gaps: ScheduleGap[] = [{ from: { type: 'today' }, to: { type: 'open' }, days: 31 }]
+    expect(getNextGapDaysOut(gaps)).toBe(0)
   })
 })

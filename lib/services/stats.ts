@@ -255,3 +255,18 @@ export async function getScheduleGaps(
 
   return gaps
 }
+
+// For the dashboard's "Next Schedule Gap" metric card: how many days from now
+// until the schedule opens up, derived from the list getScheduleGaps already
+// computed rather than re-querying. gaps[0] is the earliest gap chronologically
+// (the list is built by walking gigs in ascending date order) — its `from`
+// side is either 'today' (a gap is open right now, 0 days out) or the gig
+// immediately preceding it. Returns null when there's no gap in the window.
+// `now` is injectable so tests don't depend on the real clock; callers omit it.
+export function getNextGapDaysOut(gaps: ScheduleGap[], now: Date = new Date()): number | null {
+  const next = gaps[0]
+  if (!next) return null
+  if (next.from.type === 'today') return 0
+  if (next.from.type === 'gig') return daysBetween(now, next.from.date)
+  return null
+}
