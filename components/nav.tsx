@@ -21,19 +21,19 @@ export function Nav() {
   return (
     <header className="sticky top-0 z-10 border-b bg-background">
       <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4">
-        <Link href="/" className="text-lg font-bold tracking-tight">
+        <Link href="/" className="font-heading text-xl font-bold tracking-tight">
           Setlists
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden gap-6 md:flex" aria-label="Main">
+        <nav className="hidden flex-wrap gap-5 md:flex" aria-label="Main">
           {links.map(({ href, label }) => (
             <Link
               key={href}
               href={href}
-              className={`text-sm transition-colors ${
+              className={`text-[13px] font-medium transition-colors ${
                 pathname.startsWith(href)
-                  ? 'font-medium text-foreground'
+                  ? 'font-bold text-accent-1-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -63,7 +63,7 @@ export function Nav() {
               onClick={() => setOpen(false)}
               className={`block py-3 text-sm ${
                 pathname.startsWith(href)
-                  ? 'font-medium text-foreground'
+                  ? 'font-bold text-accent-1-foreground'
                   : 'text-muted-foreground'
               }`}
             >

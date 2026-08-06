@@ -10,6 +10,7 @@
   --font-sans: var(--font-public-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-bricolage-grotesque);
+  --color-accent-1-foreground: var(--accent-1-foreground);
   --color-accent-2: var(--accent-2);
   --color-accent-2-foreground: var(--accent-2-foreground);
   --color-financials: var(--financials);
@@ -93,6 +94,14 @@
   --sidebar-ring: oklch(62% 0.13 25);
 
   /* New tokens with no existing shadcn equivalent — see #29 acceptance criteria. */
+  /*
+   * accent-1 (burgundy) is already --primary as its base color. This is the
+   * lighter "text-safe variant" the #28 design hand-off calls out separately
+   * for text-on-dark contexts (active nav tab, set-card chevrons/headers,
+   * Performance Mode outline) — hand-off gives a range of oklch(78-82% 0.09-0.1 25);
+   * using the midpoint as a single reusable token.
+   */
+  --accent-1-foreground: oklch(80% 0.095 25);
   --accent-2: oklch(55% 0.09 265);
   --accent-2-foreground: oklch(72% 0.09 265);
   --financials: oklch(16% 0.025 30);
