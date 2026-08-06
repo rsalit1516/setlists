@@ -1,5 +1,5 @@
 import prisma from '@/lib/db'
-import type { GigSummary, GigWithDetails, GigPerformanceData, GigMusician } from '@/lib/types'
+import type { GigSummary, GigWithDetails, GigPerformanceData, GigMusician, GigMonthGroup } from '@/lib/types'
 import { sanitizeLyricsHtml } from '@/lib/services/sanitize-lyrics'
 
 function toStr(d: unknown): string | null {
@@ -54,6 +54,38 @@ export async function getGigs(): Promise<GigSummary[]> {
     tips: toStr(r.tips),
     otherRevenue: toStr(r.otherRevenue),
   }))
+}
+
+function monthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+// Buckets already-ordered gigs into month groups, preserving order within and across
+// months. `today` defaults to the real current date; tests pass a fixed one.
+export function groupGigsByMonth(gigs: GigSummary[], today: Date = new Date()): GigMonthGroup[] {
+  const currentKey = monthKey(today)
+  const nextMonthDate = new Date(today.getFullYear(), today.getMonth() + 1, 1)
+  const nextKey = monthKey(nextMonthDate)
+  const nextMonthExpandedByDefault = today.getDate() > 15
+
+  const groups = new Map<string, GigMonthGroup>()
+  for (const gig of gigs) {
+    const key = monthKey(gig.date)
+    let group = groups.get(key)
+    if (!group) {
+      const defaultExpanded =
+        key === currentKey || (key === nextKey && nextMonthExpandedByDefault)
+      group = {
+        key,
+        label: gig.date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        gigs: [],
+        defaultExpanded,
+      }
+      groups.set(key, group)
+    }
+    group.gigs.push(gig)
+  }
+  return Array.from(groups.values())
 }
 
 export async function getGigForPerformance(id: string): Promise<GigPerformanceData | null> {

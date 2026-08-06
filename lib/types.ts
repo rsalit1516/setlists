@@ -111,6 +111,13 @@ export type GigSummary = {
   _count: { musicians: number }
 }
 
+export type GigMonthGroup = {
+  key: string
+  label: string
+  gigs: GigSummary[]
+  defaultExpanded: boolean
+}
+
 export type GigSetlistItem = {
   id: string
   order: number

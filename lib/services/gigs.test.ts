@@ -6,6 +6,7 @@ import {
   calculateTotalExpenses,
   calculateGigNet,
   deriveMusicianPayoutStatus,
+  groupGigsByMonth,
 } from './gigs'
 
 vi.mock('@/lib/db', () => ({
@@ -207,6 +208,62 @@ describe('calculateGigNet', () => {
   it('treats null revenue fields as 0', () => {
     const net = calculateGigNet({ amountPaid: null, tips: null, otherRevenue: null }, 20)
     expect(net).toBe(-20)
+  })
+})
+
+describe('groupGigsByMonth', () => {
+  function makeGigSummary(overrides: Partial<typeof mockGigSummary> = {}) {
+    return { ...mockGigSummary, ...overrides }
+  }
+
+  // Gig dates and `today` are built with the local (year, month, day) constructor —
+  // the same shape actions.ts produces via `new Date(dateStr + 'T12:00:00')` — so
+  // these tests exercise the same local-getter behavior as production, independent
+  // of the test runner's timezone.
+  it('returns no groups for an empty gig list', () => {
+    expect(groupGigsByMonth([], new Date(2026, 7, 6))).toEqual([])
+  })
+
+  it('buckets gigs by month, preserving order within a month', () => {
+    const gigs = [
+      makeGigSummary({ id: 'g-1', date: new Date(2026, 7, 20) }),
+      makeGigSummary({ id: 'g-2', date: new Date(2026, 7, 5) }),
+      makeGigSummary({ id: 'g-3', date: new Date(2026, 6, 10) }),
+    ]
+    const groups = groupGigsByMonth(gigs, new Date(2026, 7, 6))
+    expect(groups.map((g) => g.key)).toEqual(['2026-08', '2026-07'])
+    expect(groups[0].gigs.map((g) => g.id)).toEqual(['g-1', 'g-2'])
+    expect(groups[0].label).toBe('August 2026')
+  })
+
+  it('marks the current month expanded by default', () => {
+    const gigs = [makeGigSummary({ date: new Date(2026, 7, 20) })]
+    const [group] = groupGigsByMonth(gigs, new Date(2026, 7, 6))
+    expect(group.defaultExpanded).toBe(true)
+  })
+
+  it('collapses next month by default before the 15th', () => {
+    const gigs = [makeGigSummary({ date: new Date(2026, 8, 1) })]
+    const [group] = groupGigsByMonth(gigs, new Date(2026, 7, 6))
+    expect(group.defaultExpanded).toBe(false)
+  })
+
+  it('expands next month by default once past the 15th', () => {
+    const gigs = [makeGigSummary({ date: new Date(2026, 8, 1) })]
+    const [group] = groupGigsByMonth(gigs, new Date(2026, 7, 16))
+    expect(group.defaultExpanded).toBe(true)
+  })
+
+  it('collapses months beyond next month regardless of date', () => {
+    const gigs = [makeGigSummary({ date: new Date(2026, 10, 1) })]
+    const [group] = groupGigsByMonth(gigs, new Date(2026, 7, 16))
+    expect(group.defaultExpanded).toBe(false)
+  })
+
+  it('collapses past months by default', () => {
+    const gigs = [makeGigSummary({ date: new Date(2026, 0, 1) })]
+    const [group] = groupGigsByMonth(gigs, new Date(2026, 7, 6))
+    expect(group.defaultExpanded).toBe(false)
   })
 })
 

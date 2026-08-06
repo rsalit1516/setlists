@@ -1,8 +1,9 @@
 import Link from 'next/link'
-import { getGigs } from '@/lib/services/gigs'
+import { getGigs, groupGigsByMonth } from '@/lib/services/gigs'
 import { deleteGig } from './actions'
 import { buttonVariants } from '@/components/ui/button'
 import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
+import { MonthSection } from '@/components/gigs/month-section'
 
 function formatDate(d: Date) {
   return new Date(d).toLocaleDateString('en-US', {
@@ -12,6 +13,7 @@ function formatDate(d: Date) {
 
 export default async function GigsPage() {
   const gigs = await getGigs()
+  const monthGroups = groupGigsByMonth(gigs)
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
@@ -25,43 +27,53 @@ export default async function GigsPage() {
       {gigs.length === 0 ? (
         <p className="text-muted-foreground">No gigs yet.</p>
       ) : (
-        <div className="space-y-2">
-          {gigs.map((gig) => {
-            const deleteAction = deleteGig.bind(null, gig.id)
-            return (
-              <div key={gig.id} className="rounded-lg border p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <Link href={`/gigs/${gig.id}`} className="min-w-0 flex-1">
-                    <div className="font-medium hover:underline">{formatDate(gig.date)}</div>
-                    <div className="text-sm text-muted-foreground">{gig.venue.name}</div>
-                  </Link>
-                  <div className="flex shrink-0 items-center gap-3">
-                    <div className="text-right text-sm">
-                      {gig.amountPaid ? (
-                        <span className="text-green-600">
-                          ${parseFloat(gig.amountPaid).toFixed(2)} paid
-                        </span>
-                      ) : gig.amountContracted ? (
-                        <span className="text-amber-600">
-                          ${parseFloat(gig.amountContracted).toFixed(2)} contracted
-                        </span>
-                      ) : null}
+        <div className="space-y-4">
+          {monthGroups.map((group) => (
+            <MonthSection
+              key={group.key}
+              monthKey={group.key}
+              label={group.label}
+              count={group.gigs.length}
+              defaultExpanded={group.defaultExpanded}
+            >
+              {group.gigs.map((gig) => {
+                const deleteAction = deleteGig.bind(null, gig.id)
+                return (
+                  <div key={gig.id} className="rounded-lg border p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <Link href={`/gigs/${gig.id}`} className="min-w-0 flex-1">
+                        <div className="font-medium hover:underline">{formatDate(gig.date)}</div>
+                        <div className="text-sm text-muted-foreground">{gig.venue.name}</div>
+                      </Link>
+                      <div className="flex shrink-0 items-center gap-3">
+                        <div className="text-right text-sm">
+                          {gig.amountPaid ? (
+                            <span className="text-green-600">
+                              ${parseFloat(gig.amountPaid).toFixed(2)} paid
+                            </span>
+                          ) : gig.amountContracted ? (
+                            <span className="text-amber-600">
+                              ${parseFloat(gig.amountContracted).toFixed(2)} contracted
+                            </span>
+                          ) : null}
+                        </div>
+                        <DeleteConfirmButton
+                          action={deleteAction}
+                          variant="icon"
+                          ariaLabel="Delete gig"
+                          description={`Remove the gig at ${gig.venue.name} on ${formatDate(gig.date)}?`}
+                        />
+                      </div>
                     </div>
-                    <DeleteConfirmButton
-                      action={deleteAction}
-                      variant="icon"
-                      ariaLabel="Delete gig"
-                      description={`Remove the gig at ${gig.venue.name} on ${formatDate(gig.date)}?`}
-                    />
+                    <div className="mt-1 text-sm text-muted-foreground">
+                      {gig.setlist.name} ·{' '}
+                      {gig._count.musicians} musician{gig._count.musicians !== 1 ? 's' : ''}
+                    </div>
                   </div>
-                </div>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  {gig.setlist.name} ·{' '}
-                  {gig._count.musicians} musician{gig._count.musicians !== 1 ? 's' : ''}
-                </div>
-              </div>
-            )
-          })}
+                )
+              })}
+            </MonthSection>
+          ))}
         </div>
       )}
     </div>
