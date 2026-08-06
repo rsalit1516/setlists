@@ -1,14 +1,11 @@
 'use client'
 
-import { buttonVariants } from '@/components/ui/button'
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 
-export function PrintButton() {
+export function PrintMenuItem() {
   return (
-    <button
-      onClick={() => window.print()}
-      className={buttonVariants({ variant: 'outline', size: 'sm' })}
-    >
+    <DropdownMenuItem onClick={() => window.print()}>
       Print Setlist
-    </button>
+    </DropdownMenuItem>
   )
 }

@@ -17,11 +17,17 @@ import {
   markAllMusiciansPaid,
 } from '@/app/gigs/actions'
 import { EditFinancialsForm } from '@/components/gigs/edit-financials-form'
-import { PrintButton } from '@/components/gigs/print-button'
+import { PrintMenuItem } from '@/components/gigs/print-button'
 import { buttonVariants, Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { buildPrintLayout } from '@/lib/setlist-print'
 import type { GigSetlistItem } from '@/lib/types'
 
@@ -122,59 +128,58 @@ export default async function GigPage({
     <div className="mx-auto max-w-4xl px-4 py-6">
 
       {/* ── Screen: back link ── */}
-      <div className="mb-2 print:hidden">
-        <Link href="/gigs" className="text-sm text-muted-foreground hover:underline">
+      <div className="mb-2.5 print:hidden">
+        <Link
+          href="/gigs"
+          className="text-xs font-medium text-[oklch(65%_0.06_25)] hover:underline"
+        >
           ← Gigs
         </Link>
       </div>
 
-      {/* ── Screen: header ── */}
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3 print:hidden">
-        <div>
-          <h1 className="text-2xl font-bold">{gig.venue.name}</h1>
-          <p className="text-muted-foreground">
-            {formatDate(gig.date)}
-            {formatTimeRange(gig.startTime, gig.endTime) && (
-              <span> · {formatTimeRange(gig.startTime, gig.endTime)}</span>
-            )}
-          </p>
-          {gig.notes && (
-            <p className="mt-1 text-sm text-muted-foreground">{gig.notes}</p>
+      {/* ── Screen: title block ── */}
+      <div className="mb-6 print:hidden">
+        <h1 className="font-heading text-[clamp(28px,4vw,38px)] font-bold leading-tight">
+          {gig.venue.name}
+        </h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          {formatDate(gig.date)}
+          {formatTimeRange(gig.startTime, gig.endTime) && (
+            <span> · {formatTimeRange(gig.startTime, gig.endTime)}</span>
           )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href={`/gigs/${gig.id}/edit`}
-            className={buttonVariants({ variant: 'outline', size: 'sm' })}
-          >
+        </p>
+        {gig.notes && (
+          <p className="mt-1 text-sm text-muted-foreground">{gig.notes}</p>
+        )}
+      </div>
+
+      {/* ── Screen: action bar ── */}
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3.5 border-b pb-5 print:hidden">
+        <div className="flex flex-wrap items-center gap-5 text-[13.5px] font-medium">
+          <Link href={`/gigs/${gig.id}/edit`} className="text-foreground hover:underline">
             Edit Gig
           </Link>
-          <Link
-            href={`/setlists/${gig.setlist.id}`}
-            className={buttonVariants({ variant: 'outline', size: 'sm' })}
-          >
+          <Link href={`/setlists/${gig.setlist.id}`} className="text-foreground hover:underline">
             Edit Setlist
           </Link>
-          <PrintButton />
-          <a
-            href={`/gigs/${gig.id}/pdf`}
-            className={buttonVariants({ variant: 'outline', size: 'sm' })}
-          >
-            Download PDF
-          </a>
-          <Link
-            href={`/gigs/${gig.id}/perform`}
-            className={buttonVariants({ variant: 'default', size: 'sm' })}
-          >
-            Start Performance Mode
-          </Link>
-          <a
-            href="#financials"
-            className={buttonVariants({ variant: 'outline', size: 'sm' })}
-          >
-            Financials ↓
-          </a>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex items-center gap-1 rounded-sm text-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50">
+              Export <span className="text-[10px]">▾</span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[150px]">
+              <PrintMenuItem />
+              <DropdownMenuItem render={<a href={`/gigs/${gig.id}/pdf`} />}>
+                Download PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
+        <Link
+          href={`/gigs/${gig.id}/perform`}
+          className="inline-flex h-9 items-center justify-center rounded-md border-[1.5px] border-primary px-4 text-[13px] font-semibold text-accent-1-foreground transition-colors hover:bg-primary/10"
+        >
+          Start Performance Mode
+        </Link>
       </div>
 
       {/* ── Screen: setlist grid ── */}
