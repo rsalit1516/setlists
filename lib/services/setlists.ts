@@ -2,11 +2,14 @@ import prisma from '@/lib/db'
 import type { SetlistSummary, SetlistWithItems } from '@/lib/types'
 
 export async function getSetlists(): Promise<SetlistSummary[]> {
+  // A setlist can now back multiple gigs (or none), so it can no longer be
+  // ordered by "its" gig date — order by creation instead and let callers
+  // fall back to each setlist's own gigs array for date info.
   return prisma.setlist.findMany({
     where: { isActive: true },
-    orderBy: [{ gig: { date: 'desc' } }, { createdAt: 'desc' }],
+    orderBy: { createdAt: 'desc' },
     include: {
-      gig: { include: { venue: true } },
+      gigs: { where: { isActive: true }, orderBy: { date: 'desc' }, include: { venue: true } },
       _count: { select: { items: { where: { isActive: true } } } },
     },
   }) as Promise<SetlistSummary[]>
@@ -21,7 +24,7 @@ export async function getSetlist(id: string): Promise<SetlistWithItems | null> {
         include: { song: true },
         orderBy: [{ setNumber: 'asc' }, { order: 'asc' }],
       },
-      gig: { include: { venue: true } },
+      gigs: { where: { isActive: true }, orderBy: { date: 'desc' }, include: { venue: true } },
     },
   }) as Promise<SetlistWithItems | null>
 }

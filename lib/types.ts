@@ -42,7 +42,7 @@ export type SetlistSummary = {
   id: string
   name: string
   createdAt: Date
-  gig: { date: Date; venue: { name: string } } | null
+  gigs: { date: Date; venue: { name: string } }[]
   _count: { items: number }
 }
 
@@ -52,7 +52,7 @@ export type SetlistWithItems = {
   createdAt: Date
   updatedAt: Date
   items: SetlistItem[]
-  gig: { id: string; date: Date; venue: Venue } | null
+  gigs: { id: string; date: Date; venue: Venue }[]
 }
 
 export type Song = {

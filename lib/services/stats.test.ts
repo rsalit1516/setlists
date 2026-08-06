@@ -103,12 +103,16 @@ describe('getMostPlayedSongs', () => {
     vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([])
     await getMostPlayedSongs()
     type FindManyArgs = {
-      where: { isActive: unknown; wasPlayed: unknown; setlist: { gig: { isActive: unknown } } }
+      where: {
+        isActive: unknown
+        wasPlayed: unknown
+        setlist: { gigs: { some: { isActive: unknown } } }
+      }
     }
     const call = vi.mocked(prisma.setlistItem.findMany).mock.calls[0][0] as unknown as FindManyArgs
     expect(call.where.isActive).toBe(true)
     expect(call.where.wasPlayed).toBe(true)
-    expect(call.where.setlist.gig.isActive).toBe(true)
+    expect(call.where.setlist.gigs.some.isActive).toBe(true)
   })
 
   it('skips the song lookup entirely when nothing has been played', async () => {

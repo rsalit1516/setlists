@@ -37,8 +37,8 @@ function daysBetween(a: Date, b: Date): number {
 }
 
 // Shared join: a play only counts if the SetlistItem is active, was actually
-// played, and belongs to a Setlist attached to an active Gig — a Setlist
-// with no Gig (e.g. a draft) never counts as a performance. Both
+// played, and belongs to a Setlist attached to at least one active Gig — a
+// Setlist with no Gig (e.g. a draft) never counts as a performance. Both
 // getMostPlayedSongs and getReadySongsNeverPlayed build on this same
 // per-song count instead of re-deriving the join twice.
 async function getPlayCountsBySongId(): Promise<Map<string, number>> {
@@ -46,7 +46,7 @@ async function getPlayCountsBySongId(): Promise<Map<string, number>> {
     where: {
       isActive: true,
       wasPlayed: true,
-      setlist: { gig: { isActive: true } },
+      setlist: { gigs: { some: { isActive: true } } },
     },
     select: { songId: true },
   })

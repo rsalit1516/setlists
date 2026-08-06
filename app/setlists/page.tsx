@@ -13,10 +13,10 @@ export default async function SetlistsPage() {
 
   const currentYear = new Date().getFullYear()
 
-  // Group by year of gig date, falling back to createdAt
+  // Group by year of most recent gig date, falling back to createdAt
   const byYear = new Map<number, typeof setlists>()
   for (const sl of setlists) {
-    const d = sl.gig?.date ?? sl.createdAt
+    const d = sl.gigs[0]?.date ?? sl.createdAt
     const year = new Date(d).getFullYear()
     if (!byYear.has(year)) byYear.set(year, [])
     byYear.get(year)!.push(sl)
@@ -72,12 +72,17 @@ export default async function SetlistsPage() {
                             {sl.name}
                           </Link>
                           <div className="mt-0.5 flex flex-wrap gap-x-3 text-sm text-muted-foreground">
-                            {sl.gig ? (
+                            {sl.gigs.length === 0 ? (
+                              <span>No gig linked</span>
+                            ) : sl.gigs.length === 1 ? (
                               <span>
-                                {sl.gig.venue.name} · {formatDate(sl.gig.date)}
+                                {sl.gigs[0].venue.name} · {formatDate(sl.gigs[0].date)}
                               </span>
                             ) : (
-                              <span>No gig linked</span>
+                              <span>
+                                Used in {sl.gigs.length} gigs · most recently {sl.gigs[0].venue.name} ·{' '}
+                                {formatDate(sl.gigs[0].date)}
+                              </span>
                             )}
                             <span>
                               {sl._count.items} song{sl._count.items !== 1 ? 's' : ''}
@@ -91,7 +96,7 @@ export default async function SetlistsPage() {
                           >
                             Edit
                           </Link>
-                          {!sl.gig && (
+                          {sl.gigs.length === 0 && (
                             <DeleteConfirmButton
                               action={deleteAction}
                               description={`Remove "${sl.name}" and all its songs?`}
