@@ -73,6 +73,20 @@ const PAYOUT_BADGE: Record<'all' | 'some' | 'none', { label: string; className: 
   },
 }
 
+function SongRow({ item, index }: { item: GigSetlistItem; index: number }) {
+  return (
+    <li className="flex items-baseline justify-between gap-2.5">
+      <span className="truncate">
+        <span className="mr-2 text-muted-foreground">{index}</span>
+        {item.song.title}
+      </span>
+      {item.song.key && (
+        <span className="shrink-0 font-semibold text-key-badge">{item.song.key}</span>
+      )}
+    </li>
+  )
+}
+
 function groupItems(items: GigSetlistItem[]) {
   const soundcheck = items.filter((i) => i.section === 'SOUNDCHECK')
   const main = items.filter((i) => i.section === 'MAIN')
@@ -163,7 +177,7 @@ export default async function GigPage({
         </div>
       </div>
 
-      {/* ── Screen: setlist columns ── */}
+      {/* ── Screen: setlist grid ── */}
       <div className="print:hidden">
         {gig.setlist.items.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">
@@ -173,93 +187,69 @@ export default async function GigPage({
             </Link>
           </p>
         ) : (
-          <div className="flex flex-col gap-4 sm:flex-row">
-            {columns.map((setNum) => {
-              const setItems = main.filter((i) => i.setNumber === setNum)
-              return (
-                <div key={setNum} className="min-w-0 flex-1 overflow-hidden rounded-lg border">
-                  {/* Soundcheck above Set 1 */}
-                  {setNum === 1 && soundcheck.length > 0 && (
-                    <div className="border-b">
-                      <div className="bg-muted/40 px-3 py-1.5">
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          Soundcheck
-                        </h3>
-                      </div>
-                      <ol>
-                        {soundcheck.map((item, i) => (
-                          <li
-                            key={item.id}
-                            className="flex items-baseline gap-2 border-t px-3 py-1.5 text-sm first:border-t-0"
-                          >
-                            <span className="w-5 shrink-0 text-right text-xs text-muted-foreground">
-                              {i + 1}
-                            </span>
-                            <span className="truncate">{item.song.title}</span>
-                            {item.song.key && (
-                              <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                                {item.song.key}
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                  )}
-
-                  {/* Set */}
-                  <div className="bg-muted/40 px-3 py-1.5">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Set {setNum}
-                      <span className="ml-1.5 font-normal">({setItems.length})</span>
-                    </h3>
-                  </div>
-                  <ol>
-                    {setItems.map((item, i) => (
-                      <li
-                        key={item.id}
-                        className="flex items-baseline gap-2 border-t px-3 py-1.5 text-sm first:border-t-0"
-                      >
-                        <span className="w-5 shrink-0 text-right text-xs text-muted-foreground">
-                          {i + 1}
-                        </span>
-                        <span className="truncate">{item.song.title}</span>
-                        {item.song.key && (
-                          <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                            {item.song.key}
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
-
-                  {/* Encore in last column */}
-                  {setNum === numCols && encore.length > 0 && (
-                    <div className="border-t">
-                      <div className="bg-muted/40 px-3 py-1.5">
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          Encore
-                        </h3>
-                      </div>
-                      <ol>
-                        {encore.map((item, i) => (
-                          <li
-                            key={item.id}
-                            className="flex items-baseline gap-2 border-t px-3 py-1.5 text-sm first:border-t-0"
-                          >
-                            <span className="w-5 shrink-0 text-right text-xs text-muted-foreground">
-                              {i + 1}
-                            </span>
-                            <span className="truncate">{item.song.title}</span>
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                  )}
+          <>
+            {/* Soundcheck above Set 1 */}
+            {soundcheck.length > 0 && (
+              <div className="mb-4 overflow-hidden rounded-lg border bg-card">
+                <div className="px-4 pb-2 pt-3.5">
+                  <span className="text-[11px] font-bold uppercase tracking-[.06em] text-muted-foreground">
+                    Soundcheck
+                  </span>
                 </div>
-              )
-            })}
-          </div>
+                <ol className="flex flex-col gap-2 px-4 pb-4 text-[13.5px]">
+                  {soundcheck.map((item, i) => (
+                    <SongRow key={item.id} item={item} index={i + 1} />
+                  ))}
+                </ol>
+              </div>
+            )}
+
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-4">
+              {columns.map((setNum) => {
+                const setItems = main.filter((i) => i.setNumber === setNum)
+                const isOdd = setNum % 2 === 1
+                const borderAccent = isOdd ? 'border-t-primary' : 'border-t-accent-2'
+                const textAccent = isOdd ? 'text-accent-1-foreground' : 'text-accent-2-foreground'
+                return (
+                  <details
+                    key={setNum}
+                    open
+                    className={`overflow-hidden rounded-lg border border-t-[3px] bg-card ${borderAccent}`}
+                  >
+                    <summary
+                      className={`flex list-none cursor-pointer items-center justify-between gap-2 px-4 pb-2.5 pt-3.5 [&::-webkit-details-marker]:hidden min-[860px]:pointer-events-none min-[860px]:cursor-default`}
+                    >
+                      <span className={`text-[11.5px] font-bold uppercase tracking-[.06em] ${textAccent}`}>
+                        Set {setNum} · {setItems.length} Songs
+                      </span>
+                      <span aria-hidden className="text-[11px] text-muted-foreground min-[860px]:hidden">
+                        ▾
+                      </span>
+                    </summary>
+                    <ol className="flex flex-col gap-2 px-4 pb-4 text-[13.5px]">
+                      {setItems.map((item, i) => (
+                        <SongRow key={item.id} item={item} index={i + 1} />
+                      ))}
+                    </ol>
+
+                    {/* Encore in the last card */}
+                    {setNum === numCols && encore.length > 0 && (
+                      <div className="px-4 pb-4">
+                        <div className="mb-2 text-[10.5px] font-bold uppercase tracking-[.05em] text-muted-foreground">
+                          Encore
+                        </div>
+                        <ol className="flex flex-col gap-2 text-[13.5px]">
+                          {encore.map((item, i) => (
+                            <SongRow key={item.id} item={item} index={i + 1} />
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                  </details>
+                )
+              })}
+            </div>
+          </>
         )}
       </div>
 
