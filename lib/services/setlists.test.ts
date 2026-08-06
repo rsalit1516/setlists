@@ -18,7 +18,7 @@ const mockSetlist = {
   createdAt: new Date('2026-05-15'),
   updatedAt: new Date('2026-05-15'),
   items: [],
-  gig: null,
+  gigs: [],
   _count: { items: 0 },
 }
 
@@ -30,7 +30,30 @@ describe('getSetlists', () => {
     const result = await getSetlists()
     expect(result).toHaveLength(1)
     expect(prisma.setlist.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { isActive: true } })
+      expect.objectContaining({ where: { isActive: true }, orderBy: { createdAt: 'desc' } })
+    )
+  })
+
+  it('includes each setlist\'s gigs so a setlist reused across multiple gigs is visible', async () => {
+    const reused = {
+      ...mockSetlist,
+      id: 'sl-2',
+      gigs: [
+        { id: 'gig-2', date: new Date('2026-06-01'), venue: { name: 'The Vault' } },
+        { id: 'gig-1', date: new Date('2026-05-20'), venue: { name: 'The Vault' } },
+      ],
+    }
+    vi.mocked(prisma.setlist.findMany).mockResolvedValue([reused] as never)
+
+    const result = await getSetlists()
+
+    expect(result[0].gigs).toHaveLength(2)
+    expect(prisma.setlist.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          gigs: expect.objectContaining({ orderBy: { date: 'desc' } }),
+        }),
+      })
     )
   })
 

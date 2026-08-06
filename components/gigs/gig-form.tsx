@@ -1,12 +1,11 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import type { GigActionState } from '@/app/gigs/actions'
-import type { GigWithDetails, Venue } from '@/lib/types'
+import type { GigWithDetails, SetlistSummary, Venue } from '@/lib/types'
 
 const selectClass =
   'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
@@ -18,16 +17,21 @@ type FormAction = (state: GigActionState, formData: FormData) => Promise<GigActi
 
 export function GigForm({
   venues,
+  setlists = [],
   gig,
   action,
   defaultSetlistId,
 }: {
   venues: Venue[]
+  setlists?: SetlistSummary[]
   gig?: GigWithDetails
   action: FormAction
   defaultSetlistId?: string
 }) {
   const [state, formAction, pending] = useActionState(action, null)
+  const [setlistMode, setSetlistMode] = useState<'new' | 'reuse'>(
+    defaultSetlistId ? 'reuse' : 'new'
+  )
 
   return (
     <form action={formAction} className="space-y-4">
@@ -49,10 +53,6 @@ export function GigForm({
       )}
 
       {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
-
-      {!gig && defaultSetlistId && (
-        <input type="hidden" name="setlistId" value={defaultSetlistId} />
-      )}
 
       <div>
         <label className="mb-1 block text-sm font-medium">Date</label>
@@ -100,16 +100,65 @@ export function GigForm({
       </div>
 
       {!gig && (
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="createSetlist"
-            name="createSetlist"
-            value="true"
-            defaultChecked={!defaultSetlistId}
-          />
-          <label htmlFor="createSetlist" className="cursor-pointer text-sm font-medium">
-            Create setlist
-          </label>
+        <div>
+          <label className="mb-1 block text-sm font-medium">Setlist</label>
+          {setlists.length === 0 ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                A new setlist will be created for this gig.
+              </p>
+              <input type="hidden" name="createSetlist" value="true" />
+            </>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex min-h-11 items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="setlistMode"
+                    checked={setlistMode === 'new'}
+                    onChange={() => setSetlistMode('new')}
+                    className="size-4"
+                  />
+                  Create new setlist
+                </label>
+                <label className="flex min-h-11 items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="setlistMode"
+                    checked={setlistMode === 'reuse'}
+                    onChange={() => setSetlistMode('reuse')}
+                    className="size-4"
+                  />
+                  Reuse existing setlist
+                </label>
+              </div>
+
+              {setlistMode === 'new' ? (
+                <input type="hidden" name="createSetlist" value="true" />
+              ) : (
+                <select
+                  name="setlistId"
+                  required
+                  title="Setlist"
+                  defaultValue={defaultSetlistId ?? ''}
+                  className={`${selectClass} mt-2`}
+                >
+                  <option value="" disabled>
+                    Select setlist…
+                  </option>
+                  {setlists.map((sl) => (
+                    <option key={sl.id} value={sl.id}>
+                      {sl.name} — {sl._count.items} song{sl._count.items !== 1 ? 's' : ''}
+                      {sl.gigs.length > 0
+                        ? ` · used in ${sl.gigs.length} gig${sl.gigs.length !== 1 ? 's' : ''}`
+                        : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </>
+          )}
         </div>
       )}
 

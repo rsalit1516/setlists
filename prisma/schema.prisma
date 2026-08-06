@@ -73,7 +73,7 @@ model Setlist {
   updatedAt DateTime @updatedAt
 
   items SetlistItem[]
-  gig   Gig?
+  gigs  Gig[]
 }
 
 model SetlistItem {
@@ -107,7 +107,7 @@ model Gig {
   updatedAt        DateTime  @updatedAt
 
   venueId   String
-  setlistId String @unique
+  setlistId String
 
   venue     Venue         @relation(fields: [venueId], references: [id])
   setlist   Setlist       @relation(fields: [setlistId], references: [id])

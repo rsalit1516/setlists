@@ -56,29 +56,24 @@ export default async function SetlistPage({
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
             <RenameForm id={setlist.id} currentName={setlist.name} />
-            {setlist.gig && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                {setlist.gig.venue.name} · {formatDate(setlist.gig.date)}
+            {setlist.gigs.length > 0 && (
+              <p className="mt-1 flex flex-wrap gap-x-3 text-sm text-muted-foreground">
+                {setlist.gigs.map((gig) => (
+                  <Link key={gig.id} href={`/gigs/${gig.id}`} className="hover:underline">
+                    {gig.venue.name} · {formatDate(gig.date)}
+                  </Link>
+                ))}
               </p>
             )}
           </div>
 
           <div className="flex gap-2">
-            {setlist.gig ? (
-              <Link
-                href={`/gigs/${setlist.gig.id}`}
-                className={buttonVariants({ variant: 'outline', size: 'sm' })}
-              >
-                View Gig
-              </Link>
-            ) : (
-              <Link
-                href={`/gigs/new?setlistId=${setlist.id}`}
-                className={buttonVariants({ variant: 'outline', size: 'sm' })}
-              >
-                Schedule Gig
-              </Link>
-            )}
+            <Link
+              href={`/gigs/new?setlistId=${setlist.id}`}
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+            >
+              {setlist.gigs.length > 0 ? 'Use for New Gig' : 'Schedule Gig'}
+            </Link>
             <form action={copySetlist.bind(null, setlist.id)}>
               <button type="submit" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
                 Copy
