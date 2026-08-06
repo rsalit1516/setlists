@@ -20,6 +20,16 @@
       "Bash(taskkill //F //IM node.exe //T)",
       "Bash(taskkill //PID * //F)",
       "Bash(npx prisma migrate dev*)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(git merge *)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr merge *)",
+      "Bash(gh pr close *)",
+      "Bash(gh issue create *)",
+      "Bash(gh issue edit *)",
+      "Bash(gh issue close *)"
     ]
   }
 }
