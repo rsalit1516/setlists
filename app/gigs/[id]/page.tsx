@@ -61,7 +61,7 @@ function toDateInputValue(d: Date | null) {
 const PAYOUT_BADGE: Record<'all' | 'some' | 'none', { label: string; className: string }> = {
   all: {
     label: 'All musicians paid',
-    className: 'border-green-600/30 bg-green-600/10 text-green-700 dark:text-green-400',
+    className: 'border-transparent bg-success-pill text-success-pill-foreground',
   },
   some: {
     label: 'Some musicians paid',
@@ -254,19 +254,22 @@ export default async function GigPage({
       </div>
 
       {/* ── Screen: financials ── */}
-      <div id="financials" className="mt-10 print:hidden space-y-4">
-        <h2 className="text-base font-semibold text-muted-foreground uppercase tracking-wider">
-          Financials
-        </h2>
+      <details
+        id="financials"
+        className="mt-10 overflow-hidden rounded-xl border border-financials-border bg-financials text-financials-foreground print:hidden"
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-4 [&::-webkit-details-marker]:hidden">
+          <span className="text-xs font-bold uppercase tracking-[.07em] text-[oklch(72%_0.1_30)]">
+            Financials · Private
+          </span>
+          <span aria-hidden className="text-[11px] text-[oklch(60%_0.05_30)]">
+            ▾
+          </span>
+        </summary>
 
-        {/* Summary */}
-        <div className="rounded-lg border">
-          <div className="border-b bg-muted/40 px-4 py-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Summary
-            </span>
-          </div>
-          <div className="space-y-1 px-4 py-3 text-sm">
+        <div className="flex flex-col gap-6 px-5 pb-6">
+          {/* Summary */}
+          <div className="flex flex-col gap-2 border-b border-financials-border pb-4 text-[13.5px]">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Contracted</span>
               <span>{fmt(gig.amountContracted)}</span>
@@ -285,66 +288,62 @@ export default async function GigPage({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Expenses</span>
-              <span className={totalExpenses > 0 ? 'text-red-600 dark:text-red-400' : ''}>
-                {totalExpenses > 0 ? `−$${totalExpenses.toFixed(2)}` : '—'}
+              <span className={totalExpenses > 0 ? 'text-negative-amount' : ''}>
+                {totalExpenses > 0 ? `–$${totalExpenses.toFixed(2)}` : '—'}
               </span>
             </div>
-            <div className="flex justify-between border-t pt-1 font-medium">
+            <div className="flex justify-between pt-1 text-[15px] font-bold">
               <span>Net</span>
               <span>
                 {hasRevenue ? `${net < 0 ? '−' : ''}$${Math.abs(net).toFixed(2)}` : '—'}
               </span>
             </div>
             {perMusician !== null && hasRevenue && (
-              <div className="flex justify-between text-muted-foreground">
+              <div className="flex justify-between text-[12.5px] text-muted-foreground/80">
                 <span>Suggested per musician ({gig.musicians.length})</span>
                 <span>${perMusician.toFixed(2)}</span>
               </div>
             )}
           </div>
-          <div className="border-t px-4 py-3">
-            <EditFinancialsForm gig={gig} action={updateGig} />
-          </div>
-        </div>
 
-        {/* Expenses */}
-        <div className="rounded-lg border">
-          <div className="border-b bg-muted/40 px-4 py-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {/* Edit fields */}
+          <EditFinancialsForm gig={gig} action={updateGig} />
+
+          {/* Expenses */}
+          <div className="flex flex-col gap-3 border-t border-financials-border pt-5">
+            <span className="text-[11px] font-bold uppercase tracking-[.06em] text-muted-foreground">
               Expenses
             </span>
-          </div>
-          {gig.expenses.length === 0 ? (
-            <p className="px-4 py-3 text-sm italic text-muted-foreground">No expenses yet</p>
-          ) : (
-            <ul className="divide-y">
-              {gig.expenses.map((expense) => {
-                const removeAction = removeExpense.bind(null, expense.id)
-                return (
-                  <li key={expense.id} className="flex items-center gap-2 px-4 py-2.5 text-sm">
-                    <span className="flex-1">{expense.description}</span>
-                    <span className="tabular-nums text-muted-foreground">
-                      ${parseFloat(expense.amount).toFixed(2)}
-                    </span>
-                    <DeleteConfirmButton
-                      action={removeAction}
-                      variant="icon"
-                      ariaLabel="Remove expense"
-                      description={`Remove expense "${expense.description}"?`}
-                    />
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-          <div className="px-4 pb-3 pt-2">
-            <form action={addExpense} className="flex gap-2">
+            {gig.expenses.length === 0 ? (
+              <p className="text-sm italic text-muted-foreground">No expenses yet</p>
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {gig.expenses.map((expense) => {
+                  const removeAction = removeExpense.bind(null, expense.id)
+                  return (
+                    <li key={expense.id} className="flex items-center justify-between gap-2 text-[13.5px]">
+                      <span>{expense.description}</span>
+                      <span className="flex items-center gap-2.5">
+                        <span className="tabular-nums">${parseFloat(expense.amount).toFixed(2)}</span>
+                        <DeleteConfirmButton
+                          action={removeAction}
+                          variant="icon"
+                          ariaLabel="Remove expense"
+                          description={`Remove expense "${expense.description}"?`}
+                        />
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+            <form action={addExpense} className="flex flex-wrap gap-2.5">
               <input type="hidden" name="gigId" value={gig.id} />
               <input
                 name="description"
                 placeholder="Description"
                 required
-                className={`${inputClass} flex-1`}
+                className={`${inputClass} min-w-[160px] flex-1`}
               />
               <input
                 name="amount"
@@ -363,90 +362,89 @@ export default async function GigPage({
               </button>
             </form>
           </div>
-        </div>
 
-        {/* Musicians */}
-        <div className="rounded-lg border">
-          <div className="border-b bg-muted/40 px-4 py-2 flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Musicians
-            </span>
-            {payoutStatus && (
-              <Badge variant="outline" className={PAYOUT_BADGE[payoutStatus].className}>
-                {PAYOUT_BADGE[payoutStatus].label}
-              </Badge>
+          {/* Musicians */}
+          <div className="flex flex-col gap-3.5 border-t border-financials-border pt-5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-[.06em] text-muted-foreground">
+                Musicians
+              </span>
+              {payoutStatus && (
+                <Badge variant="outline" className={PAYOUT_BADGE[payoutStatus].className}>
+                  {PAYOUT_BADGE[payoutStatus].label}
+                </Badge>
+              )}
+            </div>
+            {gig.musicians.length === 0 ? (
+              <p className="text-sm italic text-muted-foreground">No musicians added yet</p>
+            ) : (
+              <ul className="flex flex-col gap-3">
+                {gig.musicians.map((musician) => {
+                  const removeAction = removeMusician.bind(null, musician.id)
+                  const suggested = perMusician !== null ? perMusician.toFixed(2) : ''
+                  return (
+                    <li key={musician.id} className="flex flex-wrap items-center gap-2.5 text-[13.5px]">
+                      <span className="min-w-[8rem] flex-1 font-semibold">{musician.musician.name}</span>
+                      <form
+                        action={updateMusicianPayment}
+                        className="flex flex-wrap items-center gap-2.5"
+                      >
+                        <input type="hidden" name="gigMusicianId" value={musician.id} />
+                        <Input
+                          key={musician.amountPaid ?? suggested}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          name="amountPaid"
+                          placeholder="0.00"
+                          title={`Amount paid to ${musician.musician.name}`}
+                          defaultValue={musician.amountPaid ?? suggested}
+                          className="w-24"
+                        />
+                        <Input
+                          key={toDateInputValue(musician.paidAt)}
+                          type="date"
+                          name="paidAt"
+                          title={`Date paid to ${musician.musician.name}`}
+                          defaultValue={toDateInputValue(musician.paidAt)}
+                          className="w-[9.5rem]"
+                        />
+                        <Button type="submit" variant="outline" size="sm">
+                          Save
+                        </Button>
+                      </form>
+                      <DeleteConfirmButton
+                        action={removeAction}
+                        variant="icon"
+                        ariaLabel="Remove musician"
+                        description={`Remove ${musician.musician.name} from this gig?`}
+                      />
+                    </li>
+                  )
+                })}
+              </ul>
             )}
-          </div>
-          {gig.musicians.length === 0 ? (
-            <p className="px-4 py-3 text-sm italic text-muted-foreground">No musicians added yet</p>
-          ) : (
-            <ul className="divide-y">
-              {gig.musicians.map((musician) => {
-                const removeAction = removeMusician.bind(null, musician.id)
-                const suggested = perMusician !== null ? perMusician.toFixed(2) : ''
-                return (
-                  <li key={musician.id} className="flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
-                    <span className="min-w-[8rem] flex-1 font-medium">{musician.musician.name}</span>
-                    <form
-                      action={updateMusicianPayment}
-                      className="flex flex-wrap items-center gap-2"
-                    >
-                      <input type="hidden" name="gigMusicianId" value={musician.id} />
-                      <Input
-                        key={musician.amountPaid ?? suggested}
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        name="amountPaid"
-                        placeholder="0.00"
-                        title={`Amount paid to ${musician.musician.name}`}
-                        defaultValue={musician.amountPaid ?? suggested}
-                        className="w-24"
-                      />
-                      <Input
-                        key={toDateInputValue(musician.paidAt)}
-                        type="date"
-                        name="paidAt"
-                        title={`Date paid to ${musician.musician.name}`}
-                        defaultValue={toDateInputValue(musician.paidAt)}
-                        className="w-[9.5rem]"
-                      />
-                      <Button type="submit" variant="outline" size="sm">
-                        Save
-                      </Button>
-                    </form>
-                    <DeleteConfirmButton
-                      action={removeAction}
-                      variant="icon"
-                      ariaLabel="Remove musician"
-                      description={`Remove ${musician.musician.name} from this gig?`}
-                    />
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-          {gig.musicians.length > 0 && (
-            <div className="border-t px-4 py-3">
-              <form action={markAllMusiciansPaid} className="flex flex-wrap items-end gap-2">
+            {gig.musicians.length > 0 && (
+              <form
+                action={markAllMusiciansPaid}
+                className="flex flex-wrap items-end justify-between gap-3 border-t border-financials-border pt-4"
+              >
                 <input type="hidden" name="gigId" value={gig.id} />
                 <div>
                   <label className="mb-1 block text-xs text-muted-foreground">Paid on</label>
                   <Input type="date" name="paidAt" defaultValue={today} required className="w-[9.5rem]" />
                 </div>
-                <Button type="submit" variant="outline" size="sm">
+                <Button type="submit" size="sm">
                   Mark all musicians paid
                 </Button>
               </form>
-            </div>
-          )}
-          <div className="px-4 pb-3 pt-2">
+            )}
             {availableMusicians.length === 0 ? (
-              <p className="text-sm italic text-muted-foreground">
+              <p className="text-xs italic text-muted-foreground">
                 All roster musicians already added
               </p>
             ) : (
-              <form action={addMusician} className="flex gap-2">
+              <form action={addMusician} className="flex gap-2.5">
                 <input type="hidden" name="gigId" value={gig.id} />
                 <select
                   name="musicianId"
@@ -474,7 +472,7 @@ export default async function GigPage({
             )}
           </div>
         </div>
-      </div>
+      </details>
 
       {/* ── Print layout ── */}
       <div className="hidden print:block print-layout">

@@ -30,9 +30,9 @@ export function EditFinancialsForm({ gig, action }: { gig: GigWithDetails; actio
 
       {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="mb-1 block text-sm font-medium">Paid by venue ($)</label>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3.5">
+        <label className="flex flex-col gap-1.5 text-[11.5px] text-muted-foreground">
+          Paid by venue ($)
           <Input
             type="number"
             step="0.01"
@@ -41,16 +41,13 @@ export function EditFinancialsForm({ gig, action }: { gig: GigWithDetails; actio
             placeholder="0.00"
             defaultValue={gig.amountPaid ?? ''}
           />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium">Paid on</label>
+        </label>
+        <label className="flex flex-col gap-1.5 text-[11.5px] text-muted-foreground">
+          Paid on
           <Input type="date" name="paidAt" defaultValue={toDateInputValue(gig.paidAt)} />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="mb-1 block text-sm font-medium">Tips ($)</label>
+        </label>
+        <label className="flex flex-col gap-1.5 text-[11.5px] text-muted-foreground">
+          Tips ($)
           <Input
             type="number"
             step="0.01"
@@ -59,9 +56,9 @@ export function EditFinancialsForm({ gig, action }: { gig: GigWithDetails; actio
             placeholder="0.00"
             defaultValue={gig.tips ?? ''}
           />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium">Other revenue ($)</label>
+        </label>
+        <label className="flex flex-col gap-1.5 text-[11.5px] text-muted-foreground">
+          Other revenue ($)
           <Input
             type="number"
             step="0.01"
@@ -70,7 +67,7 @@ export function EditFinancialsForm({ gig, action }: { gig: GigWithDetails; actio
             placeholder="0.00"
             defaultValue={gig.otherRevenue ?? ''}
           />
-        </div>
+        </label>
       </div>
 
       <Button type="submit" size="sm" disabled={pending}>
