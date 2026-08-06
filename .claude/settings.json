@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__504534b2-5507-4372-8190-92f33b4ad2ec__read_file_content",
+      "Bash(npx vitest run *)",
+      "Bash(npm test*)",
+      "Bash(npx tsc --noEmit*)",
+      "Bash(npm run dev)",
+      "Bash(npm run lint)",
+      "mcp__azure-devops__wit_get_work_item",
+      "mcp__504534b2-5507-4372-8190-92f33b4ad2ec__search_files",
+      "mcp__claude-in-chrome__find",
+      "Bash(npx prisma generate)",
+      "mcp__Claude_Browser__read_page",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(npm install*)",
+      "Bash(mkdir -p *)",
+      "Bash(rm -rf .next*)",
+      "Bash(taskkill //F //IM node.exe //T)",
+      "Bash(taskkill //PID * //F)",
+      "Bash(npx prisma migrate dev*)"
+    ]
+  }
+}
