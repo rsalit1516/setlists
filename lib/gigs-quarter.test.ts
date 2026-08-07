@@ -17,6 +17,14 @@ describe('getQuarterMonths', () => {
       new Date(2027, 0, 1),
     ])
   })
+
+  it('normalizes an anchor with a non-1 day to the first', () => {
+    expect(getQuarterMonths(new Date(2026, 6, 15))).toEqual([
+      new Date(2026, 6, 1),
+      new Date(2026, 7, 1),
+      new Date(2026, 8, 1),
+    ])
+  })
 })
 
 describe('getQuarterRange', () => {

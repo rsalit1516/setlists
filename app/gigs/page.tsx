@@ -41,13 +41,16 @@ export default async function GigsPage({
     const rawAnchor = parseMonthParam(quarterParam) ?? new Date()
     const anchorMonth = new Date(rawAnchor.getFullYear(), rawAnchor.getMonth(), 1)
     const { start, end } = getQuarterRange(anchorMonth)
-    // One getGigsInRange call spans all three months; each mini-calendar
-    // below re-filters it down to its own days via buildMonthGrid.
+    // One getGigsInRange call spans all three months; each mini-calendar is
+    // then built from its own slice rather than the full quarterGigs list —
+    // buildMonthGrid does a linear scan per day cell, so handing it the whole
+    // quarter would triple that scan for no benefit.
     const [quarterGigs, anyGigs] = await Promise.all([getGigsInRange(start, end), hasAnyGigs()])
-    const months = getQuarterMonths(anchorMonth).map((monthDate) => ({
-      monthDate,
-      days: buildMonthGrid(monthDate, quarterGigs),
-    }))
+    const months = getQuarterMonths(anchorMonth).map((monthDate) => {
+      const monthRange = getMonthRange(monthDate)
+      const monthGigs = quarterGigs.filter((g) => g.date >= monthRange.start && g.date < monthRange.end)
+      return { monthDate, days: buildMonthGrid(monthDate, monthGigs) }
+    })
     content = anyGigs ? (
       <QuarterStrip anchorMonth={anchorMonth} months={months} />
     ) : (

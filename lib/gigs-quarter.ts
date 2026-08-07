@@ -6,9 +6,11 @@ import { addMonths, getMonthRange } from '@/lib/gigs-month'
 // URL is parsed with gigs-month's parseMonthParam since the param shares its
 // format.
 
-// The three months the strip displays, in order.
+// The three months the strip displays, in order. addMonths(anchorMonth, 0)
+// normalizes the first entry to the 1st the same way it already does for the
+// other two, so callers don't have to pre-normalize anchorMonth themselves.
 export function getQuarterMonths(anchorMonth: Date): Date[] {
-  return [anchorMonth, addMonths(anchorMonth, 1), addMonths(anchorMonth, 2)]
+  return [addMonths(anchorMonth, 0), addMonths(anchorMonth, 1), addMonths(anchorMonth, 2)]
 }
 
 // Half-open [start, end) covering all three months — matches getGigsInRange's

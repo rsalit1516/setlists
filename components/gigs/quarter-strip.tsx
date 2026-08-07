@@ -10,10 +10,12 @@ function quarterHref(anchorMonth: Date) {
 }
 
 function DotCell({ day }: { day: CalendarDay }) {
-  // The fetched range spans all three displayed months, so a padding cell's
-  // `gigs` can carry a real gig from whichever adjacent month owns that day —
-  // suppress it here so that gig only shows a dot on its own mini-calendar.
-  const gigs = day.inCurrentMonth ? day.gigs : []
+  // Caller (app/gigs/page.tsx) already scopes `day.gigs` to this month's own
+  // range before calling buildMonthGrid, so padding cells never carry a gig.
+  const gigs = day.gigs
+  // Dots have no visible text, so screen readers need the date in the name —
+  // otherwise multiple same-venue gigs across the strip announce identically.
+  const dateLabel = day.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
   return (
     <div
@@ -36,8 +38,8 @@ function DotCell({ day }: { day: CalendarDay }) {
         // at the full min-h-11 cell instead of shrinking to the dot itself.
         <Link
           href={`/gigs/${gigs[0].id}`}
-          title={gigs[0].venue.name}
-          aria-label={`Gig at ${gigs[0].venue.name}`}
+          title={`${gigs[0].venue.name}, ${dateLabel}`}
+          aria-label={`Gig at ${gigs[0].venue.name}, ${dateLabel}`}
           className="absolute inset-0 flex items-end justify-center pb-1.5"
         >
           <span aria-hidden className="size-2 rounded-full bg-primary" />
@@ -53,8 +55,8 @@ function DotCell({ day }: { day: CalendarDay }) {
             <Link
               key={gig.id}
               href={`/gigs/${gig.id}`}
-              title={gig.venue.name}
-              aria-label={`Gig at ${gig.venue.name}`}
+              title={`${gig.venue.name}, ${dateLabel}`}
+              aria-label={`Gig at ${gig.venue.name}, ${dateLabel}`}
               className="flex size-4 items-center justify-center rounded-full hover:bg-muted"
             >
               <span aria-hidden className="size-2 rounded-full bg-primary" />
