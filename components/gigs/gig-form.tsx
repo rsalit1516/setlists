@@ -13,6 +13,10 @@ const selectClass =
 const textareaClass =
   'flex min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none'
 
+function formatSetlistGigDate(d: Date) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 type FormAction = (state: GigActionState, formData: FormData) => Promise<GigActionState>
 
 export function GigForm({
@@ -29,8 +33,8 @@ export function GigForm({
   defaultSetlistId?: string
 }) {
   const [state, formAction, pending] = useActionState(action, null)
-  const [setlistMode, setSetlistMode] = useState<'new' | 'reuse'>(
-    defaultSetlistId ? 'reuse' : 'new'
+  const [setlistMode, setSetlistMode] = useState<'new' | 'copy'>(
+    defaultSetlistId ? 'copy' : 'new'
   )
 
   return (
@@ -126,11 +130,11 @@ export function GigForm({
                   <input
                     type="radio"
                     name="setlistMode"
-                    checked={setlistMode === 'reuse'}
-                    onChange={() => setSetlistMode('reuse')}
+                    checked={setlistMode === 'copy'}
+                    onChange={() => setSetlistMode('copy')}
                     className="size-4"
                   />
-                  Reuse existing setlist
+                  Copy an existing setlist
                 </label>
               </div>
 
@@ -145,14 +149,12 @@ export function GigForm({
                   className={`${selectClass} mt-2`}
                 >
                   <option value="" disabled>
-                    Select setlist…
+                    Select setlist to copy…
                   </option>
                   {setlists.map((sl) => (
                     <option key={sl.id} value={sl.id}>
                       {sl.name} — {sl._count.items} song{sl._count.items !== 1 ? 's' : ''}
-                      {sl.gigs.length > 0
-                        ? ` · used in ${sl.gigs.length} gig${sl.gigs.length !== 1 ? 's' : ''}`
-                        : ''}
+                      {sl.gig ? ` · ${sl.gig.venue.name}, ${formatSetlistGigDate(sl.gig.date)}` : ''}
                     </option>
                   ))}
                 </select>

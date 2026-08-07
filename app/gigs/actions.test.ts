@@ -12,6 +12,7 @@ vi.mock('@/lib/db', () => ({
     },
     setlist: {
       create: vi.fn(),
+      findUnique: vi.fn(),
     },
     musician: {
       findMany: vi.fn(),
@@ -157,9 +158,12 @@ describe('createGig', () => {
   beforeEach(() => {
     vi.mocked(prisma.gig.create).mockResolvedValue({ id: 'new-gig-1' } as never)
     vi.mocked(prisma.musician.findMany).mockResolvedValue([])
+    vi.mocked(prisma.venue.findUnique).mockResolvedValue({ name: 'The Jazz Club' } as never)
+    vi.mocked(prisma.setlist.create).mockResolvedValue({ id: 'new-setlist-1' } as never)
+    vi.mocked(prisma.setlist.findUnique).mockResolvedValue({ items: [] } as never)
   })
 
-  it('passes startTime and endTime through to the created gig when linking an existing setlist', async () => {
+  it('passes startTime and endTime through to the created gig when reusing an existing setlist', async () => {
     const fd = buildFormData({
       setlistId: 'setlist-1',
       createSetlist: '',
@@ -175,8 +179,60 @@ describe('createGig', () => {
         endTime: '22:30',
       }),
     })
-    expect(prisma.venue.findUnique).not.toHaveBeenCalled()
     expect(revalidatePath).toHaveBeenCalledWith('/gigs')
+  })
+
+  it('clones the source setlist\'s active items into a new setlist instead of pointing at the same row', async () => {
+    vi.mocked(prisma.setlist.findUnique).mockResolvedValue({
+      items: [
+        { songId: 's-1', section: 'MAIN', setNumber: 1, order: 0, isActive: true },
+        { songId: 's-2', section: 'MAIN', setNumber: 1, order: 1, isActive: true },
+      ],
+    } as never)
+    const fd = buildFormData({ setlistId: 'setlist-1', createSetlist: '' })
+
+    await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
+
+    expect(prisma.setlist.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'setlist-1' },
+        include: expect.objectContaining({ items: expect.objectContaining({ where: { isActive: true } }) }),
+      })
+    )
+    expect(prisma.setlist.create).toHaveBeenCalledWith({
+      data: {
+        name: 'The Jazz Club - 08-15-26',
+        items: {
+          create: [
+            { songId: 's-1', section: 'MAIN', setNumber: 1, order: 0 },
+            { songId: 's-2', section: 'MAIN', setNumber: 1, order: 1 },
+          ],
+        },
+      },
+    })
+    // The new gig points at the freshly cloned setlist, never the source row.
+    expect(prisma.gig.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ setlistId: 'new-setlist-1' }),
+    })
+  })
+
+  it('names a freshly created setlist from venue + date when not reusing one', async () => {
+    const fd = buildFormData({ createSetlist: 'true' })
+
+    await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
+
+    expect(prisma.setlist.create).toHaveBeenCalledWith({ data: { name: 'The Jazz Club - 08-15-26' } })
+    expect(prisma.setlist.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('returns a validation error and creates nothing when neither setlist option is chosen', async () => {
+    const fd = buildFormData({ setlistId: '', createSetlist: '' })
+
+    const result = await createGig(null, fd)
+
+    expect(result).toEqual({ error: 'Please check "Create setlist" or link an existing one.' })
+    expect(prisma.setlist.create).not.toHaveBeenCalled()
+    expect(prisma.gig.create).not.toHaveBeenCalled()
   })
 
   it('stores null for blank start/end time instead of empty strings', async () => {

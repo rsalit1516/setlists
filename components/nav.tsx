@@ -20,7 +20,6 @@ function isGroup(entry: NavEntry): entry is NavGroup {
 
 const navItems: NavEntry[] = [
   { href: '/gigs', label: 'Gigs' },
-  { href: '/setlists', label: 'Setlists' },
   { href: '/songs', label: 'Songs' },
   { href: '/finance', label: 'Finance' },
   { href: '/stats', label: 'Stats' },
