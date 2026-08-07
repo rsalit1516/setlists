@@ -2,10 +2,8 @@ import Link from 'next/link'
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
-import { addMonths, formatMonthParam, type CalendarDay } from '@/lib/gigs-month'
+import { addMonths, formatMonthParam, WEEKDAY_LABELS, type CalendarDay } from '@/lib/gigs-month'
 import type { GigSummary } from '@/lib/types'
-
-const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 function monthHref(monthDate: Date) {
   return `/gigs?view=month&month=${formatMonthParam(monthDate)}`

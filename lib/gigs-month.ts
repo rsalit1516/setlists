@@ -4,6 +4,10 @@ import type { GigSummary } from '@/lib/types'
 // lib/services/gigs.ts (top-level Prisma import) so this stays safe to import
 // from anywhere without pulling in the Prisma client, mirroring gigs-view.ts.
 
+// Shared with the Quarter strip's mini-calendars — kept here since this is
+// the module both grid layouts already depend on.
+export const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
 const MONTH_PARAM_RE = /^(\d{4})-(\d{2})$/
 
 // `YYYY-MM` -> first-of-month Date, or null if missing/malformed. Callers fall
