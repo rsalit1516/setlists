@@ -121,6 +121,65 @@ export default async function StatsPage({
       </StatStrip>
 
       <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(480px,100%),1fr))] gap-6">
+        <section id="unpaid-gigs" className="flex min-w-0 flex-col gap-4">
+          <SectionTitle>Gigs Where We Haven&rsquo;t Been Paid</SectionTitle>
+          {unpaidGigs.length === 0 ? (
+            <EmptyState>No outstanding payments.</EmptyState>
+          ) : (
+            <RowList>
+              {unpaidGigs.map((g) => (
+                <Row key={g.id} className="justify-between">
+                  <div className="min-w-0">
+                    <Link
+                      href={`/gigs/${g.id}`}
+                      className="block truncate text-[14.5px] font-semibold hover:underline"
+                    >
+                      {g.venueName}
+                    </Link>
+                    <div className="truncate text-[12.5px] text-muted-foreground">
+                      {formatDate(g.date)}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <Pill tone={PAID_STATUS_PILL[g.paidStatus].tone}>
+                      {PAID_STATUS_PILL[g.paidStatus].label}
+                    </Pill>
+                    <span className="text-[12.5px] font-semibold">
+                      {formatMoney(g.outstandingBalance)} due
+                    </span>
+                  </div>
+                </Row>
+              ))}
+            </RowList>
+          )}
+        </section>
+
+        <section id="schedule-gaps" className="flex min-w-0 flex-col gap-4">
+          <SectionTitle>Upcoming Schedule Gaps</SectionTitle>
+          <SectionHint>
+            Stretches longer than {DEFAULT_GAP_DAYS} days between gigs, looking{' '}
+            {DEFAULT_GAP_LOOKAHEAD_MONTHS} months ahead.
+          </SectionHint>
+          {scheduleGaps.length === 0 ? (
+            <EmptyState>
+              No gaps — the schedule looks solid for the next {DEFAULT_GAP_LOOKAHEAD_MONTHS} months.
+            </EmptyState>
+          ) : (
+            <RowList>
+              {scheduleGaps.map((g, i) => (
+                <Row key={i} className="justify-between">
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-1 text-[14.5px]">
+                    <GapSideLabel side={g.from} />
+                    <span className="text-muted-foreground">→</span>
+                    <GapSideLabel side={g.to} />
+                  </div>
+                  <span className="shrink-0 text-[12.5px] text-muted-foreground">{g.days} days</span>
+                </Row>
+              ))}
+            </RowList>
+          )}
+        </section>
+
         <section id="most-played" className="flex min-w-0 flex-col gap-4">
           <SectionTitle>Most Played Songs</SectionTitle>
           {mostPlayed.length === 0 ? (
@@ -203,65 +262,6 @@ export default async function StatsPage({
                 <Row key={s.songId} className="justify-between">
                   <RowTitle title={s.title} subtitle={s.artist} />
                   <Pill tone="stale">{s.daysSinceUpdate}d</Pill>
-                </Row>
-              ))}
-            </RowList>
-          )}
-        </section>
-
-        <section id="unpaid-gigs" className="flex min-w-0 flex-col gap-4">
-          <SectionTitle>Gigs Where We Haven&rsquo;t Been Paid</SectionTitle>
-          {unpaidGigs.length === 0 ? (
-            <EmptyState>No outstanding payments.</EmptyState>
-          ) : (
-            <RowList>
-              {unpaidGigs.map((g) => (
-                <Row key={g.id} className="justify-between">
-                  <div className="min-w-0">
-                    <Link
-                      href={`/gigs/${g.id}`}
-                      className="block truncate text-[14.5px] font-semibold hover:underline"
-                    >
-                      {g.venueName}
-                    </Link>
-                    <div className="truncate text-[12.5px] text-muted-foreground">
-                      {formatDate(g.date)}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <Pill tone={PAID_STATUS_PILL[g.paidStatus].tone}>
-                      {PAID_STATUS_PILL[g.paidStatus].label}
-                    </Pill>
-                    <span className="text-[12.5px] font-semibold">
-                      {formatMoney(g.outstandingBalance)} due
-                    </span>
-                  </div>
-                </Row>
-              ))}
-            </RowList>
-          )}
-        </section>
-
-        <section id="schedule-gaps" className="flex min-w-0 flex-col gap-4">
-          <SectionTitle>Upcoming Schedule Gaps</SectionTitle>
-          <SectionHint>
-            Stretches longer than {DEFAULT_GAP_DAYS} days between gigs, looking{' '}
-            {DEFAULT_GAP_LOOKAHEAD_MONTHS} months ahead.
-          </SectionHint>
-          {scheduleGaps.length === 0 ? (
-            <EmptyState>
-              No gaps — the schedule looks solid for the next {DEFAULT_GAP_LOOKAHEAD_MONTHS} months.
-            </EmptyState>
-          ) : (
-            <RowList>
-              {scheduleGaps.map((g, i) => (
-                <Row key={i} className="justify-between">
-                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-1 text-[14.5px]">
-                    <GapSideLabel side={g.from} />
-                    <span className="text-muted-foreground">→</span>
-                    <GapSideLabel side={g.to} />
-                  </div>
-                  <span className="shrink-0 text-[12.5px] text-muted-foreground">{g.days} days</span>
                 </Row>
               ))}
             </RowList>
