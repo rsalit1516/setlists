@@ -19,7 +19,7 @@ export default async function GigsPage({
   const monthGroups = groupGigsByMonth(gigs)
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-6">
+    <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Gigs</h1>
         <Link href="/gigs/new" className={buttonVariants({ size: 'sm' })}>
@@ -35,7 +35,7 @@ export default async function GigsPage({
         <CompactGigList monthGroups={monthGroups} />
       ) : (
         <p className="text-muted-foreground">
-          {view === 'month' ? 'Month' : 'Quarter'} view is coming soon.
+          {view === 'month' ? 'Month calendar' : '3-month strip'} view is coming soon.
         </p>
       )}
     </div>
