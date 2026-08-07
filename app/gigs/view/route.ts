@@ -8,7 +8,17 @@ export async function GET(request: NextRequest) {
   const viewParam = request.nextUrl.searchParams.get('view')
   const view = isGigsView(viewParam) ? viewParam : 'compact'
 
-  const response = NextResponse.redirect(new URL(`/gigs?view=${view}`, request.url))
+  // Behind Azure Static Web Apps' proxy, request.url/request.nextUrl.origin
+  // resolve to the container's internal host:port, not the public domain —
+  // prefer the forwarded headers the proxy sets. Falls back to nextUrl.origin
+  // for local dev, where there's no proxy in front of the server.
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const forwardedProto = request.headers.get('x-forwarded-proto')
+  const origin = forwardedHost
+    ? `${forwardedProto ?? 'https'}://${forwardedHost}`
+    : request.nextUrl.origin
+
+  const response = NextResponse.redirect(new URL(`/gigs?view=${view}`, origin))
   response.cookies.set(GIGS_VIEW_COOKIE, view, {
     maxAge: 60 * 60 * 24 * 365,
     path: '/',
