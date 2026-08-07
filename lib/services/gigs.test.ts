@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   getGigs,
+  getGigsInRange,
   getGig,
   getGigForPerformance,
   calculateTotalExpenses,
@@ -77,6 +78,34 @@ describe('getGigs', () => {
   it('converts tips and otherRevenue to strings', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([mockGigSummary] as never)
     const [result] = await getGigs()
+    expect(result.tips).toBe('50.00')
+    expect(result.otherRevenue).toBeNull()
+  })
+})
+
+describe('getGigsInRange', () => {
+  it('queries with a half-open date range and ascending order', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([mockGigSummary] as never)
+    const start = new Date(2026, 7, 1)
+    const end = new Date(2026, 8, 1)
+    const result = await getGigsInRange(start, end)
+    expect(result).toHaveLength(1)
+    expect(prisma.gig.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { isActive: true, date: { gte: start, lt: end } },
+        orderBy: { date: 'asc' },
+      })
+    )
+  })
+
+  it('returns empty array when no gigs fall in range', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([])
+    expect(await getGigsInRange(new Date(2026, 7, 1), new Date(2026, 8, 1))).toEqual([])
+  })
+
+  it('converts tips and otherRevenue to strings', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([mockGigSummary] as never)
+    const [result] = await getGigsInRange(new Date(2026, 7, 1), new Date(2026, 8, 1))
     expect(result.tips).toBe('50.00')
     expect(result.otherRevenue).toBeNull()
   })
