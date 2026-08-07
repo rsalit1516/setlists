@@ -15,15 +15,13 @@ describe('Nav', () => {
 
   it('renders top-level links in order, with Directory last as a dropdown trigger', () => {
     render(<Nav />)
-    const nav = within(screen.getByRole('navigation', { name: 'Main' }))
+    const navEl = screen.getByRole('navigation', { name: 'Main' })
 
-    expect(nav.getAllByRole('link').map((el) => el.textContent)).toEqual([
-      'Gigs',
-      'Songs',
-      'Finance',
-      'Stats',
-    ])
-    expect(nav.getByRole('button', { name: /Directory/ })).toBeInTheDocument()
+    const items = Array.from(navEl.querySelectorAll('a, button')).map((el) => el.textContent)
+
+    expect(items).toHaveLength(5)
+    expect(items.slice(0, 4)).toEqual(['Gigs', 'Songs', 'Finance', 'Stats'])
+    expect(items[4]).toContain('Directory')
   })
 
   it('opens the Directory dropdown on click and shows Venues and Musicians', async () => {
@@ -43,6 +41,18 @@ describe('Nav', () => {
       'href',
       '/musicians'
     )
+  })
+
+  it('closes the Directory dropdown when a menu item is selected', async () => {
+    const user = userEvent.setup()
+    render(<Nav />)
+    const nav = within(screen.getByRole('navigation', { name: 'Main' }))
+
+    await user.click(nav.getByRole('button', { name: /Directory/ }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Venues' }))
+
+    expect(screen.queryByRole('menuitem', { name: 'Venues' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Musicians' })).not.toBeInTheDocument()
   })
 
   it('highlights the active top-level link and leaves others unhighlighted', () => {
