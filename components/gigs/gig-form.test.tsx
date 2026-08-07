@@ -14,7 +14,7 @@ function makeSetlist(overrides: Partial<SetlistSummary> = {}): SetlistSummary {
     id: 'sl-1',
     name: 'Friday Night',
     createdAt: new Date('2026-05-01'),
-    gigs: [],
+    gig: null,
     _count: { items: 5 },
     ...overrides,
   }
@@ -34,40 +34,40 @@ describe('GigForm — setlist picker', () => {
     expect(hidden.value).toBe('true')
   })
 
-  it('shows the existing-setlist dropdown, with song count and gig usage, after choosing "reuse"', () => {
+  it('shows the existing-setlist dropdown, with song count and source gig, after choosing "copy"', () => {
     const setlists = [
-      makeSetlist({ id: 'sl-1', name: 'Friday Night', _count: { items: 12 }, gigs: [] }),
+      makeSetlist({ id: 'sl-1', name: 'Friday Night', _count: { items: 12 }, gig: null }),
       makeSetlist({
         id: 'sl-2',
         name: 'Greatest Hits',
         _count: { items: 8 },
-        gigs: [{ id: 'g-1', date: new Date('2026-05-01'), venue: { name: 'The Jazz Club' } }],
+        gig: { id: 'g-1', date: new Date('2026-05-01T12:00:00'), venue: { name: 'The Jazz Club' } },
       }),
     ]
     render(<GigForm venues={mockVenues} setlists={setlists} action={noopAction} />)
 
-    fireEvent.click(screen.getByLabelText('Reuse existing setlist'))
+    fireEvent.click(screen.getByLabelText('Copy an existing setlist'))
 
     const select = screen.getByTitle('Setlist') as HTMLSelectElement
     const options = Array.from(select.options).map((o) => o.text)
     expect(options).toContain('Friday Night — 12 songs')
-    expect(options).toContain('Greatest Hits — 8 songs · used in 1 gig')
+    expect(options).toContain('Greatest Hits — 8 songs · The Jazz Club, May 1, 2026')
   })
 
-  it('pre-selects reuse mode and the given setlist when defaultSetlistId is provided', () => {
+  it('pre-selects copy mode and the given setlist when defaultSetlistId is provided', () => {
     const setlists = [makeSetlist({ id: 'sl-1' }), makeSetlist({ id: 'sl-2', name: 'Other Setlist' })]
     render(
       <GigForm venues={mockVenues} setlists={setlists} action={noopAction} defaultSetlistId="sl-2" />
     )
 
-    expect(screen.getByLabelText('Reuse existing setlist')).toBeChecked()
+    expect(screen.getByLabelText('Copy an existing setlist')).toBeChecked()
     expect((screen.getByTitle('Setlist') as HTMLSelectElement).value).toBe('sl-2')
   })
 
   it('switching back to "create new" hides the dropdown and reverts to createSetlist=true', () => {
     render(<GigForm venues={mockVenues} setlists={[makeSetlist()]} action={noopAction} />)
 
-    fireEvent.click(screen.getByLabelText('Reuse existing setlist'))
+    fireEvent.click(screen.getByLabelText('Copy an existing setlist'))
     expect(screen.getByTitle('Setlist')).toBeInTheDocument()
 
     fireEvent.click(screen.getByLabelText('Create new setlist'))
@@ -80,7 +80,7 @@ describe('GigForm — setlist picker', () => {
     render(<GigForm venues={mockVenues} setlists={[]} action={noopAction} />)
 
     expect(screen.queryByLabelText('Create new setlist')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Reuse existing setlist')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Copy an existing setlist')).not.toBeInTheDocument()
     expect(screen.getByText('A new setlist will be created for this gig.')).toBeInTheDocument()
     const form = screen.getByRole('button', { name: 'Create Gig' }).closest('form')!
     expect((form.querySelector('input[name="createSetlist"]') as HTMLInputElement).value).toBe('true')

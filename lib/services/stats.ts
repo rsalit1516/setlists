@@ -46,7 +46,7 @@ async function getPlayCountsBySongId(): Promise<Map<string, number>> {
     where: {
       isActive: true,
       wasPlayed: true,
-      setlist: { gigs: { some: { isActive: true } } },
+      setlist: { gig: { isActive: true } },
     },
     select: { songId: true },
   })

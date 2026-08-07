@@ -6,7 +6,6 @@ import { SetlistSection } from '@/components/setlists/setlist-section'
 import { RenameForm } from '@/components/setlists/rename-form'
 import { SongPickerPanel } from '@/components/setlists/song-picker-panel'
 import { buttonVariants } from '@/components/ui/button'
-import { copySetlist } from '@/app/setlists/actions'
 import type { SetlistItem } from '@/lib/types'
 
 function groupBySection(items: SetlistItem[]) {
@@ -48,21 +47,22 @@ export default async function SetlistPage({
       {/* Main setlist content */}
       <div className="min-w-0 flex-1">
         <div className="mb-2">
-          <Link href="/setlists" className="text-sm text-muted-foreground hover:underline">
-            ← Setlists
+          <Link
+            href={setlist.gig ? `/gigs/${setlist.gig.id}` : '/gigs'}
+            className="text-sm text-muted-foreground hover:underline"
+          >
+            ← Back to Gig
           </Link>
         </div>
 
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
             <RenameForm id={setlist.id} currentName={setlist.name} />
-            {setlist.gigs.length > 0 && (
-              <p className="mt-1 flex flex-wrap gap-x-3 text-sm text-muted-foreground">
-                {setlist.gigs.map((gig) => (
-                  <Link key={gig.id} href={`/gigs/${gig.id}`} className="hover:underline">
-                    {gig.venue.name} · {formatDate(gig.date)}
-                  </Link>
-                ))}
+            {setlist.gig && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                <Link href={`/gigs/${setlist.gig.id}`} className="hover:underline">
+                  {setlist.gig.venue.name} · {formatDate(setlist.gig.date)}
+                </Link>
               </p>
             )}
           </div>
@@ -72,13 +72,8 @@ export default async function SetlistPage({
               href={`/gigs/new?setlistId=${setlist.id}`}
               className={buttonVariants({ variant: 'outline', size: 'sm' })}
             >
-              {setlist.gigs.length > 0 ? 'Use for New Gig' : 'Schedule Gig'}
+              Use for New Gig
             </Link>
-            <form action={copySetlist.bind(null, setlist.id)}>
-              <button type="submit" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-                Copy
-              </button>
-            </form>
             <Link
               href={revision ? `/setlists/${id}` : `/setlists/${id}?revision=1`}
               className={buttonVariants({ variant: revision ? 'default' : 'outline', size: 'sm' })}

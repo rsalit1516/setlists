@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import prisma from '@/lib/db'
 import { getGig, calculateTotalExpenses, calculateGigNet } from '@/lib/services/gigs'
+import type { SetSection } from '@/lib/types'
 
 export type GigActionState = { error: string } | null
 
@@ -25,18 +26,47 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
   const date = new Date(dateStr + 'T12:00:00')
   if (isNaN(date.getTime())) return { error: 'Invalid date.' }
 
-  let setlistId = existingSetlistId
-  if (shouldCreateSetlist) {
-    const venue = await prisma.venue.findUnique({ where: { id: venueId }, select: { name: true } })
-    const mm = String(date.getMonth() + 1).padStart(2, '0')
-    const dd = String(date.getDate()).padStart(2, '0')
-    const yy = String(date.getFullYear()).slice(2)
-    const name = venue ? `${venue.name} - ${mm}-${dd}-${yy}` : `${mm}-${dd}-${yy}`
+  if (!existingSetlistId && !shouldCreateSetlist) {
+    return { error: 'Please check "Create setlist" or link an existing one.' }
+  }
+
+  const venue = await prisma.venue.findUnique({ where: { id: venueId }, select: { name: true } })
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  const yy = String(date.getFullYear()).slice(2)
+  const name = venue ? `${venue.name} - ${mm}-${dd}-${yy}` : `${mm}-${dd}-${yy}`
+
+  let setlistId: string
+  if (existingSetlistId) {
+    // A Setlist is strictly 1:1 with its Gig (see #41 — reverts #34's
+    // reuse-by-reference model, which let SetlistItem.wasPlayed silently
+    // become shared state across every gig reusing the same setlist row).
+    // "Reuse" means copy: clone the source setlist's songs into a new
+    // Setlist owned by this gig, same as the old copySetlist action did.
+    const source = await prisma.setlist.findUnique({
+      where: { id: existingSetlistId },
+      include: {
+        items: { where: { isActive: true }, orderBy: [{ section: 'asc' }, { setNumber: 'asc' }, { order: 'asc' }] },
+      },
+    })
+    const setlist = await prisma.setlist.create({
+      data: {
+        name,
+        items: {
+          create: (source?.items ?? []).map((item) => ({
+            songId: item.songId,
+            section: item.section as SetSection,
+            setNumber: item.setNumber,
+            order: item.order,
+          })),
+        },
+      },
+    })
+    setlistId = setlist.id
+  } else {
     const setlist = await prisma.setlist.create({ data: { name } })
     setlistId = setlist.id
   }
-
-  if (!setlistId) return { error: 'Please check "Create setlist" or link an existing one.' }
 
   const gig = await prisma.gig.create({
     data: {

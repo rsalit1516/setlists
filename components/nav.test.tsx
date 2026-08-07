@@ -19,7 +19,6 @@ describe('Nav', () => {
 
     expect(nav.getAllByRole('link').map((el) => el.textContent)).toEqual([
       'Gigs',
-      'Setlists',
       'Songs',
       'Finance',
       'Stats',
