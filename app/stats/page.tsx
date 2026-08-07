@@ -10,17 +10,14 @@ import {
   DEFAULT_GAP_LOOKAHEAD_MONTHS,
   DEFAULT_GAP_DAYS,
 } from "@/lib/services/stats";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import Link from "next/link";
+import { StatStrip, StatCard } from "@/components/stats/stat-card";
+import { StaleWindowToggle } from "@/components/stats/stale-window-toggle";
 import { MostPlayedTable } from "@/components/stats/most-played-table";
 import { ReadyNeverPlayedTable } from "@/components/stats/ready-never-played-table";
 import { StaleReadyTable } from "@/components/stats/stale-ready-table";
 import { StuckInProgressTable } from "@/components/stats/stuck-in-progress-table";
 import { UnpaidGigsTable } from "@/components/stats/unpaid-gigs-table";
 import { ScheduleGapsTable } from "@/components/stats/schedule-gaps-table";
-
-const WINDOW_OPTIONS = [5, 10, 20];
 
 function parseGigWindow(value: string | undefined): number {
   const n = Number(value);
@@ -76,7 +73,6 @@ export default async function StatsPage({
     0,
   );
   const nextGapDaysOut = getNextGapDaysOut(scheduleGaps);
-  const maxPlayCount = mostPlayed[0]?.playCount ?? 0;
 
   return (
     <div className="mx-auto flex max-w-[1180px] flex-col gap-8 px-4 py-6 sm:gap-10 sm:px-8 sm:py-10 sm:pb-20">
@@ -132,23 +128,32 @@ export default async function StatsPage({
           {unpaidGigs.length === 0 ? (
             <EmptyState>No outstanding payments.</EmptyState>
           ) : (
-            <MostPlayedTable data={mostPlayed} />
+            <UnpaidGigsTable data={unpaidGigs} />
           )}
         </section>
 
-        <section
-          id="ready-never-played"
-          className="min-w-0 rounded-lg border bg-card p-4"
-        >
-          <h2 className="mb-3 text-base font-semibold uppercase tracking-wider text-muted-foreground">
-            Ready Songs Never Played
-          </h2>
-          {neverPlayed.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Every Ready song has been played.
-            </p>
+        <section id="schedule-gaps" className="flex min-w-0 flex-col gap-4">
+          <SectionTitle>Upcoming Schedule Gaps</SectionTitle>
+          <SectionHint>
+            Stretches longer than {DEFAULT_GAP_DAYS} days between gigs,
+            looking {DEFAULT_GAP_LOOKAHEAD_MONTHS} months ahead.
+          </SectionHint>
+          {scheduleGaps.length === 0 ? (
+            <EmptyState>
+              No gaps — the schedule looks solid for the next{" "}
+              {DEFAULT_GAP_LOOKAHEAD_MONTHS} months.
+            </EmptyState>
           ) : (
-            <ReadyNeverPlayedTable data={neverPlayed} />
+            <ScheduleGapsTable data={scheduleGaps} />
+          )}
+        </section>
+
+        <section id="most-played" className="flex min-w-0 flex-col gap-4">
+          <SectionTitle>Most Played Songs</SectionTitle>
+          {mostPlayed.length === 0 ? (
+            <EmptyState>No songs have been played yet.</EmptyState>
+          ) : (
+            <MostPlayedTable data={mostPlayed} />
           )}
         </section>
 
@@ -160,20 +165,7 @@ export default async function StatsPage({
           {neverPlayed.length === 0 ? (
             <EmptyState>Every Ready song has been played.</EmptyState>
           ) : (
-            <RowList>
-              {neverPlayed.map((s) => (
-                <Row key={s.songId} className="justify-between">
-                  <RowTitle title={s.title} subtitle={s.artist} />
-                  {s.key ? (
-                    <Pill tone="key">{s.key}</Pill>
-                  ) : (
-                    <span className="shrink-0 text-[12.5px] text-muted-foreground/70">
-                      —
-                    </span>
-                  )}
-                </Row>
-              ))}
-            </RowList>
+            <ReadyNeverPlayedTable data={neverPlayed} />
           )}
         </section>
 
@@ -208,43 +200,6 @@ export default async function StatsPage({
             <EmptyState>No In Progress songs have stalled.</EmptyState>
           ) : (
             <StuckInProgressTable data={staleInProgress} />
-          )}
-        </section>
-
-        <section
-          id="unpaid-gigs"
-          className="min-w-0 rounded-lg border bg-card p-4"
-        >
-          <h2 className="mb-3 text-base font-semibold uppercase tracking-wider text-muted-foreground">
-            Gigs Where We Haven&rsquo;t Been Paid
-          </h2>
-          {unpaidGigs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No outstanding payments.
-            </p>
-          ) : (
-            <UnpaidGigsTable data={unpaidGigs} />
-          )}
-        </section>
-
-        <section
-          id="schedule-gaps"
-          className="min-w-0 rounded-lg border bg-card p-4"
-        >
-          <h2 className="mb-1 text-base font-semibold uppercase tracking-wider text-muted-foreground">
-            Upcoming Schedule Gaps
-          </h2>
-          <p className="mb-3 text-sm text-muted-foreground">
-            Stretches longer than {DEFAULT_GAP_DAYS} days between gigs, looking{" "}
-            {DEFAULT_GAP_LOOKAHEAD_MONTHS} months ahead.
-          </p>
-          {scheduleGaps.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No gaps — the schedule looks solid for the next{" "}
-              {DEFAULT_GAP_LOOKAHEAD_MONTHS} months.
-            </p>
-          ) : (
-            <ScheduleGapsTable data={scheduleGaps} />
           )}
         </section>
       </div>
