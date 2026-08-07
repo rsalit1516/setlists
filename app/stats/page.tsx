@@ -11,20 +11,12 @@ import {
   DEFAULT_GAP_LOOKAHEAD_MONTHS,
   DEFAULT_GAP_DAYS,
 } from '@/lib/services/stats'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { buttonVariants } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
+import { StatStrip, StatCard } from '@/components/stats/stat-card'
+import { RowList, Row, RowTitle } from '@/components/stats/row-list'
+import { Pill } from '@/components/stats/pill'
+import { ProgressBar } from '@/components/stats/progress-bar'
+import { StaleWindowToggle } from '@/components/stats/stale-window-toggle'
 import type { UnpaidGig, ScheduleGapSide } from '@/lib/types'
-
-const WINDOW_OPTIONS = [5, 10, 20]
 
 function parseGigWindow(value: string | undefined): number {
   const n = Number(value)
@@ -39,16 +31,11 @@ function formatMoney(amount: string | number) {
   return `$${(typeof amount === 'string' ? parseFloat(amount) : amount).toFixed(2)}`
 }
 
-// Mirrors the PAYOUT_BADGE convention in app/gigs/[id]/page.tsx.
-const PAID_STATUS_BADGE: Record<UnpaidGig['paidStatus'], { label: string; className: string }> = {
-  unpaid: {
-    label: 'Unpaid',
-    className: 'border-red-600/30 bg-red-600/10 text-red-700 dark:text-red-400',
-  },
-  partial: {
-    label: 'Partially Paid',
-    className: 'border-amber-600/30 bg-amber-600/10 text-amber-700 dark:text-amber-400',
-  },
+// Reuses the Pill component's tone tokens: unpaid mirrors the danger/financials
+// pairing on the Outstanding Balance stat card, partial mirrors the staleness amber.
+const PAID_STATUS_PILL: Record<UnpaidGig['paidStatus'], { label: string; tone: 'danger' | 'stale' }> = {
+  unpaid: { label: 'Unpaid', tone: 'danger' },
+  partial: { label: 'Partially Paid', tone: 'stale' },
 }
 
 function GapSideLabel({ side }: { side: ScheduleGapSide }) {
@@ -61,32 +48,16 @@ function GapSideLabel({ side }: { side: ScheduleGapSide }) {
   )
 }
 
-// Clickable summary tile linking down to its detail section — used for the
-// metrics strip at the top of the page. Plain <a> (not next/link) since it's
-// a same-page hash anchor, not a route change.
-function MetricCard({
-  href,
-  label,
-  value,
-  sub,
-}: {
-  href: string
-  label: string
-  value: string | number
-  sub?: string
-}) {
-  return (
-    <a
-      href={href}
-      className="flex min-h-[44px] min-w-0 flex-col gap-1 rounded-lg border bg-card p-3 transition-colors hover:border-primary/50"
-    >
-      <span className="min-w-0 text-[11px] font-bold uppercase tracking-[.06em] text-muted-foreground">
-        {label}
-      </span>
-      <span className="text-2xl font-bold tabular-nums">{value}</span>
-      {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
-    </a>
-  )
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h2 className="font-heading text-lg font-bold">{children}</h2>
+}
+
+function SectionHint({ children }: { children: React.ReactNode }) {
+  return <p className="text-[13px] leading-relaxed text-muted-foreground">{children}</p>
+}
+
+function EmptyState({ children }: { children: React.ReactNode }) {
+  return <p className="text-sm text-muted-foreground">{children}</p>
 }
 
 export default async function StatsPage({
@@ -109,36 +80,35 @@ export default async function StatsPage({
 
   const unpaidBalanceTotal = unpaidGigs.reduce((sum, g) => sum + g.outstandingBalance, 0)
   const nextGapDaysOut = getNextGapDaysOut(scheduleGaps)
+  const maxPlayCount = mostPlayed[0]?.playCount ?? 0
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
-      <h1 className="mb-6 text-2xl font-bold">Stats</h1>
+    <div className="mx-auto flex max-w-[1180px] flex-col gap-8 px-4 py-6 sm:gap-10 sm:px-8 sm:py-10 sm:pb-20">
+      <div className="flex flex-col gap-1">
+        <h1 className="font-heading text-2xl font-bold sm:text-[30px]">Stats</h1>
+        <p className="text-sm text-muted-foreground">
+          A quick read on what needs attention across the set.
+        </p>
+      </div>
 
-      <div className="mb-8 grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
-        <MetricCard
-          href="#ready-never-played"
-          label="Ready, Never Played"
-          value={neverPlayed.length}
-        />
-        <MetricCard
+      <StatStrip>
+        <StatCard href="#ready-never-played" label="Ready, never played" value={neverPlayed.length} />
+        <StatCard
           href="#stale-ready"
-          label={`Stale Ready (Last ${gigWindow})`}
+          label={`Stale ready (last ${gigWindow})`}
           value={staleReady.length}
         />
-        <MetricCard
-          href="#stuck-in-progress"
-          label="Stuck In Progress"
-          value={staleInProgress.length}
-        />
-        <MetricCard
+        <StatCard href="#stuck-in-progress" label="Stuck in progress" value={staleInProgress.length} />
+        <StatCard
           href="#unpaid-gigs"
-          label="Outstanding Balance"
+          label="Outstanding balance"
           value={formatMoney(unpaidBalanceTotal)}
           sub={`${unpaidGigs.length} gig${unpaidGigs.length !== 1 ? 's' : ''}`}
+          tone="danger"
         />
-        <MetricCard
+        <StatCard
           href="#schedule-gaps"
-          label="Next Schedule Gap"
+          label="Next schedule gap"
           value={nextGapDaysOut === null ? 'None' : `${nextGapDaysOut}d`}
           sub={
             nextGapDaysOut === null
@@ -148,378 +118,153 @@ export default async function StatsPage({
                 : 'days out'
           }
         />
-      </div>
+      </StatStrip>
 
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(400px,100%),1fr))] gap-4">
-        <section id="most-played" className="min-w-0 rounded-lg border bg-card p-4">
-          <h2 className="mb-3 text-base font-semibold uppercase tracking-wider text-muted-foreground">
-            Most Played Songs
-          </h2>
+      <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(480px,100%),1fr))] gap-6">
+        <section id="most-played" className="flex min-w-0 flex-col gap-4">
+          <SectionTitle>Most Played Songs</SectionTitle>
           {mostPlayed.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No songs have been played yet.</p>
+            <EmptyState>No songs have been played yet.</EmptyState>
           ) : (
-            <>
-              <div className="hidden overflow-x-auto rounded-lg border md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10">#</TableHead>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Artist</TableHead>
-                      <TableHead className="text-right">Plays</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {mostPlayed.map((s, i) => (
-                      <TableRow key={s.songId}>
-                        <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                        <TableCell className="font-medium">{s.title}</TableCell>
-                        <TableCell className="text-muted-foreground">{s.artist ?? '—'}</TableCell>
-                        <TableCell className="text-right">{s.playCount}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <ol className="space-y-2 md:hidden">
-                {mostPlayed.map((s, i) => (
-                  <li
-                    key={s.songId}
-                    className="flex items-center justify-between gap-2 rounded-lg border p-3"
-                  >
-                    <div className="flex min-w-0 items-baseline gap-2">
-                      <span className="text-sm text-muted-foreground">{i + 1}.</span>
-                      <div className="min-w-0">
-                        <div className="truncate font-medium">{s.title}</div>
-                        {s.artist && (
-                          <div className="truncate text-sm text-muted-foreground">{s.artist}</div>
-                        )}
-                      </div>
-                    </div>
-                    <span className="shrink-0 text-sm font-medium tabular-nums">
-                      {s.playCount} play{s.playCount !== 1 ? 's' : ''}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </>
-          )}
-        </section>
-
-        <section id="ready-never-played" className="min-w-0 rounded-lg border bg-card p-4">
-          <h2 className="mb-3 text-base font-semibold uppercase tracking-wider text-muted-foreground">
-            Ready Songs Never Played
-          </h2>
-          {neverPlayed.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Every Ready song has been played.</p>
-          ) : (
-            <>
-              <div className="hidden overflow-x-auto rounded-lg border md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Artist</TableHead>
-                      <TableHead>Key</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {neverPlayed.map((s) => (
-                      <TableRow key={s.songId}>
-                        <TableCell className="font-medium">{s.title}</TableCell>
-                        <TableCell className="text-muted-foreground">{s.artist ?? '—'}</TableCell>
-                        <TableCell className="text-muted-foreground">{s.key ?? '—'}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <ul className="space-y-2 md:hidden">
-                {neverPlayed.map((s) => (
-                  <li
-                    key={s.songId}
-                    className="flex items-center justify-between gap-2 rounded-lg border p-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">{s.title}</div>
-                      {s.artist && (
-                        <div className="truncate text-sm text-muted-foreground">{s.artist}</div>
-                      )}
-                    </div>
-                    {s.key && (
-                      <span className="shrink-0 text-sm text-muted-foreground">{s.key}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </section>
-
-        <section id="stale-ready" className="min-w-0 rounded-lg border bg-card p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-semibold uppercase tracking-wider text-muted-foreground">
-              Ready Songs Not Played Recently
-            </h2>
-            <div className="flex gap-2">
-              {WINDOW_OPTIONS.map((w) => (
-                <Link
-                  key={w}
-                  href={`/stats?window=${w}#stale-ready`}
-                  className={cn(
-                    buttonVariants({ variant: w === gigWindow ? 'default' : 'outline', size: 'sm' }),
-                    'h-9 px-3'
-                  )}
-                >
-                  Last {w}
-                </Link>
+            <RowList>
+              {mostPlayed.map((s, i) => (
+                <Row key={s.songId} className="grid grid-cols-[24px_1fr_100px]">
+                  <span className="text-[13px] text-muted-foreground">{i + 1}</span>
+                  <RowTitle title={s.title} subtitle={s.artist} />
+                  <ProgressBar value={s.playCount} max={maxPlayCount} />
+                </Row>
               ))}
-            </div>
+            </RowList>
+          )}
+        </section>
+
+        <section id="ready-never-played" className="flex min-w-0 flex-col gap-4">
+          <SectionTitle>Ready Songs Never Played</SectionTitle>
+          {neverPlayed.length === 0 ? (
+            <EmptyState>Every Ready song has been played.</EmptyState>
+          ) : (
+            <RowList>
+              {neverPlayed.map((s) => (
+                <Row key={s.songId} className="justify-between">
+                  <RowTitle title={s.title} subtitle={s.artist} />
+                  {s.key ? (
+                    <Pill tone="key">{s.key}</Pill>
+                  ) : (
+                    <span className="shrink-0 text-[12.5px] text-muted-foreground/70">—</span>
+                  )}
+                </Row>
+              ))}
+            </RowList>
+          )}
+        </section>
+
+        <section id="stale-ready" className="flex min-w-0 flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <SectionTitle>Ready Songs Not Played Recently</SectionTitle>
+            <StaleWindowToggle active={gigWindow} />
           </div>
-          <p className="mb-3 text-sm text-muted-foreground">
+          <SectionHint>
             Ready songs not played in any of the last {gigWindow} gigs — distinct from songs never
             played at all (above).
-          </p>
+          </SectionHint>
           {staleReady.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
+            <EmptyState>
               Every Ready song has been played within the last {gigWindow} gigs.
-            </p>
+            </EmptyState>
           ) : (
-            <>
-              <div className="hidden overflow-x-auto rounded-lg border md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Artist</TableHead>
-                      <TableHead>Key</TableHead>
-                      <TableHead className="text-right">Last Played</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {staleReady.map((s) => (
-                      <TableRow key={s.songId}>
-                        <TableCell className="font-medium">{s.title}</TableCell>
-                        <TableCell className="text-muted-foreground">{s.artist ?? '—'}</TableCell>
-                        <TableCell className="text-muted-foreground">{s.key ?? '—'}</TableCell>
-                        <TableCell className="text-right text-muted-foreground">
-                          {s.gigsSinceLastPlayed === null
-                            ? 'Never'
-                            : `${s.gigsSinceLastPlayed} gigs ago`}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <ul className="space-y-2 md:hidden">
-                {staleReady.map((s) => (
-                  <li
-                    key={s.songId}
-                    className="flex items-center justify-between gap-2 rounded-lg border p-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">{s.title}</div>
-                      {s.artist && (
-                        <div className="truncate text-sm text-muted-foreground">{s.artist}</div>
-                      )}
-                    </div>
-                    <span className="shrink-0 text-sm text-muted-foreground">
-                      {s.gigsSinceLastPlayed === null ? 'Never' : `${s.gigsSinceLastPlayed} gigs ago`}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </>
+            <RowList>
+              {staleReady.map((s) => (
+                <Row key={s.songId} className="justify-between">
+                  <RowTitle
+                    title={s.title}
+                    subtitle={[s.artist, s.key].filter(Boolean).join(' · ') || undefined}
+                  />
+                  <span className="shrink-0 text-[12.5px] text-muted-foreground">
+                    {s.gigsSinceLastPlayed === null ? 'Never' : `${s.gigsSinceLastPlayed} gigs ago`}
+                  </span>
+                </Row>
+              ))}
+            </RowList>
           )}
         </section>
 
-        <section id="stuck-in-progress" className="min-w-0 rounded-lg border bg-card p-4">
-          <h2 className="mb-1 text-base font-semibold uppercase tracking-wider text-muted-foreground">
-            Songs Stuck In Progress
-          </h2>
-          <p className="mb-3 text-sm text-muted-foreground">
-            Based on last edited date, not time spent In Progress specifically — any field edit
-            resets the clock, so this is an approximation of &ldquo;untouched,&rdquo; not a precise measure.
-          </p>
+        <section id="stuck-in-progress" className="flex min-w-0 flex-col gap-4">
+          <SectionTitle>Songs Stuck In Progress</SectionTitle>
+          <SectionHint>
+            Based on last edit date, not time spent In Progress specifically — any field edit
+            resets the clock, so this is an approximation of &ldquo;untouched,&rdquo; not a precise
+            measure.
+          </SectionHint>
           {staleInProgress.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No In Progress songs have stalled.</p>
+            <EmptyState>No In Progress songs have stalled.</EmptyState>
           ) : (
-            <>
-              <div className="hidden overflow-x-auto rounded-lg border md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Artist</TableHead>
-                      <TableHead className="text-right">Last Updated</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {staleInProgress.map((s) => (
-                      <TableRow key={s.songId}>
-                        <TableCell className="font-medium">{s.title}</TableCell>
-                        <TableCell className="text-muted-foreground">{s.artist ?? '—'}</TableCell>
-                        <TableCell className="text-right text-muted-foreground">
-                          {s.daysSinceUpdate} days ago
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <ul className="space-y-2 md:hidden">
-                {staleInProgress.map((s) => (
-                  <li
-                    key={s.songId}
-                    className="flex items-center justify-between gap-2 rounded-lg border p-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">{s.title}</div>
-                      {s.artist && (
-                        <div className="truncate text-sm text-muted-foreground">{s.artist}</div>
-                      )}
-                    </div>
-                    <span className="shrink-0 text-sm text-muted-foreground">
-                      {s.daysSinceUpdate} days ago
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </>
+            <RowList>
+              {staleInProgress.map((s) => (
+                <Row key={s.songId} className="justify-between">
+                  <RowTitle title={s.title} subtitle={s.artist} />
+                  <Pill tone="stale">{s.daysSinceUpdate}d</Pill>
+                </Row>
+              ))}
+            </RowList>
           )}
         </section>
 
-        <section id="unpaid-gigs" className="min-w-0 rounded-lg border bg-card p-4">
-          <h2 className="mb-3 text-base font-semibold uppercase tracking-wider text-muted-foreground">
-            Gigs Where We Haven&rsquo;t Been Paid
-          </h2>
+        <section id="unpaid-gigs" className="flex min-w-0 flex-col gap-4">
+          <SectionTitle>Gigs Where We Haven&rsquo;t Been Paid</SectionTitle>
           {unpaidGigs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No outstanding payments.</p>
+            <EmptyState>No outstanding payments.</EmptyState>
           ) : (
-            <>
-              <div className="hidden overflow-x-auto rounded-lg border md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Venue</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Contracted</TableHead>
-                      <TableHead className="text-right">Paid</TableHead>
-                      <TableHead className="text-right">Outstanding</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {unpaidGigs.map((g) => (
-                      <TableRow key={g.id}>
-                        <TableCell>
-                          <Link href={`/gigs/${g.id}`} className="hover:underline">
-                            {formatDate(g.date)}
-                          </Link>
-                        </TableCell>
-                        <TableCell className="font-medium">{g.venueName}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={PAID_STATUS_BADGE[g.paidStatus].className}>
-                            {PAID_STATUS_BADGE[g.paidStatus].label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">{formatMoney(g.amountContracted)}</TableCell>
-                        <TableCell className="text-right">
-                          {g.amountPaid ? formatMoney(g.amountPaid) : '—'}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {formatMoney(g.outstandingBalance)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <ul className="space-y-2 md:hidden">
-                {unpaidGigs.map((g) => (
-                  <li key={g.id} className="rounded-lg border p-3">
-                    <div className="mb-1 flex items-center justify-between gap-2">
-                      <Link href={`/gigs/${g.id}`} className="font-medium hover:underline">
-                        {g.venueName}
-                      </Link>
-                      <Badge variant="outline" className={PAID_STATUS_BADGE[g.paidStatus].className}>
-                        {PAID_STATUS_BADGE[g.paidStatus].label}
-                      </Badge>
+            <RowList>
+              {unpaidGigs.map((g) => (
+                <Row key={g.id} className="justify-between">
+                  <div className="min-w-0">
+                    <Link
+                      href={`/gigs/${g.id}`}
+                      className="block truncate text-[14.5px] font-semibold hover:underline"
+                    >
+                      {g.venueName}
+                    </Link>
+                    <div className="truncate text-[12.5px] text-muted-foreground">
+                      {formatDate(g.date)}
                     </div>
-                    <div className="mb-2 text-sm text-muted-foreground">{formatDate(g.date)}</div>
-                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                      <dt className="text-muted-foreground">Contracted</dt>
-                      <dd className="text-right">{formatMoney(g.amountContracted)}</dd>
-                      <dt className="text-muted-foreground">Paid</dt>
-                      <dd className="text-right">{g.amountPaid ? formatMoney(g.amountPaid) : '—'}</dd>
-                      <dt className="font-medium">Outstanding</dt>
-                      <dd className="text-right font-medium">{formatMoney(g.outstandingBalance)}</dd>
-                    </dl>
-                  </li>
-                ))}
-              </ul>
-            </>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <Pill tone={PAID_STATUS_PILL[g.paidStatus].tone}>
+                      {PAID_STATUS_PILL[g.paidStatus].label}
+                    </Pill>
+                    <span className="text-[12.5px] font-semibold">
+                      {formatMoney(g.outstandingBalance)} due
+                    </span>
+                  </div>
+                </Row>
+              ))}
+            </RowList>
           )}
         </section>
 
-        <section id="schedule-gaps" className="min-w-0 rounded-lg border bg-card p-4">
-          <h2 className="mb-1 text-base font-semibold uppercase tracking-wider text-muted-foreground">
-            Upcoming Schedule Gaps
-          </h2>
-          <p className="mb-3 text-sm text-muted-foreground">
+        <section id="schedule-gaps" className="flex min-w-0 flex-col gap-4">
+          <SectionTitle>Upcoming Schedule Gaps</SectionTitle>
+          <SectionHint>
             Stretches longer than {DEFAULT_GAP_DAYS} days between gigs, looking{' '}
             {DEFAULT_GAP_LOOKAHEAD_MONTHS} months ahead.
-          </p>
+          </SectionHint>
           {scheduleGaps.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
+            <EmptyState>
               No gaps — the schedule looks solid for the next {DEFAULT_GAP_LOOKAHEAD_MONTHS} months.
-            </p>
+            </EmptyState>
           ) : (
-            <>
-              <div className="hidden overflow-x-auto rounded-lg border md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>From</TableHead>
-                      <TableHead>To</TableHead>
-                      <TableHead className="text-right">Gap</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {scheduleGaps.map((g, i) => (
-                      <TableRow key={i}>
-                        <TableCell>
-                          <GapSideLabel side={g.from} />
-                        </TableCell>
-                        <TableCell>
-                          <GapSideLabel side={g.to} />
-                        </TableCell>
-                        <TableCell className="text-right font-medium">{g.days} days</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <ul className="space-y-2 md:hidden">
-                {scheduleGaps.map((g, i) => (
-                  <li key={i} className="rounded-lg border p-3">
-                    <div className="flex flex-wrap items-center gap-x-1 text-sm">
-                      <GapSideLabel side={g.from} />
-                      <span className="text-muted-foreground">→</span>
-                      <GapSideLabel side={g.to} />
-                    </div>
-                    <div className="mt-1 text-sm font-medium">{g.days} days</div>
-                  </li>
-                ))}
-              </ul>
-            </>
+            <RowList>
+              {scheduleGaps.map((g, i) => (
+                <Row key={i} className="justify-between">
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-1 text-[14.5px]">
+                    <GapSideLabel side={g.from} />
+                    <span className="text-muted-foreground">→</span>
+                    <GapSideLabel side={g.to} />
+                  </div>
+                  <span className="shrink-0 text-[12.5px] text-muted-foreground">{g.days} days</span>
+                </Row>
+              ))}
+            </RowList>
           )}
         </section>
       </div>

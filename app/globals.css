@@ -19,6 +19,8 @@
   --color-key-badge: var(--key-badge);
   --color-success-pill: var(--success-pill);
   --color-success-pill-foreground: var(--success-pill-foreground);
+  --color-stale-pill: var(--stale-pill);
+  --color-stale-pill-foreground: var(--stale-pill-foreground);
   --color-negative-amount: var(--negative-amount);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -110,6 +112,9 @@
   --key-badge: oklch(70% 0.1 150);
   --success-pill: oklch(30% 0.06 150);
   --success-pill-foreground: oklch(78% 0.1 150);
+  /* Staleness-day pill (Stats redesign, #38) — amber warning tint. */
+  --stale-pill: oklch(28% 0.05 60 / 0.5);
+  --stale-pill-foreground: oklch(75% 0.1 60);
   --negative-amount: oklch(70% 0.14 25);
 }
 
