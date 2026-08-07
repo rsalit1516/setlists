@@ -18,6 +18,18 @@ function isGroup(entry: NavEntry): entry is NavGroup {
   return 'children' in entry
 }
 
+function isActive(pathname: string, href: string): boolean {
+  return pathname.startsWith(href)
+}
+
+function isGroupActive(pathname: string, group: NavGroup): boolean {
+  return group.children.some((child) => isActive(pathname, child.href))
+}
+
+function navLinkClassName(active: boolean, inactiveClassName: string): string {
+  return active ? 'font-bold text-accent-1-foreground' : inactiveClassName
+}
+
 const navItems: NavEntry[] = [
   { href: '/gigs', label: 'Gigs' },
   { href: '/songs', label: 'Songs' },
@@ -49,11 +61,10 @@ export function Nav() {
             isGroup(item) ? (
               <DropdownMenu key={item.label}>
                 <DropdownMenuTrigger
-                  className={`flex items-center gap-1 text-[13px] font-medium transition-colors outline-none ${
-                    item.children.some((child) => pathname.startsWith(child.href))
-                      ? 'font-bold text-accent-1-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                  className={`flex items-center gap-1 text-[13px] font-medium transition-colors outline-none ${navLinkClassName(
+                    isGroupActive(pathname, item),
+                    'text-muted-foreground hover:text-foreground'
+                  )}`}
                 >
                   {item.label} <span className="text-[10px]">▾</span>
                 </DropdownMenuTrigger>
@@ -69,11 +80,10 @@ export function Nav() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`text-[13px] font-medium transition-colors ${
-                  pathname.startsWith(item.href)
-                    ? 'font-bold text-accent-1-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
+                className={`text-[13px] font-medium transition-colors ${navLinkClassName(
+                  isActive(pathname, item.href),
+                  'text-muted-foreground hover:text-foreground'
+                )}`}
               >
                 {item.label}
               </Link>
@@ -106,11 +116,10 @@ export function Nav() {
                     key={child.href}
                     href={child.href}
                     onClick={() => setOpen(false)}
-                    className={`block py-3 pl-3 text-sm ${
-                      pathname.startsWith(child.href)
-                        ? 'font-bold text-accent-1-foreground'
-                        : 'text-muted-foreground'
-                    }`}
+                    className={`block py-3 pl-3 text-sm ${navLinkClassName(
+                      isActive(pathname, child.href),
+                      'text-muted-foreground'
+                    )}`}
                   >
                     {child.label}
                   </Link>
@@ -121,11 +130,10 @@ export function Nav() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setOpen(false)}
-                className={`block py-3 text-sm ${
-                  pathname.startsWith(item.href)
-                    ? 'font-bold text-accent-1-foreground'
-                    : 'text-muted-foreground'
-                }`}
+                className={`block py-3 text-sm ${navLinkClassName(
+                  isActive(pathname, item.href),
+                  'text-muted-foreground'
+                )}`}
               >
                 {item.label}
               </Link>
