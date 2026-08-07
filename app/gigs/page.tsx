@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { cookies } from 'next/headers'
-import { getGigs, groupGigsByMonth, resolveGigsView, GIGS_VIEW_COOKIE } from '@/lib/services/gigs'
+import { getGigs, groupGigsByMonth } from '@/lib/services/gigs'
+import { resolveGigsView, GIGS_VIEW_COOKIE } from '@/lib/gigs-view'
 import { buttonVariants } from '@/components/ui/button'
 import { ViewToggle } from '@/components/gigs/view-toggle'
 import { CompactGigList } from '@/components/gigs/compact-gig-list'
