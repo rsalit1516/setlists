@@ -35,7 +35,7 @@ export default async function GigsPage({
         <CompactGigList monthGroups={monthGroups} />
       ) : (
         <p className="text-muted-foreground">
-          {view === 'month' ? 'Month' : 'Quarter'} view is coming soon.
+          {view === 'month' ? 'Month calendar' : '3-month strip'} view is coming soon.
         </p>
       )}
     </div>

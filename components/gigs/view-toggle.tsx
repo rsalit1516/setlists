@@ -4,9 +4,9 @@ import { buttonVariants } from '@/components/ui/button'
 import type { GigsView } from '@/lib/types'
 
 const VIEWS: { value: GigsView; label: string }[] = [
-  { value: 'compact', label: 'Compact' },
-  { value: 'month', label: 'Month' },
-  { value: 'quarter', label: 'Quarter' },
+  { value: 'compact', label: 'Compact list' },
+  { value: 'month', label: 'Month calendar' },
+  { value: 'quarter', label: '3-month strip' },
 ]
 
 export function ViewToggle({ current }: { current: GigsView }) {
