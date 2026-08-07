@@ -12,6 +12,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Name the worktree/branch after the issue: `issue-<number>-<short-slug>` (e.g. `issue-17-gig-payment-fields`).
 - Leave the worktree in place until the PR merges. Don't remove a worktree with uncommitted or unmerged work without checking with the user first.
 
+## Workflow — Finishing a Story
+
+- Don't merge directly, even for solo-developer changes. Commit the finished work in its worktree, push the branch, and open a PR with `gh pr create` — leave the merge itself to the user via the GitHub UI.
+- This applies even when the change looks trivial. The PR is the review checkpoint: it's where the user reads the diff, can request a second AI review, and keeps a handle on a codebase they didn't type line-by-line.
+- Write the PR body to reference the issue it closes (e.g. `Closes #40`) and summarize what changed and how it was verified (tests run, lint/typecheck status).
+
 ## Commands
 
 ```bash
