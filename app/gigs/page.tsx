@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { cookies } from 'next/headers'
-import { getGigs, getGigsInRange, groupGigsByMonth } from '@/lib/services/gigs'
+import { getGigs, getGigsInRange, hasAnyGigs, groupGigsByMonth } from '@/lib/services/gigs'
 import { resolveGigsView, GIGS_VIEW_COOKIE } from '@/lib/gigs-view'
 import { parseMonthParam, getMonthRange, buildMonthGrid } from '@/lib/gigs-month'
 import { buttonVariants } from '@/components/ui/button'
@@ -24,8 +24,15 @@ export default async function GigsPage({
     const rawMonth = parseMonthParam(monthParam) ?? new Date()
     const monthDate = new Date(rawMonth.getFullYear(), rawMonth.getMonth(), 1)
     const { start, end } = getMonthRange(monthDate)
-    const monthGigs = await getGigsInRange(start, end)
-    content = <MonthCalendar monthDate={monthDate} days={buildMonthGrid(monthDate, monthGigs)} />
+    // Fetched together: monthGigs is scoped to the visible month (the AC), while
+    // anyGigs is a cheap count — not a full-history fetch — just to tell "no gigs
+    // booked this month" apart from "this app has zero gigs, ever" for the empty state.
+    const [monthGigs, anyGigs] = await Promise.all([getGigsInRange(start, end), hasAnyGigs()])
+    content = anyGigs ? (
+      <MonthCalendar monthDate={monthDate} days={buildMonthGrid(monthDate, monthGigs)} />
+    ) : (
+      <p className="text-muted-foreground">No gigs yet.</p>
+    )
   } else {
     const gigs = await getGigs()
     content =
