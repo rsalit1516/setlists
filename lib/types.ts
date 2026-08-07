@@ -118,6 +118,10 @@ export type GigMonthGroup = {
   defaultExpanded: boolean
 }
 
+// Month and Quarter are placeholders for now — #47 establishes the toggle
+// shell and URL/cookie state mechanism that sub-issues plug real views into.
+export type GigsView = 'compact' | 'month' | 'quarter'
+
 export type GigSetlistItem = {
   id: string
   order: number
