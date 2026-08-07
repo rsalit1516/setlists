@@ -1,6 +1,25 @@
 import prisma from '@/lib/db'
-import type { GigSummary, GigWithDetails, GigPerformanceData, GigMusician, GigMonthGroup } from '@/lib/types'
+import type { GigSummary, GigWithDetails, GigPerformanceData, GigMusician, GigMonthGroup, GigsView } from '@/lib/types'
 import { sanitizeLyricsHtml } from '@/lib/services/sanitize-lyrics'
+
+export const GIGS_VIEW_COOKIE = 'gigs-view'
+const DEFAULT_GIGS_VIEW: GigsView = 'compact'
+const GIGS_VIEWS: GigsView[] = ['compact', 'month', 'quarter']
+
+export function isGigsView(value: string | null | undefined): value is GigsView {
+  return GIGS_VIEWS.includes(value as GigsView)
+}
+
+// The URL always wins over the cookie so a shared/bookmarked link reflects the
+// view it names; the cookie only fills in on a fresh visit with no `?view=`.
+export function resolveGigsView(
+  viewParam: string | null | undefined,
+  cookieValue: string | null | undefined
+): GigsView {
+  if (isGigsView(viewParam)) return viewParam
+  if (isGigsView(cookieValue)) return cookieValue
+  return DEFAULT_GIGS_VIEW
+}
 
 function toStr(d: unknown): string | null {
   if (d === null || d === undefined) return null
