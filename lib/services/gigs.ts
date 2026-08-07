@@ -56,6 +56,35 @@ export async function getGigs(): Promise<GigSummary[]> {
   }))
 }
 
+// Cheap existence check — lets the Month calendar view show the same "No gigs
+// yet." empty state as Compact/Quarter without fetching the full gig history
+// just to find out the app has zero gigs (as opposed to zero gigs *this month*).
+export async function hasAnyGigs(): Promise<boolean> {
+  const count = await prisma.gig.count({ where: { isActive: true } })
+  return count > 0
+}
+
+// Half-open range [start, end) — used by the Month calendar view so it only
+// queries the visible month instead of the full gig history.
+export async function getGigsInRange(start: Date, end: Date): Promise<GigSummary[]> {
+  const rows: any[] = await prisma.gig.findMany({
+    where: { isActive: true, date: { gte: start, lt: end } },
+    orderBy: { date: 'asc' },
+    include: {
+      venue: { select: { name: true } },
+      setlist: { select: { name: true } },
+      _count: { select: { musicians: { where: { isActive: true } } } },
+    },
+  })
+  return rows.map((r) => ({
+    ...r,
+    amountContracted: toStr(r.amountContracted),
+    amountPaid: toStr(r.amountPaid),
+    tips: toStr(r.tips),
+    otherRevenue: toStr(r.otherRevenue),
+  }))
+}
+
 function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }

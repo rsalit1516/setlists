@@ -21,7 +21,7 @@ function PayStatus({ gig, className }: { gig: GigSummary; className?: string }) 
   }
   if (gig.amountContracted) {
     return (
-      <span className={cn('whitespace-nowrap text-red-600 dark:text-red-400', className)}>
+      <span className={cn('whitespace-nowrap text-amber-600 dark:text-amber-400', className)}>
         ${parseFloat(gig.amountContracted).toFixed(2)} Contracted
       </span>
     )
