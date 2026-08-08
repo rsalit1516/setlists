@@ -1,0 +1,65 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { GIGS_VIEW_COOKIE, GIGS_VIEWS } from '@/lib/gigs-view'
+
+// Plain GET target for filter/view toggle Links across the app: cookies can't
+// be set while a Server Component renders, so this route sets a persistence
+// cookie and redirects back to the page that linked here. One shared route
+// for every persisted filter (#56) instead of each one hand-rolling its own
+// (the original was app/gigs/view/route.ts, from #46).
+type PreferenceCookieConfig = {
+  allowedValues: readonly string[]
+  defaultValue: string
+}
+
+// Explicit allowlist of cookies this route may set, each with its own valid
+// values — this route has no auth in front of it, so both the cookie name and
+// its value must come from a small known set, never arbitrary caller input.
+// Add an entry here for each new persisted filter (#57, #58, ...).
+const PREFERENCE_COOKIES: Record<string, PreferenceCookieConfig> = {
+  [GIGS_VIEW_COOKIE]: { allowedValues: GIGS_VIEWS, defaultValue: 'compact' },
+}
+
+// Same-origin relative paths only — blocks protocol-relative ("//evil.com")
+// and backslash ("/\evil.com", which some browsers treat as "//") redirects
+// off-site, since this route redirects with no auth in front of it.
+function isSafeRedirectPath(path: string | null): path is string {
+  if (!path || !path.startsWith('/')) return false
+  return !path.startsWith('//') && !path.startsWith('/\\')
+}
+
+export async function GET(request: NextRequest) {
+  const cookieName = request.nextUrl.searchParams.get('cookie')
+  const rawValue = request.nextUrl.searchParams.get('value')
+  const redirectParam = request.nextUrl.searchParams.get('redirect')
+
+  const config = cookieName ? PREFERENCE_COOKIES[cookieName] : undefined
+  if (!cookieName || !config) {
+    return NextResponse.json({ error: 'Unknown preference cookie' }, { status: 400 })
+  }
+
+  const value = config.allowedValues.includes(rawValue ?? '') ? (rawValue as string) : config.defaultValue
+  const redirectPath = isSafeRedirectPath(redirectParam) ? redirectParam : '/'
+
+  // Behind Azure Static Web Apps' proxy, request.url/request.nextUrl.origin
+  // resolve to the container's internal host:port, not the public domain —
+  // prefer the forwarded headers the proxy sets. Falls back to nextUrl.origin
+  // for local dev, where there's no proxy in front of the server.
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const forwardedProto = request.headers.get('x-forwarded-proto')
+  const origin = forwardedHost
+    ? `${forwardedProto ?? 'https'}://${forwardedHost}`
+    : request.nextUrl.origin
+
+  const response = NextResponse.redirect(new URL(redirectPath, origin))
+  response.cookies.set(cookieName, value, {
+    maxAge: 60 * 60 * 24 * 365,
+    path: '/',
+    sameSite: 'lax',
+    // Read only server-side (Server Components + this route) — httpOnly keeps
+    // it out of reach of any client-side script; secure is skipped in dev
+    // since the local server runs over plain HTTP.
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+  })
+  return response
+}
