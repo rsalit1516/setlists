@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getGig } from '@/lib/services/gigs'
 import { getVenues } from '@/lib/services/venues'
+import { getMusicians } from '@/lib/services/musicians'
 import { GigForm } from '@/components/gigs/gig-form'
 import { updateGig } from '@/app/gigs/actions'
 
@@ -11,7 +12,7 @@ export default async function EditGigPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [gig, venues] = await Promise.all([getGig(id), getVenues()])
+  const [gig, venues, musicians] = await Promise.all([getGig(id), getVenues(), getMusicians()])
 
   if (!gig) notFound()
 
@@ -23,7 +24,7 @@ export default async function EditGigPage({
         </Link>
         <h1 className="mt-2 text-2xl font-bold">Edit Gig</h1>
       </div>
-      <GigForm venues={venues} gig={gig} action={updateGig} />
+      <GigForm venues={venues} gig={gig} musicians={musicians} action={updateGig} />
     </div>
   )
 }

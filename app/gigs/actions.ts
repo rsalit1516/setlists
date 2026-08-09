@@ -8,8 +8,6 @@ import type { SetSection } from '@/lib/types'
 
 export type GigActionState = { error: string } | null
 
-const DEFAULT_MUSICIANS = ['Richard Salit', 'Jeff Zbar', 'Scott Tunis', 'Andrew Guerrero']
-
 export async function createGig(_state: GigActionState, formData: FormData): Promise<GigActionState> {
   const venueId = formData.get('venueId') as string
   const existingSetlistId = (formData.get('setlistId') as string) || null
@@ -23,6 +21,10 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
   const tipsStr = formData.get('tips') as string
   const otherRevenueStr = formData.get('otherRevenue') as string
   const notes = formData.get('notes') as string
+  // Deduplicated: createMany below has no ON CONFLICT clause, so a duplicate
+  // musicianId would violate @@unique([gigId, musicianId]) and fail the whole
+  // gig creation.
+  const musicianIds = [...new Set(formData.getAll('musicianIds').map(String))]
 
   if (!venueId) return { error: 'Venue is required.' }
   if (!dateStr) return { error: 'Date is required.' }
@@ -88,12 +90,9 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
     },
   })
 
-  const defaultMusicians = await prisma.musician.findMany({
-    where: { name: { in: DEFAULT_MUSICIANS }, isActive: true },
-  })
-  if (defaultMusicians.length > 0) {
+  if (musicianIds.length > 0) {
     await prisma.gigMusician.createMany({
-      data: defaultMusicians.map((m) => ({ gigId: gig.id, musicianId: m.id })),
+      data: musicianIds.map((musicianId) => ({ gigId: gig.id, musicianId })),
     })
   }
 
@@ -165,26 +164,69 @@ export async function removeExpense(expenseId: string): Promise<void> {
   revalidatePath(`/gigs/${expense.gigId}`)
 }
 
-export async function addMusician(formData: FormData): Promise<void> {
+export async function bulkAddMusicians(formData: FormData): Promise<void> {
   const gigId = formData.get('gigId') as string
-  const musicianId = formData.get('musicianId') as string
+  const musicianIds = formData.getAll('musicianIds').map(String)
 
-  if (!gigId || !musicianId) return
+  if (!gigId || musicianIds.length === 0) return
 
   // A musician previously removed from this gig leaves behind an inactive
   // GigMusician row, which the @@unique([gigId, musicianId]) constraint
   // still occupies — reactivate it instead of inserting a duplicate.
-  await prisma.gigMusician.upsert({
-    where: { gigId_musicianId: { gigId, musicianId } },
-    create: { gigId, musicianId },
-    update: { isActive: true },
-  })
+  await Promise.all(
+    musicianIds.map((musicianId) =>
+      prisma.gigMusician.upsert({
+        where: { gigId_musicianId: { gigId, musicianId } },
+        create: { gigId, musicianId },
+        update: { isActive: true },
+      })
+    )
+  )
   revalidatePath(`/gigs/${gigId}`)
 }
 
 export async function removeMusician(musicianId: string): Promise<void> {
   const musician = await prisma.gigMusician.update({ where: { id: musicianId }, data: { isActive: false } })
   revalidatePath(`/gigs/${musician.gigId}`)
+}
+
+// Backs the Edit Gig form's standalone Musicians section: the checked state of
+// the roster checklist directly IS the gig's musician list, submitted via its
+// own action/button independent of the rest of the form's Save Changes.
+export async function syncGigMusicians(formData: FormData): Promise<void> {
+  const gigId = formData.get('gigId') as string
+  if (!gigId) return
+
+  const selectedIds = new Set(formData.getAll('musicianIds').map(String))
+
+  const current = await prisma.gigMusician.findMany({
+    where: { gigId, isActive: true },
+    select: { id: true, musicianId: true },
+  })
+  const currentIds = new Set(current.map((gm) => gm.musicianId))
+
+  const toAdd = [...selectedIds].filter((musicianId) => !currentIds.has(musicianId))
+  const toRemove = current.filter((gm) => !selectedIds.has(gm.musicianId))
+
+  await Promise.all([
+    ...toAdd.map((musicianId) =>
+      prisma.gigMusician.upsert({
+        where: { gigId_musicianId: { gigId, musicianId } },
+        create: { gigId, musicianId },
+        update: { isActive: true },
+      })
+    ),
+    ...(toRemove.length > 0
+      ? [
+          prisma.gigMusician.updateMany({
+            where: { id: { in: toRemove.map((gm) => gm.id) } },
+            data: { isActive: false },
+          }),
+        ]
+      : []),
+  ])
+
+  revalidatePath(`/gigs/${gigId}`)
 }
 
 export async function updateMusicianPayment(formData: FormData): Promise<void> {

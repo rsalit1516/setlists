@@ -22,6 +22,7 @@ vi.mock('@/lib/db', () => ({
       createMany: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
+      findMany: vi.fn(),
     },
   },
 }))
@@ -42,14 +43,15 @@ import { revalidatePath } from 'next/cache'
 import {
   createGig,
   updateGig,
-  addMusician,
+  bulkAddMusicians,
+  syncGigMusicians,
   updateMusicianPayment,
   markAllMusiciansPaid,
 } from './actions'
 
 beforeEach(() => vi.clearAllMocks())
 
-function buildFormData(overrides: Record<string, string> = {}): FormData {
+function buildFormData(overrides: Record<string, string> = {}, musicianIds: string[] = []): FormData {
   const fields: Record<string, string> = {
     id: 'gig-1',
     date: '2026-08-15',
@@ -66,6 +68,7 @@ function buildFormData(overrides: Record<string, string> = {}): FormData {
   }
   const fd = new FormData()
   for (const [k, v] of Object.entries(fields)) fd.set(k, v)
+  for (const musicianId of musicianIds) fd.append('musicianIds', musicianId)
   return fd
 }
 
@@ -157,7 +160,6 @@ describe('updateGig', () => {
 describe('createGig', () => {
   beforeEach(() => {
     vi.mocked(prisma.gig.create).mockResolvedValue({ id: 'new-gig-1' } as never)
-    vi.mocked(prisma.musician.findMany).mockResolvedValue([])
     vi.mocked(prisma.venue.findUnique).mockResolvedValue({ name: 'The Jazz Club' } as never)
     vi.mocked(prisma.setlist.create).mockResolvedValue({ id: 'new-setlist-1' } as never)
     vi.mocked(prisma.setlist.findUnique).mockResolvedValue({ items: [] } as never)
@@ -284,51 +286,50 @@ describe('createGig', () => {
     })
   })
 
-  it('auto-populates the 4 canonical default musicians onto the new gig', async () => {
-    const defaults = [
-      { id: 'm-1', name: 'Richard Salit' },
-      { id: 'm-2', name: 'Jeff Zbar' },
-      { id: 'm-3', name: 'Scott Tunis' },
-      { id: 'm-4', name: 'Andrew Guerrero' },
-    ]
-    vi.mocked(prisma.musician.findMany).mockResolvedValue(defaults as never)
-    const fd = buildFormData({ setlistId: 'setlist-1', createSetlist: '' })
+  it('creates a GigMusician row for each musicianId checked on the form', async () => {
+    const fd = buildFormData({ setlistId: 'setlist-1', createSetlist: '' }, ['m-1', 'm-2'])
 
     await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
 
-    expect(prisma.musician.findMany).toHaveBeenCalledWith({
-      where: {
-        name: { in: ['Richard Salit', 'Jeff Zbar', 'Scott Tunis', 'Andrew Guerrero'] },
-        isActive: true,
-      },
-    })
     expect(prisma.gigMusician.createMany).toHaveBeenCalledWith({
       data: [
         { gigId: 'new-gig-1', musicianId: 'm-1' },
         { gigId: 'new-gig-1', musicianId: 'm-2' },
-        { gigId: 'new-gig-1', musicianId: 'm-3' },
-        { gigId: 'new-gig-1', musicianId: 'm-4' },
       ],
     })
   })
 
-  it('skips the GigMusician bulk-create when no default musicians are found', async () => {
+  it('skips the GigMusician bulk-create when no musicians are checked', async () => {
     const fd = buildFormData({ setlistId: 'setlist-1', createSetlist: '' })
 
     await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
 
     expect(prisma.gigMusician.createMany).not.toHaveBeenCalled()
   })
+
+  it('deduplicates repeated musicianIds before the bulk-create, to avoid violating the @@unique([gigId, musicianId]) constraint', async () => {
+    const fd = buildFormData({ setlistId: 'setlist-1', createSetlist: '' }, ['m-1', 'm-1', 'm-2'])
+
+    await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
+
+    expect(prisma.gigMusician.createMany).toHaveBeenCalledWith({
+      data: [
+        { gigId: 'new-gig-1', musicianId: 'm-1' },
+        { gigId: 'new-gig-1', musicianId: 'm-2' },
+      ],
+    })
+  })
 })
 
-describe('addMusician', () => {
-  it('upserts a GigMusician linking the gig to the chosen roster musician', async () => {
+describe('bulkAddMusicians', () => {
+  it('upserts a GigMusician for each checked musician', async () => {
     vi.mocked(prisma.gigMusician.upsert).mockResolvedValue({} as never)
     const fd = new FormData()
     fd.set('gigId', 'gig-1')
-    fd.set('musicianId', 'musician-1')
+    fd.append('musicianIds', 'musician-1')
+    fd.append('musicianIds', 'musician-2')
 
-    await addMusician(fd)
+    await bulkAddMusicians(fd)
 
     // upsert (not create): a musician previously removed from this gig leaves an
     // inactive row behind that still occupies the @@unique([gigId, musicianId])
@@ -338,16 +339,103 @@ describe('addMusician', () => {
       create: { gigId: 'gig-1', musicianId: 'musician-1' },
       update: { isActive: true },
     })
+    expect(prisma.gigMusician.upsert).toHaveBeenCalledWith({
+      where: { gigId_musicianId: { gigId: 'gig-1', musicianId: 'musician-2' } },
+      create: { gigId: 'gig-1', musicianId: 'musician-2' },
+      update: { isActive: true },
+    })
     expect(revalidatePath).toHaveBeenCalledWith('/gigs/gig-1')
   })
 
-  it('does nothing when musicianId is missing', async () => {
+  it('does nothing when no musicians are checked', async () => {
     const fd = new FormData()
     fd.set('gigId', 'gig-1')
 
-    await addMusician(fd)
+    await bulkAddMusicians(fd)
 
     expect(prisma.gigMusician.upsert).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when gigId is missing', async () => {
+    const fd = new FormData()
+    fd.append('musicianIds', 'musician-1')
+
+    await bulkAddMusicians(fd)
+
+    expect(prisma.gigMusician.upsert).not.toHaveBeenCalled()
+  })
+})
+
+describe('syncGigMusicians', () => {
+  it('upserts newly checked musicians and deactivates newly unchecked ones', async () => {
+    vi.mocked(prisma.gigMusician.findMany).mockResolvedValue([
+      { id: 'gm-1', musicianId: 'm-1' },
+      { id: 'gm-2', musicianId: 'm-2' },
+    ] as never)
+    vi.mocked(prisma.gigMusician.upsert).mockResolvedValue({} as never)
+    vi.mocked(prisma.gigMusician.updateMany).mockResolvedValue({ count: 1 } as never)
+    const fd = new FormData()
+    fd.set('gigId', 'gig-1')
+    fd.append('musicianIds', 'm-1')
+    fd.append('musicianIds', 'm-3')
+
+    await syncGigMusicians(fd)
+
+    expect(prisma.gigMusician.findMany).toHaveBeenCalledWith({
+      where: { gigId: 'gig-1', isActive: true },
+      select: { id: true, musicianId: true },
+    })
+    // m-1 stays checked (no-op besides reactivation upsert), m-3 is newly checked.
+    expect(prisma.gigMusician.upsert).toHaveBeenCalledWith({
+      where: { gigId_musicianId: { gigId: 'gig-1', musicianId: 'm-3' } },
+      create: { gigId: 'gig-1', musicianId: 'm-3' },
+      update: { isActive: true },
+    })
+    // m-2 was active but unchecked on submit, so it's soft-removed.
+    expect(prisma.gigMusician.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['gm-2'] } },
+      data: { isActive: false },
+    })
+    expect(revalidatePath).toHaveBeenCalledWith('/gigs/gig-1')
+  })
+
+  it('skips the deactivate call when nothing was unchecked', async () => {
+    vi.mocked(prisma.gigMusician.findMany).mockResolvedValue([
+      { id: 'gm-1', musicianId: 'm-1' },
+    ] as never)
+    const fd = new FormData()
+    fd.set('gigId', 'gig-1')
+    fd.append('musicianIds', 'm-1')
+
+    await syncGigMusicians(fd)
+
+    expect(prisma.gigMusician.updateMany).not.toHaveBeenCalled()
+    expect(prisma.gigMusician.upsert).not.toHaveBeenCalled()
+  })
+
+  it('deactivates every current musician when all boxes are unchecked', async () => {
+    vi.mocked(prisma.gigMusician.findMany).mockResolvedValue([
+      { id: 'gm-1', musicianId: 'm-1' },
+      { id: 'gm-2', musicianId: 'm-2' },
+    ] as never)
+    const fd = new FormData()
+    fd.set('gigId', 'gig-1')
+
+    await syncGigMusicians(fd)
+
+    expect(prisma.gigMusician.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['gm-1', 'gm-2'] } },
+      data: { isActive: false },
+    })
+  })
+
+  it('does nothing when gigId is missing', async () => {
+    const fd = new FormData()
+    fd.append('musicianIds', 'm-1')
+
+    await syncGigMusicians(fd)
+
+    expect(prisma.gigMusician.findMany).not.toHaveBeenCalled()
   })
 })
 
