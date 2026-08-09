@@ -306,6 +306,19 @@ describe('createGig', () => {
 
     expect(prisma.gigMusician.createMany).not.toHaveBeenCalled()
   })
+
+  it('deduplicates repeated musicianIds before the bulk-create, to avoid violating the @@unique([gigId, musicianId]) constraint', async () => {
+    const fd = buildFormData({ setlistId: 'setlist-1', createSetlist: '' }, ['m-1', 'm-1', 'm-2'])
+
+    await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
+
+    expect(prisma.gigMusician.createMany).toHaveBeenCalledWith({
+      data: [
+        { gigId: 'new-gig-1', musicianId: 'm-1' },
+        { gigId: 'new-gig-1', musicianId: 'm-2' },
+      ],
+    })
+  })
 })
 
 describe('bulkAddMusicians', () => {

@@ -1,7 +1,12 @@
+import type { ChangeEvent } from 'react'
+
 // No 'use client' here on purpose: with no getConfirmMessage, this renders as
 // plain server-rendered checkboxes (e.g. the detail page's "Add Selected"
-// list) needing zero client JS. GigForm passes getConfirmMessage from within
-// its own 'use client' boundary, which is what makes the onChange handler work there.
+// list) needing zero client JS. Per Next.js's Server/Client Components docs,
+// "once a file is marked with 'use client', all its imports and child
+// components are considered part of the client bundle" — so this component
+// picks up interactivity for free when GigForm (which has 'use client')
+// passes getConfirmMessage, with no directive needed here.
 export function MusicianCheckboxList({
   musicians,
   defaultCheckedIds,
@@ -25,7 +30,7 @@ export function MusicianCheckboxList({
             className="size-4"
             onChange={
               getConfirmMessage
-                ? (e: React.ChangeEvent<HTMLInputElement>) => {
+                ? (e: ChangeEvent<HTMLInputElement>) => {
                     if (e.target.checked) return
                     const message = getConfirmMessage(m.id)
                     if (message && !window.confirm(message)) {

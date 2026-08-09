@@ -21,7 +21,10 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
   const tipsStr = formData.get('tips') as string
   const otherRevenueStr = formData.get('otherRevenue') as string
   const notes = formData.get('notes') as string
-  const musicianIds = formData.getAll('musicianIds').map(String)
+  // Deduplicated: createMany below has no ON CONFLICT clause, so a duplicate
+  // musicianId would violate @@unique([gigId, musicianId]) and fail the whole
+  // gig creation.
+  const musicianIds = [...new Set(formData.getAll('musicianIds').map(String))]
 
   if (!venueId) return { error: 'Venue is required.' }
   if (!dateStr) return { error: 'Date is required.' }
