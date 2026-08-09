@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GIGS_VIEW_COOKIE, GIGS_VIEWS } from '@/lib/gigs-view'
+import { SONGS_STATUS_COOKIE, SONGS_STATUS_FILTERS } from '@/lib/songs-status-filter'
 
 // Plain GET target for filter/view toggle Links across the app: cookies can't
 // be set while a Server Component renders, so this route sets a persistence
@@ -17,6 +18,7 @@ type PreferenceCookieConfig = {
 // Add an entry here for each new persisted filter (#57, #58, ...).
 const PREFERENCE_COOKIES: Record<string, PreferenceCookieConfig> = {
   [GIGS_VIEW_COOKIE]: { allowedValues: GIGS_VIEWS, defaultValue: 'compact' },
+  [SONGS_STATUS_COOKIE]: { allowedValues: SONGS_STATUS_FILTERS, defaultValue: 'ALL' },
 }
 
 // Same-origin relative paths only — blocks protocol-relative ("//evil.com")
