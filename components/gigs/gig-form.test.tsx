@@ -1,9 +1,13 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { GigForm } from './gig-form'
-import type { GigWithDetails, SetlistSummary, Venue } from '@/lib/types'
+import type { GigWithDetails, Musician, SetlistSummary, Venue } from '@/lib/types'
 
 vi.mock('../../lib/db', () => ({ default: {} }))
+vi.mock('@/app/gigs/actions', async () => {
+  const actual = await vi.importActual<typeof import('@/app/gigs/actions')>('@/app/gigs/actions')
+  return { ...actual, syncGigMusicians: vi.fn() }
+})
 
 const mockVenues: Venue[] = [
   { id: 'v-1', name: 'The Jazz Club', address: null, notes: null, isActive: true, createdAt: new Date(), updatedAt: new Date() },
@@ -16,6 +20,41 @@ function makeSetlist(overrides: Partial<SetlistSummary> = {}): SetlistSummary {
     createdAt: new Date('2026-05-01'),
     gig: null,
     _count: { items: 5 },
+    ...overrides,
+  }
+}
+
+function makeMusician(overrides: Partial<Musician> = {}): Musician {
+  return {
+    id: 'm-1',
+    name: 'Richard Salit',
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  }
+}
+
+function makeGig(overrides: Partial<GigWithDetails> = {}): GigWithDetails {
+  return {
+    id: 'gig-1',
+    date: new Date('2026-05-01'),
+    startTime: null,
+    endTime: null,
+    notes: null,
+    amountContracted: null,
+    amountPaid: null,
+    paidAt: null,
+    tips: null,
+    otherRevenue: null,
+    venueId: 'v-1',
+    setlistId: 'sl-1',
+    venue: mockVenues[0],
+    setlist: { id: 'sl-1', name: 'Friday Night', items: [] },
+    expenses: [],
+    musicians: [],
+    createdAt: new Date('2026-05-01'),
+    updatedAt: new Date('2026-05-01'),
     ...overrides,
   }
 }
@@ -180,5 +219,132 @@ describe('GigForm — financials fields', () => {
 
     const form = screen.getByRole('button', { name: 'Save Changes' }).closest('form')!
     expect((form.querySelector('input[name="paidAt"]') as HTMLInputElement).value).toBe('')
+  })
+})
+
+describe('GigForm — musicians (New Gig)', () => {
+  const roster = [
+    makeMusician({ id: 'm-1', name: 'Richard Salit' }),
+    makeMusician({ id: 'm-2', name: 'Jeff Zbar' }),
+    makeMusician({ id: 'm-3', name: 'Scott Tunis' }),
+    makeMusician({ id: 'm-4', name: 'Andrew Guerrero' }),
+    makeMusician({ id: 'm-5', name: 'Guest Player' }),
+  ]
+
+  it('pre-checks the 4 canonical default musicians and leaves others unchecked', () => {
+    render(<GigForm venues={mockVenues} setlists={[]} musicians={roster} action={noopAction} />)
+
+    expect(screen.getByLabelText('Richard Salit')).toBeChecked()
+    expect(screen.getByLabelText('Jeff Zbar')).toBeChecked()
+    expect(screen.getByLabelText('Scott Tunis')).toBeChecked()
+    expect(screen.getByLabelText('Andrew Guerrero')).toBeChecked()
+    expect(screen.getByLabelText('Guest Player')).not.toBeChecked()
+  })
+
+  it('submits checked musicianIds as part of the single Create Gig form', () => {
+    render(<GigForm venues={mockVenues} setlists={[]} musicians={roster} action={noopAction} />)
+
+    const form = screen.getByRole('button', { name: 'Create Gig' }).closest('form')!
+    const checked = Array.from(
+      form.querySelectorAll<HTMLInputElement>('input[name="musicianIds"]:checked')
+    ).map((el) => el.value)
+    expect(checked).toEqual(['m-1', 'm-2', 'm-3', 'm-4'])
+  })
+
+  it('does not render a separate Update Musicians form when creating a new gig', () => {
+    render(<GigForm venues={mockVenues} setlists={[]} musicians={roster} action={noopAction} />)
+
+    expect(screen.queryByRole('button', { name: 'Update Musicians' })).not.toBeInTheDocument()
+  })
+})
+
+describe('GigForm — musicians (Edit Gig)', () => {
+  const roster = [
+    makeMusician({ id: 'm-1', name: 'Richard Salit' }),
+    makeMusician({ id: 'm-2', name: 'Jeff Zbar' }),
+  ]
+
+  it('pre-checks the musicians currently on the gig, independent of the default-4 list', () => {
+    const gig = makeGig({
+      musicians: [
+        {
+          id: 'gm-1',
+          musicianId: 'm-2',
+          musician: { id: 'm-2', name: 'Jeff Zbar' },
+          amountPaid: null,
+          paidAt: null,
+          gigId: 'gig-1',
+          isActive: true,
+          createdAt: new Date(),
+        },
+      ],
+    })
+    render(<GigForm venues={mockVenues} musicians={roster} gig={gig} action={noopAction} />)
+
+    expect(screen.getByLabelText('Richard Salit')).not.toBeChecked()
+    expect(screen.getByLabelText('Jeff Zbar')).toBeChecked()
+  })
+
+  it('renders Update Musicians as its own form, separate from Save Changes', () => {
+    const gig = makeGig()
+    render(<GigForm venues={mockVenues} musicians={roster} gig={gig} action={noopAction} />)
+
+    const saveForm = screen.getByRole('button', { name: 'Save Changes' }).closest('form')!
+    const musiciansForm = screen.getByRole('button', { name: 'Update Musicians' }).closest('form')!
+    expect(saveForm).not.toBe(musiciansForm)
+    expect(musiciansForm.querySelector('input[name="gigId"]')).toHaveValue(gig.id)
+  })
+
+  it('unchecking a musician with recorded payment shows a confirm naming them and the amount/date, and reverts if cancelled', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const gig = makeGig({
+      musicians: [
+        {
+          id: 'gm-1',
+          musicianId: 'm-1',
+          musician: { id: 'm-1', name: 'Richard Salit' },
+          amountPaid: '150',
+          paidAt: new Date('2026-08-03T12:00:00'),
+          gigId: 'gig-1',
+          isActive: true,
+          createdAt: new Date(),
+        },
+      ],
+    })
+    render(<GigForm venues={mockVenues} musicians={roster} gig={gig} action={noopAction} />)
+
+    const checkbox = screen.getByLabelText('Richard Salit')
+    fireEvent.click(checkbox)
+
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Richard Salit'))
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('$150.00'))
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('Aug 3'))
+    expect(checkbox).toBeChecked()
+    confirmSpy.mockRestore()
+  })
+
+  it('unchecking a musician with no recorded payment does not prompt for confirmation', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm')
+    const gig = makeGig({
+      musicians: [
+        {
+          id: 'gm-1',
+          musicianId: 'm-1',
+          musician: { id: 'm-1', name: 'Richard Salit' },
+          amountPaid: null,
+          paidAt: null,
+          gigId: 'gig-1',
+          isActive: true,
+          createdAt: new Date(),
+        },
+      ],
+    })
+    render(<GigForm venues={mockVenues} musicians={roster} gig={gig} action={noopAction} />)
+
+    fireEvent.click(screen.getByLabelText('Richard Salit'))
+
+    expect(confirmSpy).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Richard Salit')).not.toBeChecked()
+    confirmSpy.mockRestore()
   })
 })
