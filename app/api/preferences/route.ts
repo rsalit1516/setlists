@@ -27,6 +27,34 @@ function isSafeRedirectPath(path: string | null): path is string {
   return !path.startsWith('//') && !path.startsWith('/\\')
 }
 
+// A proxy hop can append rather than replace these headers, leaving a
+// comma-separated list ("public.example.com, internal-proxy") — the first
+// value is the one the original client actually requested.
+function firstHeaderValue(headerValue: string | null): string | null {
+  if (!headerValue) return null
+  return headerValue.split(',')[0]?.trim() || null
+}
+
+// Behind Azure Static Web Apps' proxy, request.url/request.nextUrl.origin
+// resolve to the container's internal host:port, not the public domain —
+// prefer the forwarded headers the proxy sets. Falls back to nextUrl.origin
+// for local dev (no proxy in front) and if the forwarded headers are absent
+// or malformed, since this route is reachable without auth and shouldn't
+// trust them blindly enough to throw or redirect off-site on bad input.
+function resolveOrigin(request: NextRequest): string {
+  const forwardedHost = firstHeaderValue(request.headers.get('x-forwarded-host'))
+  if (!forwardedHost) return request.nextUrl.origin
+
+  const forwardedProto = firstHeaderValue(request.headers.get('x-forwarded-proto'))
+  const proto = forwardedProto === 'http' || forwardedProto === 'https' ? forwardedProto : 'https'
+
+  try {
+    return new URL(`${proto}://${forwardedHost}`).origin
+  } catch {
+    return request.nextUrl.origin
+  }
+}
+
 export async function GET(request: NextRequest) {
   const cookieName = request.nextUrl.searchParams.get('cookie')
   const rawValue = request.nextUrl.searchParams.get('value')
@@ -37,18 +65,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unknown preference cookie' }, { status: 400 })
   }
 
-  const value = config.allowedValues.includes(rawValue ?? '') ? (rawValue as string) : config.defaultValue
+  const value = rawValue !== null && config.allowedValues.includes(rawValue) ? rawValue : config.defaultValue
   const redirectPath = isSafeRedirectPath(redirectParam) ? redirectParam : '/'
-
-  // Behind Azure Static Web Apps' proxy, request.url/request.nextUrl.origin
-  // resolve to the container's internal host:port, not the public domain —
-  // prefer the forwarded headers the proxy sets. Falls back to nextUrl.origin
-  // for local dev, where there's no proxy in front of the server.
-  const forwardedHost = request.headers.get('x-forwarded-host')
-  const forwardedProto = request.headers.get('x-forwarded-proto')
-  const origin = forwardedHost
-    ? `${forwardedProto ?? 'https'}://${forwardedHost}`
-    : request.nextUrl.origin
+  const origin = resolveOrigin(request)
 
   const response = NextResponse.redirect(new URL(redirectPath, origin))
   response.cookies.set(cookieName, value, {

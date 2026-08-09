@@ -61,6 +61,17 @@ describe('GET /api/preferences', () => {
     expect(response.cookies.get(GIGS_VIEW_COOKIE)?.value).toBe('compact')
   })
 
+  it('falls back to the cookie config default when the value param is missing', async () => {
+    // Regression: a naive `rawValue ?? ''` check would let this through if an
+    // allowlist ever included '' as a valid value, setting the cookie to the
+    // literal string "null" instead of the intended default.
+    const request = makeRequest('http://localhost:3000/api/preferences?cookie=gigs-view&redirect=%2Fgigs')
+
+    const response = await GET(request)
+
+    expect(response.cookies.get(GIGS_VIEW_COOKIE)?.value).toBe('compact')
+  })
+
   it('rejects an unknown cookie name with 400 and sets no cookie', async () => {
     const request = makeRequest(
       'http://localhost:3000/api/preferences?cookie=not-a-real-cookie&value=whatever&redirect=%2Fgigs'
@@ -116,5 +127,50 @@ describe('GET /api/preferences', () => {
     const response = await GET(request)
 
     expect(response.headers.get('location')).toBe('http://localhost:3000/')
+  })
+
+  it('uses only the first host when x-forwarded-host is a comma-separated list', async () => {
+    // A multi-hop proxy chain can append rather than replace this header —
+    // the first entry is the one the original client actually requested.
+    const request = makeRequest(
+      'http://internal-container:8080/api/preferences?cookie=gigs-view&value=month&redirect=%2Fgigs',
+      {
+        'x-forwarded-host': 'proud-ocean-04af2510f.7.azurestaticapps.net, internal-proxy:9090',
+        'x-forwarded-proto': 'https',
+      }
+    )
+
+    const response = await GET(request)
+
+    expect(response.headers.get('location')).toBe(
+      'https://proud-ocean-04af2510f.7.azurestaticapps.net/gigs'
+    )
+  })
+
+  it('defaults to https for an unrecognized x-forwarded-proto value', async () => {
+    const request = makeRequest(
+      'http://internal-container:8080/api/preferences?cookie=gigs-view&value=month&redirect=%2Fgigs',
+      {
+        'x-forwarded-host': 'proud-ocean-04af2510f.7.azurestaticapps.net',
+        'x-forwarded-proto': 'javascript',
+      }
+    )
+
+    const response = await GET(request)
+
+    expect(response.headers.get('location')).toBe(
+      'https://proud-ocean-04af2510f.7.azurestaticapps.net/gigs'
+    )
+  })
+
+  it('falls back to the request URL origin when x-forwarded-host is not a valid host', async () => {
+    const request = makeRequest(
+      'http://localhost:3000/api/preferences?cookie=gigs-view&value=month&redirect=%2Fgigs',
+      { 'x-forwarded-host': 'not a valid host/with spaces' }
+    )
+
+    const response = await GET(request)
+
+    expect(response.headers.get('location')).toBe('http://localhost:3000/gigs')
   })
 })
