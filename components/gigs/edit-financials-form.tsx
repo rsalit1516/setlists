@@ -3,15 +3,11 @@
 import { useActionState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { toDateInputValue } from '@/lib/dates'
 import type { GigActionState } from '@/app/gigs/actions'
 import type { GigWithDetails } from '@/lib/types'
 
 type FormAction = (state: GigActionState, formData: FormData) => Promise<GigActionState>
-
-function toDateInputValue(d: Date | null) {
-  if (!d) return ''
-  return new Date(d).toISOString().slice(0, 10)
-}
 
 export function EditFinancialsForm({ gig, action }: { gig: GigWithDetails; action: FormAction }) {
   const [state, formAction, pending] = useActionState(action, null)

@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { toDateInputValue } from '@/lib/dates'
 import type { GigActionState } from '@/app/gigs/actions'
 import type { GigWithDetails, SetlistSummary, Venue } from '@/lib/types'
 
@@ -15,11 +16,6 @@ const textareaClass =
 
 function formatSetlistGigDate(d: Date) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function toDateInputValue(d: Date | null | undefined) {
-  if (!d) return ''
-  return new Date(d).toISOString().slice(0, 10)
 }
 
 type FormAction = (state: GigActionState, formData: FormData) => Promise<GigActionState>

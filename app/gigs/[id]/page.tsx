@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { buildPrintLayout } from '@/lib/setlist-print'
+import { toDateInputValue } from '@/lib/dates'
 import type { GigSetlistItem } from '@/lib/types'
 
 const inputClass =
@@ -57,11 +58,6 @@ function formatTimeRange(startTime: string | null, endTime: string | null) {
 function fmt(amount: string | null) {
   if (!amount) return '—'
   return `$${parseFloat(amount).toFixed(2)}`
-}
-
-function toDateInputValue(d: Date | null) {
-  if (!d) return ''
-  return new Date(d).toISOString().slice(0, 10)
 }
 
 const PAYOUT_BADGE: Record<'all' | 'some' | 'none', { label: string; className: string }> = {
