@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { NextRequest } from 'next/server'
 import { GET } from './route'
 import { GIGS_VIEW_COOKIE } from '@/lib/gigs-view'
+import { SONGS_STATUS_COOKIE } from '@/lib/songs-status-filter'
 
 function makeRequest(url: string, headers?: Record<string, string>) {
   return new NextRequest(url, headers ? { headers } : undefined)
@@ -70,6 +71,26 @@ describe('GET /api/preferences', () => {
     const response = await GET(request)
 
     expect(response.cookies.get(GIGS_VIEW_COOKIE)?.value).toBe('compact')
+  })
+
+  it('sets the songs-status cookie, including the ALL state, for a second registered preference', async () => {
+    const request = makeRequest(
+      'http://localhost:3000/api/preferences?cookie=songs-status&value=ALL&redirect=%2Fsongs'
+    )
+
+    const response = await GET(request)
+
+    expect(response.cookies.get(SONGS_STATUS_COOKIE)?.value).toBe('ALL')
+  })
+
+  it('falls back to the songs-status cookie config default for an invalid value', async () => {
+    const request = makeRequest(
+      'http://localhost:3000/api/preferences?cookie=songs-status&value=nonsense&redirect=%2Fsongs'
+    )
+
+    const response = await GET(request)
+
+    expect(response.cookies.get(SONGS_STATUS_COOKIE)?.value).toBe('ALL')
   })
 
   it('rejects an unknown cookie name with 400 and sets no cookie', async () => {
