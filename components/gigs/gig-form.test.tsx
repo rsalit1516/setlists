@@ -113,3 +113,72 @@ describe('GigForm — setlist picker', () => {
     expect(screen.queryByLabelText('Create new setlist')).not.toBeInTheDocument()
   })
 })
+
+describe('GigForm — financials fields', () => {
+  it('renders Paid by venue, Paid on, Tips, and Other revenue as empty editable fields when creating a new gig', () => {
+    render(<GigForm venues={mockVenues} setlists={[]} action={noopAction} />)
+
+    const form = screen.getByRole('button', { name: 'Create Gig' }).closest('form')!
+    expect((form.querySelector('input[name="amountPaid"]') as HTMLInputElement).value).toBe('')
+    expect((form.querySelector('input[name="paidAt"]') as HTMLInputElement).value).toBe('')
+    expect((form.querySelector('input[name="tips"]') as HTMLInputElement).value).toBe('')
+    expect((form.querySelector('input[name="otherRevenue"]') as HTMLInputElement).value).toBe('')
+  })
+
+  it("pre-fills financials fields with the gig's existing values when editing", () => {
+    const gig: GigWithDetails = {
+      id: 'gig-1',
+      date: new Date('2026-05-01'),
+      startTime: null,
+      endTime: null,
+      notes: null,
+      amountContracted: '500',
+      amountPaid: '250',
+      paidAt: new Date('2026-08-16T12:00:00'),
+      tips: '40',
+      otherRevenue: '15',
+      venueId: 'v-1',
+      setlistId: 'sl-1',
+      venue: mockVenues[0],
+      setlist: { id: 'sl-1', name: 'Friday Night', items: [] },
+      expenses: [],
+      musicians: [],
+      createdAt: new Date('2026-05-01'),
+      updatedAt: new Date('2026-05-01'),
+    }
+    render(<GigForm venues={mockVenues} setlists={[]} gig={gig} action={noopAction} />)
+
+    const form = screen.getByRole('button', { name: 'Save Changes' }).closest('form')!
+    expect((form.querySelector('input[name="amountPaid"]') as HTMLInputElement).value).toBe('250')
+    expect((form.querySelector('input[name="paidAt"]') as HTMLInputElement).value).toBe('2026-08-16')
+    expect((form.querySelector('input[name="tips"]') as HTMLInputElement).value).toBe('40')
+    expect((form.querySelector('input[name="otherRevenue"]') as HTMLInputElement).value).toBe('15')
+  })
+
+  it('leaves Paid on blank when the gig has no recorded payment date', () => {
+    const gig: GigWithDetails = {
+      id: 'gig-1',
+      date: new Date('2026-05-01'),
+      startTime: null,
+      endTime: null,
+      notes: null,
+      amountContracted: null,
+      amountPaid: null,
+      paidAt: null,
+      tips: null,
+      otherRevenue: null,
+      venueId: 'v-1',
+      setlistId: 'sl-1',
+      venue: mockVenues[0],
+      setlist: { id: 'sl-1', name: 'Friday Night', items: [] },
+      expenses: [],
+      musicians: [],
+      createdAt: new Date('2026-05-01'),
+      updatedAt: new Date('2026-05-01'),
+    }
+    render(<GigForm venues={mockVenues} setlists={[]} gig={gig} action={noopAction} />)
+
+    const form = screen.getByRole('button', { name: 'Save Changes' }).closest('form')!
+    expect((form.querySelector('input[name="paidAt"]') as HTMLInputElement).value).toBe('')
+  })
+})

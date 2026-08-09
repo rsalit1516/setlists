@@ -17,6 +17,11 @@ function formatSetlistGigDate(d: Date) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function toDateInputValue(d: Date | null | undefined) {
+  if (!d) return ''
+  return new Date(d).toISOString().slice(0, 10)
+}
+
 type FormAction = (state: GigActionState, formData: FormData) => Promise<GigActionState>
 
 export function GigForm({
@@ -40,21 +45,6 @@ export function GigForm({
   return (
     <form action={formAction} className="space-y-4">
       {gig && <input type="hidden" name="id" value={gig.id} />}
-
-      {/* Financials are edited on the gig detail page (EditFinancialsForm), not here —
-          updateGig writes every field each submit, so carry these through unchanged. */}
-      {gig && (
-        <>
-          <input type="hidden" name="amountPaid" value={gig.amountPaid ?? ''} />
-          <input
-            type="hidden"
-            name="paidAt"
-            value={gig.paidAt ? new Date(gig.paidAt).toISOString().slice(0, 10) : ''}
-          />
-          <input type="hidden" name="tips" value={gig.tips ?? ''} />
-          <input type="hidden" name="otherRevenue" value={gig.otherRevenue ?? ''} />
-        </>
-      )}
 
       {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
 
@@ -174,6 +164,52 @@ export function GigForm({
           placeholder="0.00"
           defaultValue={gig?.amountContracted ?? ''}
         />
+      </div>
+
+      {/* Also editable on the gig detail page's Financials section (EditFinancialsForm) —
+          updateGig/createGig write every field each submit, so each form carries the
+          other's fields through as hidden passthrough where it doesn't render them itself. */}
+      <div className="border-t pt-4">
+        <h2 className="mb-3 text-sm font-semibold">Financials</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium">Paid by venue ($)</label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              name="amountPaid"
+              placeholder="0.00"
+              defaultValue={gig?.amountPaid ?? ''}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Paid on</label>
+            <Input type="date" name="paidAt" defaultValue={toDateInputValue(gig?.paidAt)} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Tips ($)</label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              name="tips"
+              placeholder="0.00"
+              defaultValue={gig?.tips ?? ''}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Other revenue ($)</label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              name="otherRevenue"
+              placeholder="0.00"
+              defaultValue={gig?.otherRevenue ?? ''}
+            />
+          </div>
+        </div>
       </div>
 
       <div>
