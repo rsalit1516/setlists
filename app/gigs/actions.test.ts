@@ -245,6 +245,45 @@ describe('createGig', () => {
     })
   })
 
+  it('writes amountPaid, paidAt, tips, and otherRevenue along with amountContracted', async () => {
+    const fd = buildFormData({
+      setlistId: 'setlist-1',
+      createSetlist: '',
+      amountContracted: '500',
+      amountPaid: '250',
+      paidAt: '2026-08-16',
+      tips: '40',
+      otherRevenue: '15',
+    })
+
+    await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
+
+    expect(prisma.gig.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        amountContracted: 500,
+        amountPaid: 250,
+        paidAt: new Date('2026-08-16T12:00:00'),
+        tips: 40,
+        otherRevenue: 15,
+      }),
+    })
+  })
+
+  it('stores null for blank amountPaid, paidAt, tips, and otherRevenue instead of empty strings', async () => {
+    const fd = buildFormData({ setlistId: 'setlist-1', createSetlist: '' })
+
+    await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
+
+    expect(prisma.gig.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        amountPaid: null,
+        paidAt: null,
+        tips: null,
+        otherRevenue: null,
+      }),
+    })
+  })
+
   it('auto-populates the 4 canonical default musicians onto the new gig', async () => {
     const defaults = [
       { id: 'm-1', name: 'Richard Salit' },

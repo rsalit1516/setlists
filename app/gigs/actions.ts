@@ -18,6 +18,10 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
   const startTime = (formData.get('startTime') as string) || null
   const endTime = (formData.get('endTime') as string) || null
   const amountContractedStr = formData.get('amountContracted') as string
+  const amountPaidStr = formData.get('amountPaid') as string
+  const paidAtStr = formData.get('paidAt') as string
+  const tipsStr = formData.get('tips') as string
+  const otherRevenueStr = formData.get('otherRevenue') as string
   const notes = formData.get('notes') as string
 
   if (!venueId) return { error: 'Venue is required.' }
@@ -77,6 +81,10 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
       setlistId,
       notes: notes || null,
       amountContracted: amountContractedStr ? parseFloat(amountContractedStr) : null,
+      amountPaid: amountPaidStr ? parseFloat(amountPaidStr) : null,
+      paidAt: paidAtStr ? new Date(paidAtStr + 'T12:00:00') : null,
+      tips: tipsStr ? parseFloat(tipsStr) : null,
+      otherRevenue: otherRevenueStr ? parseFloat(otherRevenueStr) : null,
     },
   })
 
