@@ -5,9 +5,10 @@ import { isKnownPreferenceValue, resolvePreference } from '@/lib/preference-cook
 // DB — doesn't pull the Prisma client into its bundle. Mirrors lib/gigs-view.ts.
 export const STALE_WINDOW_COOKIE = 'stats-stale-window'
 
-// Cookie/URL values are strings; the page converts the resolved option to a
-// number before passing it to getStaleReadySongs. '10' mirrors
-// DEFAULT_STALE_GIG_WINDOW in lib/services/stats.ts.
+// Cookie/URL values are strings; resolveStaleWindow below converts the
+// resolved option to a number, since that's what getStaleReadySongs and the
+// rest of the page consume. '10' mirrors DEFAULT_STALE_GIG_WINDOW in
+// lib/services/stats.ts.
 export type StaleWindowOption = '5' | '10' | '20'
 const DEFAULT_STALE_WINDOW: StaleWindowOption = '10'
 export const STALE_WINDOW_OPTIONS: readonly StaleWindowOption[] = ['5', '10', '20']
