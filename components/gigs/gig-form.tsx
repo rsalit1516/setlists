@@ -6,6 +6,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MusicianCheckboxList } from '@/components/gigs/musician-checkbox-list'
 import { syncGigMusicians } from '@/app/gigs/actions'
+import { toDateInputValue } from '@/lib/dates'
 import { musicianPaymentLossWarning } from '@/lib/musician-payment-warning'
 import { DEFAULT_MUSICIAN_NAMES } from '@/lib/musicians-defaults'
 import type { GigActionState } from '@/app/gigs/actions'
@@ -19,11 +20,6 @@ const textareaClass =
 
 function formatSetlistGigDate(d: Date) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function toDateInputValue(d: Date | null | undefined) {
-  if (!d) return ''
-  return new Date(d).toISOString().slice(0, 10)
 }
 
 type FormAction = (state: GigActionState, formData: FormData) => Promise<GigActionState>
