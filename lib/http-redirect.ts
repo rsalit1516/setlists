@@ -1,7 +1,8 @@
 import type { NextRequest } from 'next/server'
 
-// Extracted from app/api/preferences/route.ts (#56) so app/api/genre-filter/route.ts
-// (#69) can share the same redirect-safety logic instead of re-deriving it.
+// Extracted from app/api/preferences/route.ts (#56), which remains its only
+// consumer — app/api/genre-filter/route.ts (#69) briefly shared it too but was
+// replaced by a Server Action (#72) since it doesn't redirect.
 
 // Same-origin relative paths only — blocks protocol-relative ("//evil.com")
 // and backslash ("/\evil.com", which some browsers treat as "//") redirects
