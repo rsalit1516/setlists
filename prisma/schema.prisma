@@ -11,6 +11,7 @@ enum SongStatus {
   READY
   IN_PROGRESS
   WISH
+  SHELVED
 }
 
 enum SetSection {

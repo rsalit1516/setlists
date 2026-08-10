@@ -145,6 +145,17 @@ describe('createSong', () => {
       data: expect.objectContaining({ genres: { connect: [] } }),
     })
   })
+
+  it('accepts SHELVED as a valid status', async () => {
+    vi.mocked(prisma.song.create).mockResolvedValue({ id: 'song-1' } as never)
+    const fd = buildFormData({ status: 'SHELVED' })
+
+    await expect(createSong(null, fd)).rejects.toThrow('REDIRECT:/songs')
+
+    expect(prisma.song.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ status: 'SHELVED' }),
+    })
+  })
 })
 
 describe('updateSong', () => {
@@ -204,6 +215,17 @@ describe('updateSong', () => {
     expect(prisma.song.update).toHaveBeenCalledWith({
       where: { id: 'song-1' },
       data: expect.objectContaining({ genres: { set: [{ id: 'genre-2' }] } }),
+    })
+  })
+
+  it('moves a song to SHELVED', async () => {
+    const fd = buildFormData({ id: 'song-1', status: 'SHELVED' })
+
+    await expect(updateSong(null, fd)).rejects.toThrow('REDIRECT:/songs')
+
+    expect(prisma.song.update).toHaveBeenCalledWith({
+      where: { id: 'song-1' },
+      data: expect.objectContaining({ status: 'SHELVED' }),
     })
   })
 })

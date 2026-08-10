@@ -5,10 +5,9 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { uploadChartFile, deleteChartFile } from '@/lib/services/azure-blob'
 import { sanitizeLyricsHtml } from '@/lib/services/sanitize-lyrics'
+import type { SongStatus } from '@/lib/types'
 
 export type SongActionState = { error: string } | null
-
-type SongStatus = 'READY' | 'IN_PROGRESS' | 'WISH'
 
 function parseDuration(value: string | null): number | null {
   if (!value || value.trim() === '') return null
