@@ -29,10 +29,13 @@ function parseSongFormData(formData: FormData) {
     status: (formData.get('status') as SongStatus) ?? 'WISH',
     keyboardRequired: formData.get('keyboardRequired') === 'true',
     durationSeconds: parseDuration(formData.get('duration') as string | null),
-    orientation: (formData.get('orientation') as string).trim() || null,
     bpm: formData.get('bpm') ? parseInt(formData.get('bpm') as string) || null : null,
     lyrics: sanitizeLyricsHtml(formData.get('lyrics') as string | null),
   }
+}
+
+function parseGenreIds(formData: FormData): string[] {
+  return [...new Set(formData.getAll('genreIds').map(String))]
 }
 
 async function resolveChartFile(
@@ -67,10 +70,13 @@ export async function createSong(
 ): Promise<SongActionState> {
   const data = parseSongFormData(formData)
   if (!data.title) return { error: 'Title is required.' }
+  const genreIds = parseGenreIds(formData)
 
   let song
   try {
-    song = await prisma.song.create({ data })
+    song = await prisma.song.create({
+      data: { ...data, genres: { connect: genreIds.map((genreId) => ({ id: genreId })) } },
+    })
   } catch {
     return { error: 'Failed to create song.' }
   }
@@ -96,6 +102,7 @@ export async function updateSong(
   const id = formData.get('id') as string
   const data = parseSongFormData(formData)
   if (!data.title) return { error: 'Title is required.' }
+  const genreIds = parseGenreIds(formData)
 
   let chartUpdate
   try {
@@ -106,7 +113,10 @@ export async function updateSong(
   }
 
   try {
-    await prisma.song.update({ where: { id }, data: { ...data, ...chartUpdate } })
+    await prisma.song.update({
+      where: { id },
+      data: { ...data, ...chartUpdate, genres: { set: genreIds.map((genreId) => ({ id: genreId })) } },
+    })
   } catch {
     return { error: 'Failed to update song.' }
   }

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { SongPickerPanel } from './song-picker-panel'
-import type { Song } from '@/lib/types'
+import type { Genre, Song } from '@/lib/types'
 
 vi.mock('../../lib/db', () => ({ default: {} }))
 
@@ -9,13 +9,15 @@ vi.mock('../../app/setlists/actions', () => ({
   addItem: vi.fn().mockResolvedValue(undefined),
 }))
 
+const genreDead: Genre = { id: 'g-1', name: 'Dead', isActive: true, createdAt: new Date(), updatedAt: new Date() }
+const genreFunk: Genre = { id: 'g-2', name: 'Funk', isActive: true, createdAt: new Date(), updatedAt: new Date() }
+
 const makeSong = (overrides: Partial<Song> & Pick<Song, 'id' | 'title' | 'status'>): Song => ({
   artist: null,
   key: null,
   singer: null,
   keyboardRequired: false,
   durationSeconds: null,
-  orientation: null,
   bpm: null,
   lyricsUrl: null,
   chartsUrl: null,
@@ -26,17 +28,19 @@ const makeSong = (overrides: Partial<Song> & Pick<Song, 'id' | 'title' | 'status
   isActive: true,
   createdAt: new Date(),
   updatedAt: new Date(),
+  genres: [],
   ...overrides,
 })
 
 const mockSongs: Song[] = [
-  makeSong({ id: '1', title: 'Ready Song', artist: 'Artist A', status: 'READY' }),
+  makeSong({ id: '1', title: 'Ready Song', artist: 'Artist A', status: 'READY', genres: [genreDead] }),
   makeSong({ id: '2', title: 'In Progress Song', status: 'IN_PROGRESS' }),
-  makeSong({ id: '3', title: 'Wish Song', artist: 'Artist B', status: 'WISH' }),
+  makeSong({ id: '3', title: 'Wish Song', artist: 'Artist B', status: 'WISH', genres: [genreFunk] }),
 ]
 
 const defaultProps = {
   allSongs: mockSongs,
+  allGenres: [genreDead, genreFunk],
   setlistId: 'sl-1',
   existingIds: new Set<string>(),
   displaySets: 1,
@@ -115,5 +119,45 @@ describe('SongPickerPanel', () => {
     expect(options).toContain('Set 1')
     expect(options).toContain('Set 2')
     expect(options).toContain('Encore')
+  })
+
+  it('does not render a genre filter row when there are no genres', () => {
+    render(<SongPickerPanel {...defaultProps} allGenres={[]} />)
+    expect(screen.queryByRole('button', { name: 'Dead' })).not.toBeInTheDocument()
+  })
+
+  it('filters to songs carrying the selected genre', () => {
+    render(<SongPickerPanel {...defaultProps} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Dead' }))
+    expect(screen.getByText('Ready Song')).toBeInTheDocument()
+    expect(screen.queryByText('In Progress Song')).not.toBeInTheDocument()
+    expect(screen.queryByText('Wish Song')).not.toBeInTheDocument()
+  })
+
+  it('OR-matches when multiple genres are selected', () => {
+    render(<SongPickerPanel {...defaultProps} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Dead' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Funk' }))
+    expect(screen.getByText('Ready Song')).toBeInTheDocument()
+    expect(screen.getByText('Wish Song')).toBeInTheDocument()
+    expect(screen.queryByText('In Progress Song')).not.toBeInTheDocument()
+  })
+
+  it('clears the genre filter when the active pill is clicked again', () => {
+    render(<SongPickerPanel {...defaultProps} />)
+    const deadButton = screen.getByRole('button', { name: 'Dead' })
+
+    fireEvent.click(deadButton)
+    expect(screen.queryByText('Wish Song')).not.toBeInTheDocument()
+
+    fireEvent.click(deadButton)
+    expect(screen.getByText('Wish Song')).toBeInTheDocument()
+  })
+
+  it('combines the genre filter with the status filter (AND across dimensions)', () => {
+    render(<SongPickerPanel {...defaultProps} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ready' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Funk' }))
+    expect(screen.getByText('No songs available')).toBeInTheDocument()
   })
 })

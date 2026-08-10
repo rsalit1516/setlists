@@ -24,7 +24,7 @@ describe('Nav', () => {
     expect(items[4]).toContain('Directory')
   })
 
-  it('opens the Directory dropdown on click and shows Venues and Musicians', async () => {
+  it('opens the Directory dropdown on click and shows Venues, Musicians, and Genres', async () => {
     const user = userEvent.setup()
     render(<Nav />)
     const nav = within(screen.getByRole('navigation', { name: 'Main' }))
@@ -41,6 +41,7 @@ describe('Nav', () => {
       'href',
       '/musicians'
     )
+    expect(screen.getByRole('menuitem', { name: 'Genres' })).toHaveAttribute('href', '/genres')
   })
 
   it('closes the Directory dropdown when a menu item is selected', async () => {

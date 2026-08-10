@@ -28,7 +28,6 @@ model Song {
   status           SongStatus @default(WISH)
   keyboardRequired Boolean    @default(false)
   durationSeconds  Int?
-  orientation      String?
   bpm              Int?
   lyricsUrl        String?
   chartsUrl        String?
@@ -41,6 +40,17 @@ model Song {
   updatedAt        DateTime   @updatedAt
 
   setlistItems SetlistItem[]
+  genres       Genre[]
+}
+
+model Genre {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  songs Song[]
 }
 
 model Venue {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { GIGS_VIEW_COOKIE, GIGS_VIEWS } from '@/lib/gigs-view'
 import { SONGS_STATUS_COOKIE, SONGS_STATUS_FILTERS } from '@/lib/songs-status-filter'
 import { STALE_WINDOW_COOKIE, STALE_WINDOW_OPTIONS } from '@/lib/stale-window'
+import { isSafeRedirectPath, resolveOrigin } from '@/lib/http-redirect'
 
 // Plain GET target for filter/view toggle Links across the app: cookies can't
 // be set while a Server Component renders, so this route sets a persistence
@@ -21,42 +22,6 @@ const PREFERENCE_COOKIES: Record<string, PreferenceCookieConfig> = {
   [GIGS_VIEW_COOKIE]: { allowedValues: GIGS_VIEWS, defaultValue: 'compact' },
   [SONGS_STATUS_COOKIE]: { allowedValues: SONGS_STATUS_FILTERS, defaultValue: 'ALL' },
   [STALE_WINDOW_COOKIE]: { allowedValues: STALE_WINDOW_OPTIONS, defaultValue: '10' },
-}
-
-// Same-origin relative paths only — blocks protocol-relative ("//evil.com")
-// and backslash ("/\evil.com", which some browsers treat as "//") redirects
-// off-site, since this route redirects with no auth in front of it.
-function isSafeRedirectPath(path: string | null): path is string {
-  if (!path || !path.startsWith('/')) return false
-  return !path.startsWith('//') && !path.startsWith('/\\')
-}
-
-// A proxy hop can append rather than replace these headers, leaving a
-// comma-separated list ("public.example.com, internal-proxy") — the first
-// value is the one the original client actually requested.
-function firstHeaderValue(headerValue: string | null): string | null {
-  if (!headerValue) return null
-  return headerValue.split(',')[0]?.trim() || null
-}
-
-// Behind Azure Static Web Apps' proxy, request.url/request.nextUrl.origin
-// resolve to the container's internal host:port, not the public domain —
-// prefer the forwarded headers the proxy sets. Falls back to nextUrl.origin
-// for local dev (no proxy in front) and if the forwarded headers are absent
-// or malformed, since this route is reachable without auth and shouldn't
-// trust them blindly enough to throw or redirect off-site on bad input.
-function resolveOrigin(request: NextRequest): string {
-  const forwardedHost = firstHeaderValue(request.headers.get('x-forwarded-host'))
-  if (!forwardedHost) return request.nextUrl.origin
-
-  const forwardedProto = firstHeaderValue(request.headers.get('x-forwarded-proto'))
-  const proto = forwardedProto === 'http' || forwardedProto === 'https' ? forwardedProto : 'https'
-
-  try {
-    return new URL(`${proto}://${forwardedHost}`).origin
-  } catch {
-    return request.nextUrl.origin
-  }
 }
 
 export async function GET(request: NextRequest) {

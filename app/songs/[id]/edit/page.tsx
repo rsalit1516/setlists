@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getSong } from '@/lib/services/songs'
+import { getGenres } from '@/lib/services/genres'
 import { SongForm } from '@/components/songs/song-form'
 import { updateSong } from '../../actions'
 import type { SongStatus } from '@/lib/types'
@@ -11,7 +12,7 @@ export default async function EditSongPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const song = await getSong(id)
+  const [song, genres] = await Promise.all([getSong(id), getGenres()])
 
   if (!song) notFound()
 
@@ -25,6 +26,7 @@ export default async function EditSongPage({
       </div>
       <SongForm
         song={{ ...song, status: song.status as SongStatus }}
+        genres={genres}
         action={updateSong}
       />
     </div>

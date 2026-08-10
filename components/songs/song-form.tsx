@@ -6,9 +6,10 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LyricsEditor } from '@/components/songs/lyrics-editor'
+import { GenreCheckboxList } from '@/components/songs/genre-checkbox-list'
 import { cn } from '@/lib/utils'
 import type { SongActionState } from '@/app/songs/actions'
-import type { Song } from '@/lib/types'
+import type { Genre, Song } from '@/lib/types'
 
 type FormAction = (state: SongActionState, formData: FormData) => Promise<SongActionState>
 
@@ -21,9 +22,11 @@ function formatDuration(seconds: number | null): string {
 
 export function SongForm({
   song,
+  genres,
   action,
 }: {
   song?: Song
+  genres: Genre[]
   action: FormAction
 }) {
   const [state, formAction, pending] = useActionState(action, null)
@@ -64,31 +67,26 @@ export function SongForm({
         </div>
       </div>
 
-      {/* Row 3: Status + Orientation */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Label htmlFor="status">Status</Label>
-          <select
-            id="status"
-            name="status"
-            title="Status"
-            defaultValue={song?.status ?? 'WISH'}
-            className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            <option value="WISH">Wish</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="READY">Ready</option>
-          </select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="orientation">Orientation / Genre</Label>
-          <Input
-            id="orientation"
-            name="orientation"
-            placeholder="e.g. Dead, Funk, Mainstream"
-            defaultValue={song?.orientation ?? ''}
-          />
-        </div>
+      {/* Row 3: Status */}
+      <div className="space-y-1.5">
+        <Label htmlFor="status">Status</Label>
+        <select
+          id="status"
+          name="status"
+          title="Status"
+          defaultValue={song?.status ?? 'WISH'}
+          className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:max-w-xs"
+        >
+          <option value="WISH">Wish</option>
+          <option value="IN_PROGRESS">In Progress</option>
+          <option value="READY">Ready</option>
+        </select>
+      </div>
+
+      {/* Genres */}
+      <div className="space-y-1.5">
+        <Label>Genres</Label>
+        <GenreCheckboxList genres={genres} defaultCheckedIds={new Set(song?.genres.map((g) => g.id) ?? [])} />
       </div>
 
       {/* Row 4: Duration + BPM */}
