@@ -10,13 +10,14 @@ import { getMusicians } from '@/lib/services/musicians'
 import {
   addExpense,
   removeExpense,
-  addMusician,
+  bulkAddMusicians,
   removeMusician,
   updateGig,
   updateMusicianPayment,
   markAllMusiciansPaid,
 } from '@/app/gigs/actions'
 import { EditFinancialsForm } from '@/components/gigs/edit-financials-form'
+import { MusicianCheckboxList } from '@/components/gigs/musician-checkbox-list'
 import { PrintMenuItem } from '@/components/gigs/print-button'
 import { buttonVariants, Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -30,6 +31,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { buildPrintLayout } from '@/lib/setlist-print'
 import { toDateInputValue } from '@/lib/dates'
+import { musicianPaymentLossWarning } from '@/lib/musician-payment-warning'
 import type { GigSetlistItem } from '@/lib/types'
 
 const inputClass =
@@ -418,7 +420,13 @@ export default async function GigPage({
                         action={removeAction}
                         variant="icon"
                         ariaLabel="Remove musician"
-                        description={`Remove ${musician.musician.name} from this gig?`}
+                        description={
+                          musicianPaymentLossWarning(
+                            musician.musician.name,
+                            musician.amountPaid,
+                            musician.paidAt
+                          ) ?? `Remove ${musician.musician.name} from this gig?`
+                        }
                       />
                     </li>
                   )
@@ -445,29 +453,17 @@ export default async function GigPage({
                 All roster musicians already added
               </p>
             ) : (
-              <form action={addMusician} className="flex gap-2.5">
+              <form action={bulkAddMusicians} className="flex flex-col items-start gap-3">
                 <input type="hidden" name="gigId" value={gig.id} />
-                <select
-                  name="musicianId"
-                  required
-                  title="Musician"
-                  defaultValue=""
-                  className={`${inputClass} flex-1`}
-                >
-                  <option value="" disabled>
-                    Select musician…
-                  </option>
-                  {availableMusicians.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
+                <MusicianCheckboxList
+                  musicians={availableMusicians}
+                  defaultCheckedIds={new Set()}
+                />
                 <button
                   type="submit"
                   className={buttonVariants({ variant: 'outline', size: 'sm' })}
                 >
-                  Add
+                  Add Selected
                 </button>
               </form>
             )}

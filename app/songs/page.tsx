@@ -1,14 +1,15 @@
 import Link from 'next/link'
+import { cookies } from 'next/headers'
 import { getSongs } from '@/lib/services/songs'
 import { SongStatusBadge } from '@/components/songs/song-status-badge'
+import { StatusFilter } from '@/components/songs/status-filter'
 import { PrintButton } from '@/components/songs/print-button'
 import { buttonVariants } from '@/components/ui/button'
 import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
 import { deleteSong } from './actions'
 import { cn } from '@/lib/utils'
-import { SONG_STATUS_LABELS, type SongStatus } from '@/lib/types'
-
-const STATUS_FILTERS = Object.keys(SONG_STATUS_LABELS) as SongStatus[]
+import { SONG_STATUS_LABELS } from '@/lib/types'
+import { SONGS_STATUS_COOKIE, resolveSongsStatusFilter } from '@/lib/songs-status-filter'
 
 function formatDuration(seconds: number | null): string {
   if (!seconds) return '—'
@@ -17,17 +18,15 @@ function formatDuration(seconds: number | null): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-function isSongStatus(value: string | undefined): value is SongStatus {
-  return STATUS_FILTERS.includes(value as SongStatus)
-}
-
 export default async function SongsPage({
   searchParams,
 }: {
   searchParams: Promise<{ status?: string }>
 }) {
   const { status: statusParam } = await searchParams
-  const status = isSongStatus(statusParam) ? statusParam : undefined
+  const cookieStore = await cookies()
+  const statusFilter = resolveSongsStatusFilter(statusParam, cookieStore.get(SONGS_STATUS_COOKIE)?.value)
+  const status = statusFilter === 'ALL' ? undefined : statusFilter
   const songs = await getSongs(status)
 
   return (
@@ -42,26 +41,7 @@ export default async function SongsPage({
         </div>
       </div>
 
-      <div className="mb-6 flex flex-wrap gap-2 print:hidden">
-        <Link
-          href="/songs"
-          className={cn(
-            buttonVariants({ variant: status === undefined ? 'default' : 'outline' }),
-            'h-11 px-4'
-          )}
-        >
-          All
-        </Link>
-        {STATUS_FILTERS.map((s) => (
-          <Link
-            key={s}
-            href={`/songs?status=${s}`}
-            className={cn(buttonVariants({ variant: status === s ? 'default' : 'outline' }), 'h-11 px-4')}
-          >
-            {SONG_STATUS_LABELS[s]}
-          </Link>
-        ))}
-      </div>
+      <StatusFilter current={statusFilter} />
 
       <div className="print:hidden">
         {songs.length === 0 ? (

@@ -1,14 +1,15 @@
 import type { GigsView } from '@/lib/types'
+import { isKnownPreferenceValue, resolvePreference } from '@/lib/preference-cookie'
 
 // Kept separate from lib/services/gigs.ts (which has a top-level Prisma
-// import) so the /gigs/view route handler — which never touches the DB —
-// doesn't pull the Prisma client into its bundle.
+// import) so the /api/preferences route handler — which never touches the
+// DB — doesn't pull the Prisma client into its bundle.
 export const GIGS_VIEW_COOKIE = 'gigs-view'
 const DEFAULT_GIGS_VIEW: GigsView = 'compact'
-const GIGS_VIEWS: GigsView[] = ['compact', 'month', 'quarter']
+export const GIGS_VIEWS: readonly GigsView[] = ['compact', 'month', 'quarter']
 
 export function isGigsView(value: string | null | undefined): value is GigsView {
-  return GIGS_VIEWS.includes(value as GigsView)
+  return isKnownPreferenceValue(value, GIGS_VIEWS)
 }
 
 // The URL always wins over the cookie so a shared/bookmarked link reflects the
@@ -17,7 +18,5 @@ export function resolveGigsView(
   viewParam: string | null | undefined,
   cookieValue: string | null | undefined
 ): GigsView {
-  if (isGigsView(viewParam)) return viewParam
-  if (isGigsView(cookieValue)) return cookieValue
-  return DEFAULT_GIGS_VIEW
+  return resolvePreference(viewParam, cookieValue, GIGS_VIEWS, DEFAULT_GIGS_VIEW)
 }

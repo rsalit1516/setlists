@@ -3,7 +3,7 @@ import { toDateInputValue } from './dates'
 
 describe('toDateInputValue', () => {
   it('formats a Date as YYYY-MM-DD', () => {
-    expect(toDateInputValue(new Date('2026-08-16T12:00:00'))).toBe('2026-08-16')
+    expect(toDateInputValue(new Date(Date.UTC(2026, 7, 16, 12, 0, 0)))).toBe('2026-08-16')
   })
 
   it('returns an empty string for null', () => {
