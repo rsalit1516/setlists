@@ -37,15 +37,18 @@ Two contributing causes, usually together:
 ## How to diagnose
 
 Requires the `az` CLI, logged in with access to the `Setlists-prod-rg` resource group
-(`az login` if needed).
+(`az login` if needed). The `staticwebapp` commands need the Azure CLI extension of the same
+name — if it's not already installed, `az` will report an unrecognized command; install it
+with `az extension add --name staticwebapp`.
 
 ```bash
 az staticwebapp environment list -n Setlists -g Setlists-prod-rg -o table
 ```
 
 Cross-check the listed environments' `SourceBranch` / `PullRequestTitle` against
-`gh pr list --repo rsalit1516/setlists --state all` — any environment whose PR is already
-merged or closed is orphaned and safe to delete.
+`gh pr list --repo rsalit1516/setlists --state all --limit 200` — the default page size is
+30, which can miss older PRs and make the orphan-check unreliable, so pass an explicit
+`--limit` high enough to cover the repo's full PR history.
 
 ## How to fix
 
