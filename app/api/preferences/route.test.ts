@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 import { GET } from './route'
 import { GIGS_VIEW_COOKIE } from '@/lib/gigs-view'
 import { SONGS_STATUS_COOKIE } from '@/lib/songs-status-filter'
+import { STALE_WINDOW_COOKIE } from '@/lib/stale-window'
 
 function makeRequest(url: string, headers?: Record<string, string>) {
   return new NextRequest(url, headers ? { headers } : undefined)
@@ -91,6 +92,26 @@ describe('GET /api/preferences', () => {
     const response = await GET(request)
 
     expect(response.cookies.get(SONGS_STATUS_COOKIE)?.value).toBe('ALL')
+  })
+
+  it('sets the stats-stale-window cookie for a third registered preference', async () => {
+    const request = makeRequest(
+      'http://localhost:3000/api/preferences?cookie=stats-stale-window&value=5&redirect=%2Fstats'
+    )
+
+    const response = await GET(request)
+
+    expect(response.cookies.get(STALE_WINDOW_COOKIE)?.value).toBe('5')
+  })
+
+  it('falls back to the stats-stale-window cookie config default for an invalid value', async () => {
+    const request = makeRequest(
+      'http://localhost:3000/api/preferences?cookie=stats-stale-window&value=15&redirect=%2Fstats'
+    )
+
+    const response = await GET(request)
+
+    expect(response.cookies.get(STALE_WINDOW_COOKIE)?.value).toBe('10')
   })
 
   it('rejects an unknown cookie name with 400 and sets no cookie', async () => {
