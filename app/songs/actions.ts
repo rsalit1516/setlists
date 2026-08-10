@@ -3,9 +3,10 @@
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { uploadChartFile, deleteChartFile } from '@/lib/services/azure-blob'
 import { sanitizeLyricsHtml } from '@/lib/services/sanitize-lyrics'
-import type { SongStatus } from '@/lib/types'
+import { SONGS_GENRES_COOKIE, parseGenreFilterValue, toggleGenreId } from '@/lib/songs-genre-filter'
 
 export type SongActionState = { error: string } | null
 
@@ -126,5 +127,30 @@ export async function updateSong(
 
 export async function deleteSong(id: string): Promise<void> {
   await prisma.song.update({ where: { id }, data: { isActive: false } })
+  revalidatePath('/songs')
+}
+
+// Server Action, not a Link-to-GET-route-handler (the previous app/api/genre-filter/route.ts
+// approach) — a GET reachable via <Link href> gets invoked by Next.js's automatic viewport
+// prefetching (see node_modules/next/dist/docs/.../prefetching.md, "Triggering unwanted
+// side-effects during prefetching"), which was silently flipping the genre-filter cookie in
+// the background since every pill sits in the viewport at once. A Server Action is a POST,
+// never prefetched. See #72.
+export async function toggleSongsGenreFilter(genreId: string): Promise<void> {
+  const cookieStore = await cookies()
+  const current = parseGenreFilterValue(cookieStore.get(SONGS_GENRES_COOKIE)?.value)
+  const next = toggleGenreId(current, genreId)
+
+  const validGenres = next.length
+    ? await prisma.genre.findMany({ where: { id: { in: next }, isActive: true }, select: { id: true } })
+    : []
+
+  cookieStore.set(SONGS_GENRES_COOKIE, validGenres.map((g) => g.id).join(','), {
+    maxAge: 60 * 60 * 24 * 365,
+    path: '/',
+    sameSite: 'lax',
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+  })
   revalidatePath('/songs')
 }

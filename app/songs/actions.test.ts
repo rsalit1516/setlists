@@ -8,6 +8,9 @@ vi.mock('@/lib/db', () => ({
       findUnique: vi.fn(),
       delete: vi.fn(),
     },
+    genre: {
+      findMany: vi.fn(),
+    },
   },
 }))
 
@@ -27,10 +30,24 @@ vi.mock('@/lib/services/azure-blob', () => ({
   deleteChartFile: vi.fn(),
 }))
 
+vi.mock('next/headers', () => ({ cookies: vi.fn() }))
+
 import prisma from '@/lib/db'
-import { createSong, updateSong } from './actions'
+import { cookies } from 'next/headers'
+import { revalidatePath } from 'next/cache'
+import { createSong, updateSong, toggleSongsGenreFilter } from './actions'
+import { SONGS_GENRES_COOKIE } from '@/lib/songs-genre-filter'
 
 beforeEach(() => vi.clearAllMocks())
+
+function mockCookieStore(currentValue?: string) {
+  const store = {
+    get: vi.fn(() => (currentValue === undefined ? undefined : { value: currentValue })),
+    set: vi.fn(),
+  }
+  vi.mocked(cookies).mockResolvedValue(store as never)
+  return store
+}
 
 function buildFormData(overrides: Record<string, string> = {}): FormData {
   const fields: Record<string, string> = {
@@ -227,5 +244,75 @@ describe('updateSong', () => {
       where: { id: 'song-1' },
       data: expect.objectContaining({ status: 'SHELVED' }),
     })
+  })
+})
+
+describe('toggleSongsGenreFilter', () => {
+  it('adds a genre id not currently in the cookie', async () => {
+    const store = mockCookieStore(undefined)
+    vi.mocked(prisma.genre.findMany).mockResolvedValue([{ id: 'g-1' }] as never)
+
+    await toggleSongsGenreFilter('g-1')
+
+    expect(prisma.genre.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['g-1'] }, isActive: true },
+      select: { id: true },
+    })
+    expect(store.set).toHaveBeenCalledWith(SONGS_GENRES_COOKIE, 'g-1', expect.any(Object))
+  })
+
+  it('removes a genre id already in the cookie — the toggle-off case', async () => {
+    const store = mockCookieStore('g-1,g-2')
+    vi.mocked(prisma.genre.findMany).mockResolvedValue([{ id: 'g-2' }] as never)
+
+    await toggleSongsGenreFilter('g-1')
+
+    expect(prisma.genre.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['g-2'] }, isActive: true },
+      select: { id: true },
+    })
+    expect(store.set).toHaveBeenCalledWith(SONGS_GENRES_COOKIE, 'g-2', expect.any(Object))
+  })
+
+  it('deselecting the only selected genre clears the cookie and skips the db lookup — back to "All"', async () => {
+    const store = mockCookieStore('g-1')
+
+    await toggleSongsGenreFilter('g-1')
+
+    expect(prisma.genre.findMany).not.toHaveBeenCalled()
+    expect(store.set).toHaveBeenCalledWith(SONGS_GENRES_COOKIE, '', expect.any(Object))
+  })
+
+  it('drops ids that are no longer real, active genres', async () => {
+    const store = mockCookieStore('g-1')
+    vi.mocked(prisma.genre.findMany).mockResolvedValue([] as never)
+
+    await toggleSongsGenreFilter('g-2')
+
+    expect(store.set).toHaveBeenCalledWith(SONGS_GENRES_COOKIE, '', expect.any(Object))
+  })
+
+  it('sets standard persistence-cookie attributes', async () => {
+    const store = mockCookieStore(undefined)
+    vi.mocked(prisma.genre.findMany).mockResolvedValue([{ id: 'g-1' }] as never)
+
+    await toggleSongsGenreFilter('g-1')
+
+    expect(store.set).toHaveBeenCalledWith(SONGS_GENRES_COOKIE, 'g-1', {
+      maxAge: 60 * 60 * 24 * 365,
+      path: '/',
+      sameSite: 'lax',
+      httpOnly: true,
+      secure: false,
+    })
+  })
+
+  it('revalidates the songs page so the pills reflect the new selection', async () => {
+    mockCookieStore(undefined)
+    vi.mocked(prisma.genre.findMany).mockResolvedValue([{ id: 'g-1' }] as never)
+
+    await toggleSongsGenreFilter('g-1')
+
+    expect(revalidatePath).toHaveBeenCalledWith('/songs')
   })
 })

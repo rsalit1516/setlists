@@ -1,8 +1,9 @@
 // Genre selections don't fit app/api/preferences/route.ts's allowlist model
 // (a small, statically known set of values per cookie) — the set of genre
-// ids is dynamic and DB-generated, so this filter gets its own cookie and its
-// own route (app/api/genre-filter/route.ts), which validates against the
-// live set of active genres instead of a hardcoded array. See #69.
+// ids is dynamic and DB-generated, so this filter gets its own cookie, set by
+// the toggleSongsGenreFilter Server Action (app/songs/actions.ts), which
+// validates against the live set of active genres instead of a hardcoded
+// array. See #69, #72.
 export const SONGS_GENRES_COOKIE = 'songs-genres'
 
 export function parseGenreFilterValue(value: string | null | undefined): string[] {
