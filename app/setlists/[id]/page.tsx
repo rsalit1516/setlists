@@ -34,7 +34,11 @@ export default async function SetlistPage({
   const { revision: revParam, sets: setsParam } = await searchParams
   const revision = revParam === '1'
 
-  const [setlist, allSongs, allGenres] = await Promise.all([getSetlist(id), getSongs(), getGenres()])
+  const [setlist, allSongs, allGenres] = await Promise.all([
+    getSetlist(id),
+    getSongs(undefined, undefined, true),
+    getGenres(),
+  ])
   if (!setlist) notFound()
 
   const allExistingIds = new Set(setlist.items.map((i) => i.songId))

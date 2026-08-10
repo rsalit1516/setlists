@@ -23,6 +23,7 @@ export function GenreFilter({ genres, selected }: { genres: Genre[]; selected: s
           <Link
             key={genre.id}
             href={`/api/genre-filter?genres=${encodeURIComponent(nextSelected.join(','))}&redirect=${encodeURIComponent(hrefFor(nextSelected))}`}
+            role="button"
             aria-pressed={isSelected}
             className={cn(buttonVariants({ variant: isSelected ? 'default' : 'outline' }), 'h-11 px-4')}
           >

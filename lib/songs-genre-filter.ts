@@ -7,7 +7,10 @@ export const SONGS_GENRES_COOKIE = 'songs-genres'
 
 export function parseGenreFilterValue(value: string | null | undefined): string[] {
   if (!value) return []
-  return value.split(',').filter(Boolean)
+  return value
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean)
 }
 
 // The URL always wins over the cookie so a shared/bookmarked link with an

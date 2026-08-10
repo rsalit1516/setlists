@@ -15,6 +15,10 @@ describe('parseGenreFilterValue', () => {
   it('drops empty entries from stray commas', () => {
     expect(parseGenreFilterValue('g-1,,g-2,')).toEqual(['g-1', 'g-2'])
   })
+
+  it('trims whitespace around each id, e.g. from a "g-1, g-2" style value', () => {
+    expect(parseGenreFilterValue('g-1, g-2')).toEqual(['g-1', 'g-2'])
+  })
 })
 
 describe('resolveSongsGenreFilter', () => {

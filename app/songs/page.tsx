@@ -32,7 +32,7 @@ export default async function SongsPage({
   const statusFilter = resolveSongsStatusFilter(statusParam, cookieStore.get(SONGS_STATUS_COOKIE)?.value)
   const status = statusFilter === 'ALL' ? undefined : statusFilter
   const genreFilter = resolveSongsGenreFilter(genresParam, cookieStore.get(SONGS_GENRES_COOKIE)?.value)
-  const [songs, allGenres] = await Promise.all([getSongs(status, genreFilter), getGenres()])
+  const [songs, allGenres] = await Promise.all([getSongs(status, genreFilter, true), getGenres()])
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
