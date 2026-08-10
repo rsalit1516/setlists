@@ -7,6 +7,7 @@ import { cookies } from 'next/headers'
 import { uploadChartFile, deleteChartFile } from '@/lib/services/azure-blob'
 import { sanitizeLyricsHtml } from '@/lib/services/sanitize-lyrics'
 import { SONGS_GENRES_COOKIE, parseGenreFilterValue, toggleGenreId } from '@/lib/songs-genre-filter'
+import type { SongStatus } from '@/lib/types'
 
 export type SongActionState = { error: string } | null
 
