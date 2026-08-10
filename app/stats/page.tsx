@@ -1,8 +1,8 @@
+import { cookies } from "next/headers";
 import {
   getMostPlayedSongs,
   getReadySongsNeverPlayed,
   getStaleReadySongs,
-  DEFAULT_STALE_GIG_WINDOW,
   getStaleInProgressSongs,
   getUnpaidGigs,
   getScheduleGaps,
@@ -10,6 +10,7 @@ import {
   DEFAULT_GAP_LOOKAHEAD_MONTHS,
   DEFAULT_GAP_DAYS,
 } from "@/lib/services/stats";
+import { STALE_WINDOW_COOKIE, resolveStaleWindow } from "@/lib/stale-window";
 import { StatStrip, StatCard } from "@/components/stats/stat-card";
 import { StaleWindowToggle } from "@/components/stats/stale-window-toggle";
 import { MostPlayedTable } from "@/components/stats/most-played-table";
@@ -18,11 +19,6 @@ import { StaleReadyTable } from "@/components/stats/stale-ready-table";
 import { StuckInProgressTable } from "@/components/stats/stuck-in-progress-table";
 import { UnpaidGigsTable } from "@/components/stats/unpaid-gigs-table";
 import { ScheduleGapsTable } from "@/components/stats/schedule-gaps-table";
-
-function parseGigWindow(value: string | undefined): number {
-  const n = Number(value);
-  return Number.isInteger(n) && n > 0 ? n : DEFAULT_STALE_GIG_WINDOW;
-}
 
 function formatMoney(amount: string | number) {
   return `$${(typeof amount === "string" ? parseFloat(amount) : amount).toFixed(2)}`;
@@ -50,7 +46,11 @@ export default async function StatsPage({
   searchParams: Promise<{ window?: string }>;
 }) {
   const { window: windowParam } = await searchParams;
-  const gigWindow = parseGigWindow(windowParam);
+  const cookieStore = await cookies();
+  const gigWindow = resolveStaleWindow(
+    windowParam,
+    cookieStore.get(STALE_WINDOW_COOKIE)?.value,
+  );
 
   const [
     mostPlayed,
