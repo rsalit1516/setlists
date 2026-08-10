@@ -1,8 +1,11 @@
 import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { getSongs } from '@/lib/services/songs'
+import { getGenres } from '@/lib/services/genres'
 import { SongStatusBadge } from '@/components/songs/song-status-badge'
 import { StatusFilter } from '@/components/songs/status-filter'
+import { GenreFilter } from '@/components/songs/genre-filter'
+import { GenreBadgeList } from '@/components/songs/genre-badge-list'
 import { PrintButton } from '@/components/songs/print-button'
 import { buttonVariants } from '@/components/ui/button'
 import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
@@ -10,6 +13,7 @@ import { deleteSong } from './actions'
 import { cn } from '@/lib/utils'
 import { SONG_STATUS_LABELS } from '@/lib/types'
 import { SONGS_STATUS_COOKIE, resolveSongsStatusFilter } from '@/lib/songs-status-filter'
+import { SONGS_GENRES_COOKIE, resolveSongsGenreFilter } from '@/lib/songs-genre-filter'
 
 function formatDuration(seconds: number | null): string {
   if (!seconds) return '—'
@@ -21,13 +25,14 @@ function formatDuration(seconds: number | null): string {
 export default async function SongsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>
+  searchParams: Promise<{ status?: string; genres?: string }>
 }) {
-  const { status: statusParam } = await searchParams
+  const { status: statusParam, genres: genresParam } = await searchParams
   const cookieStore = await cookies()
   const statusFilter = resolveSongsStatusFilter(statusParam, cookieStore.get(SONGS_STATUS_COOKIE)?.value)
   const status = statusFilter === 'ALL' ? undefined : statusFilter
-  const songs = await getSongs(status)
+  const genreFilter = resolveSongsGenreFilter(genresParam, cookieStore.get(SONGS_GENRES_COOKIE)?.value)
+  const [songs, allGenres] = await Promise.all([getSongs(status, genreFilter), getGenres()])
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
@@ -42,11 +47,12 @@ export default async function SongsPage({
       </div>
 
       <StatusFilter current={statusFilter} />
+      <GenreFilter genres={allGenres} selected={genreFilter} />
 
       <div className="print:hidden">
         {songs.length === 0 ? (
           <p className="text-muted-foreground">
-            {status ? 'No songs match this filter.' : 'No songs yet. Add your first one!'}
+            {status || genreFilter.length > 0 ? 'No songs match this filter.' : 'No songs yet. Add your first one!'}
           </p>
         ) : (
           <>
@@ -62,7 +68,7 @@ export default async function SongsPage({
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Kbd</th>
                     <th className="px-4 py-3">Duration</th>
-                    <th className="px-4 py-3">Orientation</th>
+                    <th className="px-4 py-3">Genres</th>
                     <th className="px-4 py-3 sr-only">Actions</th>
                   </tr>
                 </thead>
@@ -86,7 +92,9 @@ export default async function SongsPage({
                           {song.keyboardRequired ? '🎹' : ''}
                         </td>
                         <td className="px-4 py-3">{formatDuration(song.durationSeconds)}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{song.orientation ?? '—'}</td>
+                        <td className="px-4 py-3">
+                          <GenreBadgeList genres={song.genres} />
+                        </td>
                         <td className="px-4 py-3">
                           <div className="flex gap-2">
                             <Link

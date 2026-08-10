@@ -25,6 +25,16 @@ export type Musician = {
   updatedAt: Date
 }
 
+export type Genre = {
+  id: string
+  name: string
+  isActive: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+export type GenreWithSongCount = Genre & { songCount: number }
+
 export type SetlistItem = {
   id: string
   order: number
@@ -64,7 +74,6 @@ export type Song = {
   status: SongStatus
   keyboardRequired: boolean
   durationSeconds: number | null
-  orientation: string | null
   bpm: number | null
   lyricsUrl: string | null
   chartsUrl: string | null
@@ -75,6 +84,7 @@ export type Song = {
   isActive: boolean
   createdAt: Date
   updatedAt: Date
+  genres: Genre[]
 }
 
 export type Expense = {

@@ -3,7 +3,8 @@
 import { useState, useTransition } from 'react'
 import { addItem } from '@/app/setlists/actions'
 import { Button } from '@/components/ui/button'
-import { SONG_STATUS_LABELS, type Song, type SetSection, type SongStatus } from '@/lib/types'
+import { toggleGenreId } from '@/lib/songs-genre-filter'
+import { SONG_STATUS_LABELS, type Genre, type Song, type SetSection, type SongStatus } from '@/lib/types'
 
 type TargetSection = { section: SetSection; setNumber: number; label: string }
 
@@ -41,11 +42,13 @@ function buildSections(displaySets: number): TargetSection[] {
 
 export function SongPickerPanel({
   allSongs,
+  allGenres,
   setlistId,
   existingIds,
   displaySets,
 }: {
   allSongs: Song[]
+  allGenres: Genre[]
   setlistId: string
   existingIds: Set<string>
   displaySets: number
@@ -54,11 +57,15 @@ export function SongPickerPanel({
   const defaultTarget = sections.find((s) => s.section === 'MAIN') ?? sections[0]
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL')
+  const [genreFilter, setGenreFilter] = useState<string[]>([])
   const [target, setTarget] = useState<TargetSection>(defaultTarget)
   const [isPending, startTransition] = useTransition()
 
   const available = allSongs.filter(
-    (s) => !existingIds.has(s.id) && (statusFilter === 'ALL' || s.status === statusFilter)
+    (s) =>
+      !existingIds.has(s.id) &&
+      (statusFilter === 'ALL' || s.status === statusFilter) &&
+      (genreFilter.length === 0 || s.genres.some((g) => genreFilter.includes(g.id)))
   )
 
   function handleAdd(songId: string) {
@@ -117,6 +124,26 @@ export function SongPickerPanel({
           </button>
         ))}
       </div>
+
+      {/* Genre filter — multiple can be active at once (OR-match), unlike Status above */}
+      {allGenres.length > 0 && (
+        <div className="flex flex-wrap gap-1 border-b px-3 py-2">
+          {allGenres.map((genre) => (
+            <button
+              key={genre.id}
+              onClick={() => setGenreFilter((selected) => toggleGenreId(selected, genre.id))}
+              aria-pressed={genreFilter.includes(genre.id)}
+              className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                genreFilter.includes(genre.id)
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/60'
+              }`}
+            >
+              {genre.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Song list */}
       <div className="flex-1 overflow-y-auto">

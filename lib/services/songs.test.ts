@@ -21,7 +21,6 @@ const mockSong = {
   status: "READY" as const,
   keyboardRequired: false,
   durationSeconds: 270,
-  orientation: "Dead",
   bpm: 120,
   lyricsUrl: null,
   chartsUrl: null,
@@ -32,6 +31,7 @@ const mockSong = {
   isActive: true,
   createdAt: new Date(),
   updatedAt: new Date(),
+  genres: [{ id: "genre-1", name: "Dead", isActive: true, createdAt: new Date(), updatedAt: new Date() }],
 };
 
 beforeEach(() => {
@@ -39,12 +39,13 @@ beforeEach(() => {
 });
 
 describe("getSongs", () => {
-  it("returns songs ordered by title", async () => {
+  it("returns songs ordered by title, including genres", async () => {
     vi.mocked(prisma.song.findMany).mockResolvedValue([mockSong]);
     const result = await getSongs();
     expect(result).toEqual([mockSong]);
     expect(prisma.song.findMany).toHaveBeenCalledWith({
       where: { isActive: true },
+      include: { genres: true },
       orderBy: { title: "asc" },
     });
   });
@@ -61,18 +62,41 @@ describe("getSongs", () => {
     expect(result).toEqual([mockSong]);
     expect(prisma.song.findMany).toHaveBeenCalledWith({
       where: { isActive: true, status: "READY" },
+      include: { genres: true },
+      orderBy: { title: "asc" },
+    });
+  });
+
+  it("filters by genre ids when provided, matching any of them", async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([mockSong]);
+    const result = await getSongs(undefined, ["genre-1", "genre-2"]);
+    expect(result).toEqual([mockSong]);
+    expect(prisma.song.findMany).toHaveBeenCalledWith({
+      where: { isActive: true, genres: { some: { id: { in: ["genre-1", "genre-2"] } } } },
+      include: { genres: true },
+      orderBy: { title: "asc" },
+    });
+  });
+
+  it("ignores an empty genre ids array", async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([mockSong]);
+    await getSongs(undefined, []);
+    expect(prisma.song.findMany).toHaveBeenCalledWith({
+      where: { isActive: true },
+      include: { genres: true },
       orderBy: { title: "asc" },
     });
   });
 });
 
 describe("getSong", () => {
-  it("returns the song when found", async () => {
+  it("returns the song when found, including genres", async () => {
     vi.mocked(prisma.song.findUnique).mockResolvedValue(mockSong);
     const result = await getSong("song-1");
     expect(result).toEqual(mockSong);
     expect(prisma.song.findUnique).toHaveBeenCalledWith({
       where: { id: "song-1" },
+      include: { genres: true },
     });
   });
 

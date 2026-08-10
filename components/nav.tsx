@@ -40,6 +40,7 @@ const navItems: NavEntry[] = [
     children: [
       { href: '/venues', label: 'Venues' },
       { href: '/musicians', label: 'Musicians' },
+      { href: '/genres', label: 'Genres' },
     ],
   },
 ]

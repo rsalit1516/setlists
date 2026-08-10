@@ -41,13 +41,18 @@ function buildFormData(overrides: Record<string, string> = {}): FormData {
     status: 'WISH',
     keyboardRequired: 'false',
     duration: '',
-    orientation: '',
     bpm: '',
     lyrics: '',
     ...overrides,
   }
   const fd = new FormData()
   for (const [k, v] of Object.entries(fields)) fd.set(k, v)
+  return fd
+}
+
+function buildFormDataWithGenres(genreIds: string[], overrides: Record<string, string> = {}): FormData {
+  const fd = buildFormData(overrides)
+  for (const genreId of genreIds) fd.append('genreIds', genreId)
   return fd
 }
 
@@ -105,6 +110,41 @@ describe('createSong', () => {
     expect(result).toEqual({ error: 'Title is required.' })
     expect(prisma.song.create).not.toHaveBeenCalled()
   })
+
+  it('connects the selected genres', async () => {
+    vi.mocked(prisma.song.create).mockResolvedValue({ id: 'song-1' } as never)
+    const fd = buildFormDataWithGenres(['genre-1', 'genre-2'])
+
+    await expect(createSong(null, fd)).rejects.toThrow('REDIRECT:/songs')
+
+    expect(prisma.song.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        genres: { connect: [{ id: 'genre-1' }, { id: 'genre-2' }] },
+      }),
+    })
+  })
+
+  it('dedupes repeated genre ids from the checkbox list', async () => {
+    vi.mocked(prisma.song.create).mockResolvedValue({ id: 'song-1' } as never)
+    const fd = buildFormDataWithGenres(['genre-1', 'genre-1'])
+
+    await expect(createSong(null, fd)).rejects.toThrow('REDIRECT:/songs')
+
+    expect(prisma.song.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ genres: { connect: [{ id: 'genre-1' }] } }),
+    })
+  })
+
+  it('connects no genres when none are checked', async () => {
+    vi.mocked(prisma.song.create).mockResolvedValue({ id: 'song-1' } as never)
+    const fd = buildFormData()
+
+    await expect(createSong(null, fd)).rejects.toThrow('REDIRECT:/songs')
+
+    expect(prisma.song.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ genres: { connect: [] } }),
+    })
+  })
 })
 
 describe('updateSong', () => {
@@ -143,5 +183,27 @@ describe('updateSong', () => {
 
     expect(result).toEqual({ error: 'Title is required.' })
     expect(prisma.song.update).not.toHaveBeenCalled()
+  })
+
+  it('replaces the full genre selection, including clearing it when nothing is checked', async () => {
+    const fd = buildFormData({ id: 'song-1' })
+
+    await expect(updateSong(null, fd)).rejects.toThrow('REDIRECT:/songs')
+
+    expect(prisma.song.update).toHaveBeenCalledWith({
+      where: { id: 'song-1' },
+      data: expect.objectContaining({ genres: { set: [] } }),
+    })
+  })
+
+  it('sets the genre relation to exactly the checked ids', async () => {
+    const fd = buildFormDataWithGenres(['genre-2'], { id: 'song-1' })
+
+    await expect(updateSong(null, fd)).rejects.toThrow('REDIRECT:/songs')
+
+    expect(prisma.song.update).toHaveBeenCalledWith({
+      where: { id: 'song-1' },
+      data: expect.objectContaining({ genres: { set: [{ id: 'genre-2' }] } }),
+    })
   })
 })

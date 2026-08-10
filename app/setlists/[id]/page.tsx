@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getSetlist } from '@/lib/services/setlists'
 import { getSongs } from '@/lib/services/songs'
+import { getGenres } from '@/lib/services/genres'
 import { SetlistSection } from '@/components/setlists/setlist-section'
 import { RenameForm } from '@/components/setlists/rename-form'
 import { SongPickerPanel } from '@/components/setlists/song-picker-panel'
@@ -33,7 +34,7 @@ export default async function SetlistPage({
   const { revision: revParam, sets: setsParam } = await searchParams
   const revision = revParam === '1'
 
-  const [setlist, allSongs] = await Promise.all([getSetlist(id), getSongs()])
+  const [setlist, allSongs, allGenres] = await Promise.all([getSetlist(id), getSongs(), getGenres()])
   if (!setlist) notFound()
 
   const allExistingIds = new Set(setlist.items.map((i) => i.songId))
@@ -145,6 +146,7 @@ export default async function SetlistPage({
         <aside className="hidden md:sticky md:top-6 md:flex md:w-72 md:shrink-0 md:self-start md:flex-col lg:w-80">
           <SongPickerPanel
             allSongs={allSongs}
+            allGenres={allGenres}
             setlistId={setlist.id}
             existingIds={allExistingIds}
             displaySets={displaySets}
