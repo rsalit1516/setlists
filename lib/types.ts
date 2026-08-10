@@ -1,10 +1,11 @@
-export type SongStatus = 'READY' | 'IN_PROGRESS' | 'WISH'
+export type SongStatus = 'READY' | 'IN_PROGRESS' | 'WISH' | 'SHELVED'
 export type SetSection = 'SOUNDCHECK' | 'MAIN' | 'ENCORE'
 
 export const SONG_STATUS_LABELS: Record<SongStatus, string> = {
   READY: 'Ready',
   IN_PROGRESS: 'In Progress',
   WISH: 'Wish',
+  SHELVED: 'Shelved',
 }
 
 export type Venue = {

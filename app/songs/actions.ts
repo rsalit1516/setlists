@@ -10,8 +10,6 @@ import { SONGS_GENRES_COOKIE, parseGenreFilterValue, toggleGenreId } from '@/lib
 
 export type SongActionState = { error: string } | null
 
-type SongStatus = 'READY' | 'IN_PROGRESS' | 'WISH'
-
 function parseDuration(value: string | null): number | null {
   if (!value || value.trim() === '') return null
   if (value.includes(':')) {

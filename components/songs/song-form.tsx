@@ -80,6 +80,7 @@ export function SongForm({
           <option value="WISH">Wish</option>
           <option value="IN_PROGRESS">In Progress</option>
           <option value="READY">Ready</option>
+          <option value="SHELVED">Shelved</option>
         </select>
       </div>
 

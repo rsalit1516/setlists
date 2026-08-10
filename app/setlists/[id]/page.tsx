@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getSetlist } from '@/lib/services/setlists'
 import { getSongs } from '@/lib/services/songs'
 import { getGenres } from '@/lib/services/genres'
+import { selectableSongs } from '@/lib/songs-selectable'
 import { SetlistSection } from '@/components/setlists/setlist-section'
 import { RenameForm } from '@/components/setlists/rename-form'
 import { SongPickerPanel } from '@/components/setlists/song-picker-panel'
@@ -34,12 +35,15 @@ export default async function SetlistPage({
   const { revision: revParam, sets: setsParam } = await searchParams
   const revision = revParam === '1'
 
-  const [setlist, allSongs, allGenres] = await Promise.all([
+  const [setlist, songs, allGenres] = await Promise.all([
     getSetlist(id),
     getSongs(undefined, undefined, true),
     getGenres(),
   ])
   if (!setlist) notFound()
+
+  // Shelved songs can't be added to a setlist — see lib/songs-selectable.ts.
+  const allSongs = selectableSongs(songs)
 
   const allExistingIds = new Set(setlist.items.map((i) => i.songId))
   const { soundcheck, main, encore, maxSet } = groupBySection(setlist.items)

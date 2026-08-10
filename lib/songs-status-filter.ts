@@ -16,6 +16,7 @@ export const SONGS_STATUS_FILTERS: readonly SongsStatusFilter[] = [
   'READY',
   'IN_PROGRESS',
   'WISH',
+  'SHELVED',
 ]
 
 export function isSongsStatusFilter(value: string | null | undefined): value is SongsStatusFilter {
