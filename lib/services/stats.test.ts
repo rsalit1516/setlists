@@ -101,19 +101,21 @@ function makeGig(overrides: Partial<MockGig> = {}): MockGig {
 beforeEach(() => vi.clearAllMocks())
 
 describe('getMostPlayedSongs', () => {
-  it('only counts active, played setlist items at active gigs', async () => {
+  it('only counts active, played, non-Soundcheck setlist items at active gigs', async () => {
     vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([])
     await getMostPlayedSongs()
     type FindManyArgs = {
       where: {
         isActive: unknown
         wasPlayed: unknown
+        section: unknown
         setlist: { gig: { isActive: unknown } }
       }
     }
     const call = vi.mocked(prisma.setlistItem.findMany).mock.calls[0][0] as unknown as FindManyArgs
     expect(call.where.isActive).toBe(true)
     expect(call.where.wasPlayed).toBe(true)
+    expect(call.where.section).toEqual({ not: 'SOUNDCHECK' })
     expect(call.where.setlist.gig.isActive).toBe(true)
   })
 
@@ -137,6 +139,16 @@ describe('getMostPlayedSongs', () => {
     const result = await getMostPlayedSongs()
     expect(result.find((s) => s.songId === 'song-1')?.playCount).toBe(2)
     expect(result.find((s) => s.songId === 'song-2')?.playCount).toBe(1)
+  })
+
+  it('reflects only Main/Encore plays for a song played in mixed sections, since the query already excludes Soundcheck rows', async () => {
+    // song-1 was played twice at soundcheck and once at Main — the real DB
+    // query's `section: { not: 'SOUNDCHECK' }` filter means only the Main
+    // row is ever returned here, so playCount is 1, not 3.
+    vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([makeItem('song-1')] as never)
+    vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
+    const result = await getMostPlayedSongs()
+    expect(result.find((s) => s.songId === 'song-1')?.playCount).toBe(1)
   })
 
   it('sorts by play count descending', async () => {
@@ -225,6 +237,18 @@ describe('getReadySongsNeverPlayed', () => {
     expect(result).toHaveLength(2)
   })
 
+  it('treats a Ready song only ever played at soundcheck as never played', async () => {
+    // song-1's only play was at soundcheck, so the DB-side `section: { not:
+    // 'SOUNDCHECK' }` filter means it never shows up in the play-count rows —
+    // it should surface here as never played, not be excluded.
+    vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([])
+    vi.mocked(prisma.song.findMany).mockResolvedValue([
+      makeSong({ id: 'song-1', title: 'Soundcheck Only' }),
+    ] as never)
+    const result = await getReadySongsNeverPlayed()
+    expect(result.map((s) => s.songId)).toEqual(['song-1'])
+  })
+
   it('returns an empty list when every Ready song has been played', async () => {
     vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([
       makeItem('song-1'),
@@ -273,6 +297,32 @@ describe('getStaleReadySongs', () => {
     expect(call.where.isActive).toBe(true)
     expect(call.where.date.lte).toBeInstanceOf(Date)
     expect(call.orderBy.date).toBe('desc')
+  })
+
+  it('only considers active, played, non-Soundcheck setlist items when computing last-played', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([])
+    vi.mocked(prisma.song.findMany).mockResolvedValue([])
+    await getStaleReadySongs()
+    type FindManyArgs = {
+      select: {
+        setlist: { select: { items: { where: { isActive: unknown; wasPlayed: unknown; section: unknown } } } }
+      }
+    }
+    const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as unknown as FindManyArgs
+    const itemsWhere = call.select.setlist.select.items.where
+    expect(itemsWhere.isActive).toBe(true)
+    expect(itemsWhere.wasPlayed).toBe(true)
+    expect(itemsWhere.section).toEqual({ not: 'SOUNDCHECK' })
+  })
+
+  it('treats a Ready song only ever played at soundcheck as never played (gigsSinceLastPlayed null)', async () => {
+    // The real query's `section: { not: 'SOUNDCHECK' }` filter means a
+    // soundcheck-only play never appears in a gig's items here — same shape
+    // as a song that was never played at all.
+    vi.mocked(prisma.gig.findMany).mockResolvedValue(makeGigs([], []) as never)
+    vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
+    const result = await getStaleReadySongs()
+    expect(result[0].gigsSinceLastPlayed).toBeNull()
   })
 
   it('excludes a Ready song played within the window', async () => {
