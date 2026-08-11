@@ -250,5 +250,12 @@
   }
   html {
     @apply font-sans;
+    /*
+     * App is dark-only (no light/dark toggle — see .dark note above), but native
+     * form controls (the <select> dropdown popup, scrollbars, etc.) ignore our
+     * CSS variables and default to the OS light theme unless told otherwise.
+     * This tells the browser to render those natively-drawn pieces dark too.
+     */
+    color-scheme: dark;
   }
 }
