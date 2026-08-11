@@ -5,11 +5,20 @@ import Link from 'next/link'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { LyricsEditor } from '@/components/songs/lyrics-editor'
 import { GenreCheckboxList } from '@/components/songs/genre-checkbox-list'
 import { cn } from '@/lib/utils'
 import type { SongActionState } from '@/app/songs/actions'
-import type { Genre, Song } from '@/lib/types'
+import { SONG_STATUS_LABELS, type Genre, type Song, type SongStatus } from '@/lib/types'
+
+const STATUS_OPTIONS: SongStatus[] = ['WISH', 'IN_PROGRESS', 'READY', 'SHELVED']
 
 type FormAction = (state: SongActionState, formData: FormData) => Promise<SongActionState>
 
@@ -70,18 +79,18 @@ export function SongForm({
       {/* Row 3: Status */}
       <div className="space-y-1.5">
         <Label htmlFor="status">Status</Label>
-        <select
-          id="status"
-          name="status"
-          title="Status"
-          defaultValue={song?.status ?? 'WISH'}
-          className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:max-w-xs"
-        >
-          <option value="WISH">Wish</option>
-          <option value="IN_PROGRESS">In Progress</option>
-          <option value="READY">Ready</option>
-          <option value="SHELVED">Shelved</option>
-        </select>
+        <Select name="status" defaultValue={song?.status ?? 'WISH'}>
+          <SelectTrigger id="status" className="w-full sm:max-w-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_OPTIONS.map((status) => (
+              <SelectItem key={status} value={status}>
+                {SONG_STATUS_LABELS[status]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Genres */}
