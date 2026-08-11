@@ -3,6 +3,13 @@
 import { useState, useTransition } from 'react'
 import { addItem } from '@/app/setlists/actions'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toggleGenreId } from '@/lib/songs-genre-filter'
 import { SONG_STATUS_LABELS, type Genre, type Song, type SetSection, type SongStatus } from '@/lib/types'
 
@@ -81,8 +88,8 @@ export function SongPickerPanel({
     startTransition(() => addItem(fd))
   }
 
-  function handleTargetChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const found = sections.find((s) => `${s.section}:${s.setNumber}` === e.target.value)
+  function handleTargetChange(value: string | null) {
+    const found = sections.find((s) => `${s.section}:${s.setNumber}` === value)
     if (found) setTarget(found)
   }
 
@@ -97,18 +104,22 @@ export function SongPickerPanel({
           <label htmlFor="picker-target" className="text-xs text-muted-foreground">
             Add to:
           </label>
-          <select
-            id="picker-target"
-            value={`${target.section}:${target.setNumber}`}
-            onChange={handleTargetChange}
-            className="h-6 rounded border border-input bg-transparent px-1.5 text-xs outline-none focus-visible:border-ring"
-          >
-            {sections.map((s) => (
-              <option key={`${s.section}:${s.setNumber}`} value={`${s.section}:${s.setNumber}`}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+          <Select value={`${target.section}:${target.setNumber}`} onValueChange={handleTargetChange}>
+            <SelectTrigger id="picker-target" size="sm" className="h-6 px-1.5 text-xs">
+              <SelectValue>
+                {(value: string | null) =>
+                  sections.find((s) => `${s.section}:${s.setNumber}` === value)?.label
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {sections.map((s) => (
+                <SelectItem key={`${s.section}:${s.setNumber}`} value={`${s.section}:${s.setNumber}`}>
+                  {s.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

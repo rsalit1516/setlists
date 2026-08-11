@@ -4,6 +4,13 @@ import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { MusicianCheckboxList } from '@/components/gigs/musician-checkbox-list'
 import { syncGigMusicians } from '@/app/gigs/actions'
 import { toDateInputValue } from '@/lib/dates'
@@ -12,14 +19,15 @@ import { DEFAULT_MUSICIAN_NAMES } from '@/lib/musicians-defaults'
 import type { GigActionState } from '@/app/gigs/actions'
 import type { GigWithDetails, Musician, SetlistSummary, Venue } from '@/lib/types'
 
-const selectClass =
-  'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
-
 const textareaClass =
   'flex min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none'
 
 function formatSetlistGigDate(d: Date) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function formatSetlistLabel(sl: SetlistSummary): string {
+  return `${sl.name} — ${sl._count.items} song${sl._count.items !== 1 ? 's' : ''}${sl.gig ? ` · ${sl.gig.venue.name}, ${formatSetlistGigDate(sl.gig.date)}` : ''}`
 }
 
 type FormAction = (state: GigActionState, formData: FormData) => Promise<GigActionState>
@@ -95,18 +103,18 @@ export function GigForm({
 
         <div>
           <label className="mb-1 block text-sm font-medium">Venue</label>
-          <select
-            name="venueId"
-            required
-            title="Venue"
-            defaultValue={gig?.venueId ?? ''}
-            className={selectClass}
-          >
-            <option value="">Select venue…</option>
-            {venues.map((v) => (
-              <option key={v.id} value={v.id}>{v.name}</option>
-            ))}
-          </select>
+          <Select name="venueId" required defaultValue={gig?.venueId ?? ''}>
+            <SelectTrigger aria-label="Venue" className="w-full">
+              <SelectValue>
+                {(value: string | null) => venues.find((v) => v.id === value)?.name ?? 'Select venue…'}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {venues.map((v) => (
+                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {!gig && (
@@ -147,23 +155,23 @@ export function GigForm({
                 {setlistMode === 'new' ? (
                   <input type="hidden" name="createSetlist" value="true" />
                 ) : (
-                  <select
-                    name="setlistId"
-                    required
-                    title="Setlist"
-                    defaultValue={defaultSetlistId ?? ''}
-                    className={`${selectClass} mt-2`}
-                  >
-                    <option value="" disabled>
-                      Select setlist to copy…
-                    </option>
-                    {setlists.map((sl) => (
-                      <option key={sl.id} value={sl.id}>
-                        {sl.name} — {sl._count.items} song{sl._count.items !== 1 ? 's' : ''}
-                        {sl.gig ? ` · ${sl.gig.venue.name}, ${formatSetlistGigDate(sl.gig.date)}` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <Select name="setlistId" required defaultValue={defaultSetlistId ?? ''}>
+                    <SelectTrigger aria-label="Setlist" className="mt-2 w-full">
+                      <SelectValue>
+                        {(value: string | null) => {
+                          const sl = setlists.find((s) => s.id === value)
+                          return sl ? formatSetlistLabel(sl) : 'Select setlist to copy…'
+                        }}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {setlists.map((sl) => (
+                        <SelectItem key={sl.id} value={sl.id}>
+                          {formatSetlistLabel(sl)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 )}
               </>
             )}

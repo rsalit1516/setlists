@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { SongPickerPanel } from './song-picker-panel'
 import type { Genre, Song } from '@/lib/types'
 
@@ -111,14 +112,14 @@ describe('SongPickerPanel', () => {
     expect(fd.get('setNumber')).toBe('1')
   })
 
-  it('includes all sections in the target dropdown', () => {
+  it('includes all sections in the target dropdown', async () => {
+    const user = userEvent.setup()
     render(<SongPickerPanel {...defaultProps} displaySets={2} />)
-    const select = screen.getByRole('combobox', { name: /add to/i })
-    const options = Array.from((select as HTMLSelectElement).options).map((o) => o.text)
-    expect(options).toContain('Soundcheck')
-    expect(options).toContain('Set 1')
-    expect(options).toContain('Set 2')
-    expect(options).toContain('Encore')
+    await user.click(screen.getByRole('combobox', { name: /add to/i }))
+    expect(screen.getByRole('option', { name: 'Soundcheck' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Set 1' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Set 2' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Encore' })).toBeInTheDocument()
   })
 
   it('does not render a genre filter row when there are no genres', () => {
