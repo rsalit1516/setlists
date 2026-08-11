@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { GigForm } from './gig-form'
 import type { GigWithDetails, Musician, SetlistSummary, Venue } from '@/lib/types'
 
@@ -66,14 +67,15 @@ describe('GigForm — setlist picker', () => {
     render(<GigForm venues={mockVenues} setlists={[makeSetlist()]} action={noopAction} />)
 
     expect(screen.getByLabelText('Create new setlist')).toBeChecked()
-    expect(screen.queryByTitle('Setlist')).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Setlist' })).not.toBeInTheDocument()
 
     const form = screen.getByRole('button', { name: 'Create Gig' }).closest('form')!
     const hidden = form.querySelector('input[name="createSetlist"]') as HTMLInputElement
     expect(hidden.value).toBe('true')
   })
 
-  it('shows the existing-setlist dropdown, with song count and source gig, after choosing "copy"', () => {
+  it('shows the existing-setlist dropdown, with song count and source gig, after choosing "copy"', async () => {
+    const user = userEvent.setup()
     const setlists = [
       makeSetlist({ id: 'sl-1', name: 'Friday Night', _count: { items: 12 }, gig: null }),
       makeSetlist({
@@ -86,11 +88,12 @@ describe('GigForm — setlist picker', () => {
     render(<GigForm venues={mockVenues} setlists={setlists} action={noopAction} />)
 
     fireEvent.click(screen.getByLabelText('Copy an existing setlist'))
+    await user.click(screen.getByRole('combobox', { name: 'Setlist' }))
 
-    const select = screen.getByTitle('Setlist') as HTMLSelectElement
-    const options = Array.from(select.options).map((o) => o.text)
-    expect(options).toContain('Friday Night — 12 songs')
-    expect(options).toContain('Greatest Hits — 8 songs · The Jazz Club, May 1, 2026')
+    expect(screen.getByRole('option', { name: 'Friday Night — 12 songs' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('option', { name: 'Greatest Hits — 8 songs · The Jazz Club, May 1, 2026' })
+    ).toBeInTheDocument()
   })
 
   it('pre-selects copy mode and the given setlist when defaultSetlistId is provided', () => {
@@ -100,17 +103,17 @@ describe('GigForm — setlist picker', () => {
     )
 
     expect(screen.getByLabelText('Copy an existing setlist')).toBeChecked()
-    expect((screen.getByTitle('Setlist') as HTMLSelectElement).value).toBe('sl-2')
+    expect(screen.getByRole('combobox', { name: 'Setlist' })).toHaveTextContent('Other Setlist — 5 songs')
   })
 
   it('switching back to "create new" hides the dropdown and reverts to createSetlist=true', () => {
     render(<GigForm venues={mockVenues} setlists={[makeSetlist()]} action={noopAction} />)
 
     fireEvent.click(screen.getByLabelText('Copy an existing setlist'))
-    expect(screen.getByTitle('Setlist')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Setlist' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByLabelText('Create new setlist'))
-    expect(screen.queryByTitle('Setlist')).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Setlist' })).not.toBeInTheDocument()
     const form = screen.getByRole('button', { name: 'Create Gig' }).closest('form')!
     expect((form.querySelector('input[name="createSetlist"]') as HTMLInputElement).value).toBe('true')
   })

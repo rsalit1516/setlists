@@ -81,7 +81,9 @@ export function SongForm({
         <Label htmlFor="status">Status</Label>
         <Select name="status" defaultValue={song?.status ?? 'WISH'}>
           <SelectTrigger id="status" className="w-full sm:max-w-xs">
-            <SelectValue />
+            <SelectValue>
+              {(value: SongStatus | null) => (value ? SONG_STATUS_LABELS[value] : null)}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {STATUS_OPTIONS.map((status) => (

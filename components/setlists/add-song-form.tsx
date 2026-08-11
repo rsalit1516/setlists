@@ -1,9 +1,20 @@
 'use client'
 
-import { useRef } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { addItem } from '@/app/setlists/actions'
 import type { Song, SetSection } from '@/lib/types'
+
+function formatSongLabel(s: Song): string {
+  return `${s.title}${s.artist ? ` — ${s.artist}` : ''}`
+}
 
 export function AddSongForm({
   setlistId,
@@ -18,37 +29,38 @@ export function AddSongForm({
   songs: Song[]
   existingIds: Set<string>
 }) {
-  const formRef = useRef<HTMLFormElement>(null)
+  const [songId, setSongId] = useState<string | null>(null)
   const available = songs.filter((s) => !existingIds.has(s.id))
 
   if (available.length === 0) return null
 
   async function handleSubmit(formData: FormData) {
     await addItem(formData)
-    formRef.current?.reset()
+    setSongId(null)
   }
 
   return (
-    <form ref={formRef} action={handleSubmit} className="flex gap-2 pt-1">
+    <form action={handleSubmit} className="flex gap-2 pt-1">
       <input type="hidden" name="setlistId" value={setlistId} />
       <input type="hidden" name="section" value={section} />
       <input type="hidden" name="setNumber" value={setNumber} />
-      <select
-        name="songId"
-        title="Song to add"
-        required
-        className="flex h-8 flex-1 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-        defaultValue=""
-      >
-        <option value="" disabled>
-          Add a song…
-        </option>
-        {available.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.title}{s.artist ? ` — ${s.artist}` : ''}
-          </option>
-        ))}
-      </select>
+      <Select name="songId" required value={songId} onValueChange={setSongId}>
+        <SelectTrigger aria-label="Song to add" className="h-8 flex-1">
+          <SelectValue>
+            {(value: string | null) => {
+              const s = available.find((song) => song.id === value)
+              return s ? formatSongLabel(s) : 'Add a song…'
+            }}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {available.map((s) => (
+            <SelectItem key={s.id} value={s.id}>
+              {formatSongLabel(s)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <Button type="submit" size="sm" variant="outline">
         Add
       </Button>
