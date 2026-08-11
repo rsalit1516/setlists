@@ -37,8 +37,10 @@ function daysBetween(a: Date, b: Date): number {
 }
 
 // Shared join: a play only counts if the SetlistItem is active, was actually
-// played, and belongs to a Setlist attached to at least one active Gig — a
-// Setlist with no Gig (e.g. a draft) never counts as a performance. Both
+// played, belongs to a Setlist attached to at least one active Gig (a
+// Setlist with no Gig, e.g. a draft, never counts as a performance), and
+// wasn't a Soundcheck run-through — soundcheck reps aren't performances in
+// front of an audience, so they don't count as a "play." Both
 // getMostPlayedSongs and getReadySongsNeverPlayed build on this same
 // per-song count instead of re-deriving the join twice.
 async function getPlayCountsBySongId(): Promise<Map<string, number>> {
@@ -46,6 +48,7 @@ async function getPlayCountsBySongId(): Promise<Map<string, number>> {
     where: {
       isActive: true,
       wasPlayed: true,
+      section: { not: 'SOUNDCHECK' },
       setlist: { gig: { isActive: true } },
     },
     select: { songId: true },
@@ -90,6 +93,8 @@ export async function getReadySongsNeverPlayed(): Promise<ReadySongNeverPlayed[]
 // can tell "played, but not within the last N gigs" apart from "never
 // played." Built gig-first (not setlistItem-first) so iteration order over
 // gigs (most-recent-first) doubles as each song's "gigs since last played."
+// Soundcheck items are excluded for the same reason as getPlayCountsBySongId
+// — a soundcheck run-through isn't a real performance.
 async function getGigsSinceLastPlayedBySongId(): Promise<Map<string, number>> {
   const gigs = await prisma.gig.findMany({
     where: { isActive: true, date: { lte: new Date() } },
@@ -98,7 +103,7 @@ async function getGigsSinceLastPlayedBySongId(): Promise<Map<string, number>> {
       setlist: {
         select: {
           items: {
-            where: { isActive: true, wasPlayed: true },
+            where: { isActive: true, wasPlayed: true, section: { not: 'SOUNDCHECK' } },
             select: { songId: true },
           },
         },

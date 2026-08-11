@@ -51,14 +51,17 @@ function SortableRow({
   const moveDownAction = moveItem.bind(null, item.id, 'down')
   const removeAction = removeItem.bind(null, item.id)
   const toggleAction = togglePlayed.bind(null, item.id, item.wasPlayed)
+  // Soundcheck run-throughs don't count as real plays (see stats.ts), so the
+  // played/skipped toggle has no purpose there — hide it and its styling.
+  const isSoundcheck = item.section === 'SOUNDCHECK'
 
   return (
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={`flex items-center gap-2 px-4 py-2.5 text-sm ${playedClass(item.wasPlayed)} ${
-        isDragging ? 'z-10 bg-muted/60' : ''
-      }`}
+      className={`flex items-center gap-2 px-4 py-2.5 text-sm ${
+        isSoundcheck ? '' : playedClass(item.wasPlayed)
+      } ${isDragging ? 'z-10 bg-muted/60' : ''}`}
     >
       {/* Drag handle */}
       {!revision && (
@@ -117,8 +120,8 @@ function SortableRow({
         </span>
       )}
 
-      {/* Revision mode: played toggle */}
-      {revision && (
+      {/* Revision mode: played toggle — not for Soundcheck, which stats ignore */}
+      {revision && !isSoundcheck && (
         <form action={toggleAction}>
           <button
             type="submit"
