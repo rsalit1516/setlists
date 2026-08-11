@@ -7,7 +7,9 @@ import { selectableSongs } from '@/lib/songs-selectable'
 import { SetlistSection } from '@/components/setlists/setlist-section'
 import { RenameForm } from '@/components/setlists/rename-form'
 import { SongPickerPanel } from '@/components/setlists/song-picker-panel'
+import { markSectionPlayed } from '@/app/setlists/actions'
 import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import type { SetlistItem } from '@/lib/types'
 
 function groupBySection(items: SetlistItem[]) {
@@ -93,8 +95,19 @@ export default async function SetlistPage({
         </div>
 
         {revision && (
-          <div className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-            Revision mode — mark each song as played or skipped.
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+            <span>Revision mode — mark each song as played or skipped.</span>
+            <form action={markSectionPlayed.bind(null, setlist.id, 'all')}>
+              <button
+                type="submit"
+                className={cn(
+                  buttonVariants({ variant: 'outline', size: 'sm' }),
+                  'min-h-11 border-amber-300 bg-amber-100 px-3 text-amber-900 hover:bg-amber-200 dark:border-amber-800 dark:bg-amber-900/40 dark:text-amber-200 dark:hover:bg-amber-900/60'
+                )}
+              >
+                Mark All as Played
+              </button>
+            </form>
           </div>
         )}
 

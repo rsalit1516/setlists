@@ -82,6 +82,35 @@ export async function togglePlayed(
   revalidatePath(`/setlists/${(item as { setlistId: string }).setlistId}`)
 }
 
+// Bulk revision-mode action — see #84. Always overwrites wasPlayed to true for
+// every matching active item, including ones previously marked Skipped; there's
+// no "only fill blanks" mode. Soundcheck is never a valid scope (stats ignore it).
+export type MarkPlayedScope =
+  | 'all'
+  | { section: 'MAIN' | 'ENCORE'; setNumber: number }
+
+export async function markSectionPlayed(
+  setlistId: string,
+  scope: MarkPlayedScope
+): Promise<void> {
+  const sectionFilter =
+    scope === 'all'
+      ? { in: ['MAIN', 'ENCORE'] as SetSection[] }
+      : (scope.section as SetSection)
+
+  await prisma.setlistItem.updateMany({
+    where: {
+      setlistId,
+      isActive: true,
+      section: sectionFilter,
+      ...(scope !== 'all' ? { setNumber: scope.setNumber } : {}),
+    },
+    data: { wasPlayed: true } as Record<string, unknown>,
+  })
+
+  revalidatePath(`/setlists/${setlistId}`)
+}
+
 export async function renameSetlist(
   _state: SetlistActionState,
   formData: FormData
