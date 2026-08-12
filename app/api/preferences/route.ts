@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { GIGS_VIEW_COOKIE, GIGS_VIEWS } from '@/lib/gigs-view'
 import { SONGS_STATUS_COOKIE, SONGS_STATUS_FILTERS } from '@/lib/songs-status-filter'
 import { STALE_WINDOW_COOKIE, STALE_WINDOW_OPTIONS } from '@/lib/stale-window'
+import {
+  GAP_DAYS_COOKIE,
+  GAP_DAYS_OPTIONS,
+  GAP_LOOKAHEAD_COOKIE,
+  GAP_LOOKAHEAD_OPTIONS,
+} from '@/lib/schedule-gaps-filter'
 import { isSafeRedirectPath, resolveOrigin } from '@/lib/http-redirect'
 
 // Plain GET target for filter/view toggle Links across the app: cookies can't
@@ -17,11 +23,13 @@ type PreferenceCookieConfig = {
 // Explicit allowlist of cookies this route may set, each with its own valid
 // values — this route has no auth in front of it, so both the cookie name and
 // its value must come from a small known set, never arbitrary caller input.
-// Add an entry here for each new persisted filter (#57, #58, ...).
+// Add an entry here for each new persisted filter (#57, #58, #87, ...).
 const PREFERENCE_COOKIES: Record<string, PreferenceCookieConfig> = {
   [GIGS_VIEW_COOKIE]: { allowedValues: GIGS_VIEWS, defaultValue: 'compact' },
   [SONGS_STATUS_COOKIE]: { allowedValues: SONGS_STATUS_FILTERS, defaultValue: 'ALL' },
   [STALE_WINDOW_COOKIE]: { allowedValues: STALE_WINDOW_OPTIONS, defaultValue: '10' },
+  [GAP_DAYS_COOKIE]: { allowedValues: GAP_DAYS_OPTIONS, defaultValue: '14' },
+  [GAP_LOOKAHEAD_COOKIE]: { allowedValues: GAP_LOOKAHEAD_OPTIONS, defaultValue: '6' },
 }
 
 export async function GET(request: NextRequest) {

@@ -4,6 +4,7 @@ import { GET } from './route'
 import { GIGS_VIEW_COOKIE } from '@/lib/gigs-view'
 import { SONGS_STATUS_COOKIE } from '@/lib/songs-status-filter'
 import { STALE_WINDOW_COOKIE } from '@/lib/stale-window'
+import { GAP_DAYS_COOKIE, GAP_LOOKAHEAD_COOKIE } from '@/lib/schedule-gaps-filter'
 
 function makeRequest(url: string, headers?: Record<string, string>) {
   return new NextRequest(url, headers ? { headers } : undefined)
@@ -112,6 +113,46 @@ describe('GET /api/preferences', () => {
     const response = await GET(request)
 
     expect(response.cookies.get(STALE_WINDOW_COOKIE)?.value).toBe('10')
+  })
+
+  it('sets the stats-gap-days cookie for a fourth registered preference', async () => {
+    const request = makeRequest(
+      'http://localhost:3000/api/preferences?cookie=stats-gap-days&value=21&redirect=%2Fstats'
+    )
+
+    const response = await GET(request)
+
+    expect(response.cookies.get(GAP_DAYS_COOKIE)?.value).toBe('21')
+  })
+
+  it('falls back to the stats-gap-days cookie config default for an invalid value', async () => {
+    const request = makeRequest(
+      'http://localhost:3000/api/preferences?cookie=stats-gap-days&value=15&redirect=%2Fstats'
+    )
+
+    const response = await GET(request)
+
+    expect(response.cookies.get(GAP_DAYS_COOKIE)?.value).toBe('14')
+  })
+
+  it('sets the stats-gap-lookahead cookie for a fifth registered preference', async () => {
+    const request = makeRequest(
+      'http://localhost:3000/api/preferences?cookie=stats-gap-lookahead&value=9&redirect=%2Fstats'
+    )
+
+    const response = await GET(request)
+
+    expect(response.cookies.get(GAP_LOOKAHEAD_COOKIE)?.value).toBe('9')
+  })
+
+  it('falls back to the stats-gap-lookahead cookie config default for an invalid value', async () => {
+    const request = makeRequest(
+      'http://localhost:3000/api/preferences?cookie=stats-gap-lookahead&value=12&redirect=%2Fstats'
+    )
+
+    const response = await GET(request)
+
+    expect(response.cookies.get(GAP_LOOKAHEAD_COOKIE)?.value).toBe('6')
   })
 
   it('rejects an unknown cookie name with 400 and sets no cookie', async () => {
