@@ -7,12 +7,18 @@ import {
   getUnpaidGigs,
   getScheduleGaps,
   getNextGapDaysOut,
-  DEFAULT_GAP_LOOKAHEAD_MONTHS,
-  DEFAULT_GAP_DAYS,
 } from "@/lib/services/stats";
 import { STALE_WINDOW_COOKIE, resolveStaleWindow } from "@/lib/stale-window";
+import {
+  GAP_DAYS_COOKIE,
+  GAP_LOOKAHEAD_COOKIE,
+  resolveGapDays,
+  resolveGapLookaheadMonths,
+} from "@/lib/schedule-gaps-filter";
 import { StatStrip, StatCard } from "@/components/stats/stat-card";
 import { StaleWindowToggle } from "@/components/stats/stale-window-toggle";
+import { GapDaysToggle } from "@/components/stats/gap-days-toggle";
+import { GapLookaheadSelect } from "@/components/stats/gap-lookahead-select";
 import { MostPlayedTable } from "@/components/stats/most-played-table";
 import { ReadyNeverPlayedTable } from "@/components/stats/ready-never-played-table";
 import { StaleReadyTable } from "@/components/stats/stale-ready-table";
@@ -43,13 +49,22 @@ function EmptyState({ children }: { children: React.ReactNode }) {
 export default async function StatsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ window?: string }>;
+  searchParams: Promise<{ window?: string; gapDays?: string; gapMonths?: string }>;
 }) {
-  const { window: windowParam } = await searchParams;
+  const { window: windowParam, gapDays: gapDaysParam, gapMonths: gapMonthsParam } =
+    await searchParams;
   const cookieStore = await cookies();
   const gigWindow = resolveStaleWindow(
     windowParam,
     cookieStore.get(STALE_WINDOW_COOKIE)?.value,
+  );
+  const gapDays = resolveGapDays(
+    gapDaysParam,
+    cookieStore.get(GAP_DAYS_COOKIE)?.value,
+  );
+  const gapLookaheadMonths = resolveGapLookaheadMonths(
+    gapMonthsParam,
+    cookieStore.get(GAP_LOOKAHEAD_COOKIE)?.value,
   );
 
   const [
@@ -65,7 +80,7 @@ export default async function StatsPage({
     getStaleReadySongs(gigWindow),
     getStaleInProgressSongs(),
     getUnpaidGigs(),
-    getScheduleGaps(),
+    getScheduleGaps(gapLookaheadMonths, gapDays),
   ]);
 
   const unpaidBalanceTotal = unpaidGigs.reduce(
@@ -114,7 +129,7 @@ export default async function StatsPage({
           value={nextGapDaysOut === null ? "None" : `${nextGapDaysOut}d`}
           sub={
             nextGapDaysOut === null
-              ? `in next ${DEFAULT_GAP_LOOKAHEAD_MONTHS} months`
+              ? `in next ${gapLookaheadMonths} months`
               : nextGapDaysOut === 0
                 ? "open now"
                 : "days out"
@@ -133,18 +148,30 @@ export default async function StatsPage({
         </section>
 
         <section id="schedule-gaps" className="flex min-w-0 flex-col gap-4">
-          <SectionTitle>Upcoming Schedule Gaps</SectionTitle>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <SectionTitle>Upcoming Schedule Gaps</SectionTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <GapDaysToggle active={gapDays} lookaheadMonths={gapLookaheadMonths} />
+              <GapLookaheadSelect active={gapLookaheadMonths} gapDays={gapDays} />
+            </div>
+          </div>
           <SectionHint>
-            Stretches longer than {DEFAULT_GAP_DAYS} days between gigs,
-            looking {DEFAULT_GAP_LOOKAHEAD_MONTHS} months ahead.
+            Stretches longer than {gapDays} days between gigs, looking{" "}
+            {gapLookaheadMonths} months ahead.
           </SectionHint>
           {scheduleGaps.length === 0 ? (
             <EmptyState>
               No gaps — the schedule looks solid for the next{" "}
-              {DEFAULT_GAP_LOOKAHEAD_MONTHS} months.
+              {gapLookaheadMonths} months.
             </EmptyState>
           ) : (
-            <ScheduleGapsTable data={scheduleGaps} />
+            // Keyed on gapDays/gapLookaheadMonths so switching either control
+            // remounts the table instead of preserving stale sort/pagination
+            // state across data changes — same pattern as StaleReadyTable below.
+            <ScheduleGapsTable
+              key={`${gapDays}-${gapLookaheadMonths}`}
+              data={scheduleGaps}
+            />
           )}
         </section>
 
