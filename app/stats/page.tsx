@@ -17,7 +17,7 @@ import {
 } from "@/lib/schedule-gaps-filter";
 import { StatStrip, StatCard } from "@/components/stats/stat-card";
 import { StaleWindowToggle } from "@/components/stats/stale-window-toggle";
-import { GapDaysToggle } from "@/components/stats/gap-days-toggle";
+import { GapDaysSelect } from "@/components/stats/gap-days-select";
 import { GapLookaheadSelect } from "@/components/stats/gap-lookahead-select";
 import { MostPlayedTable } from "@/components/stats/most-played-table";
 import { ReadyNeverPlayedTable } from "@/components/stats/ready-never-played-table";
@@ -151,7 +151,7 @@ export default async function StatsPage({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <SectionTitle>Upcoming Schedule Gaps</SectionTitle>
             <div className="flex flex-wrap items-center gap-2">
-              <GapDaysToggle active={gapDays} lookaheadMonths={gapLookaheadMonths} />
+              <GapDaysSelect active={gapDays} lookaheadMonths={gapLookaheadMonths} />
               <GapLookaheadSelect active={gapLookaheadMonths} gapDays={gapDays} />
             </div>
           </div>
