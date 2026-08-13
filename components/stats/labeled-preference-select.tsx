@@ -28,7 +28,7 @@ export function LabeledPreferenceSelect({
       <Select
         value={value}
         onValueChange={(next) => {
-          if (next) onSelect(next)
+          if (next && next !== value) onSelect(next)
         }}
       >
         <SelectTrigger size="sm" aria-label={ariaLabel} className="h-7 min-h-7 w-auto">
