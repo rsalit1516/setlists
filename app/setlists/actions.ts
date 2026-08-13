@@ -70,6 +70,35 @@ export async function reorderItems(setlistId: string, orderedItemIds: string[]):
   revalidatePath(`/setlists/${setlistId}`)
 }
 
+// Cross-set drag-and-drop (#82): unlike reorderItems, the moved item also
+// changes section/setNumber. destinationOrderedIds is the target
+// section/setNumber's final order (itemId included); sourceOrderedIds is
+// what's left behind in the section it was dragged out of — both get
+// re-sequenced in the same transaction so order stays contiguous per list.
+export async function moveItemToSection(
+  setlistId: string,
+  itemId: string,
+  target: { section: SetSection; setNumber: number },
+  destinationOrderedIds: string[],
+  sourceOrderedIds: string[]
+): Promise<void> {
+  const destinationUpdates = destinationOrderedIds.map((id, index) =>
+    prisma.setlistItem.update({
+      where: { id },
+      data:
+        id === itemId
+          ? { order: index, section: target.section, setNumber: target.setNumber }
+          : { order: index },
+    })
+  )
+  const sourceUpdates = sourceOrderedIds.map((id, index) =>
+    prisma.setlistItem.update({ where: { id }, data: { order: index } })
+  )
+
+  await prisma.$transaction([...destinationUpdates, ...sourceUpdates])
+  revalidatePath(`/setlists/${setlistId}`)
+}
+
 export async function togglePlayed(
   itemId: string,
   current: boolean | null
