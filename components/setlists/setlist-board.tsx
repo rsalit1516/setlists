@@ -54,11 +54,20 @@ export function SetlistBoard({
 
   const [containers, setContainers] = useState(() => groupIntoContainers(items, containerIds))
   const [prevItems, setPrevItems] = useState(items)
+  const [prevContainerIds, setPrevContainerIds] = useState(containerIds.join(','))
   const [dragOrigin, setDragOrigin] = useState<string | null>(null)
   const [, startTransition] = useTransition()
 
-  if (items !== prevItems) {
+  // Derived-state-during-render (React's documented pattern for "reset state
+  // when a prop changes" — see react.dev/learn/you-might-not-need-an-effect),
+  // not a useEffect: it applies before this render commits, avoiding the
+  // extra render/flash an effect-based sync would cost. Keyed off both items
+  // and the container id list so an "+Add Set" navigation (new displaySets,
+  // same items reference in the pathological case) still resyncs.
+  const containerIdsKey = containerIds.join(',')
+  if (items !== prevItems || containerIdsKey !== prevContainerIds) {
     setPrevItems(items)
+    setPrevContainerIds(containerIdsKey)
     setContainers(groupIntoContainers(items, containerIds))
   }
 
@@ -74,13 +83,19 @@ export function SetlistBoard({
   function handleDragOver(event: DragOverEvent) {
     const { active, over } = event
     if (!over) return
-    const activeContainerId = findContainer(containers, String(active.id))
-    const overContainerId = findContainer(containers, String(over.id))
-    if (!activeContainerId || !overContainerId || activeContainerId === overContainerId) return
+    const activeId = String(active.id)
+    const overId = String(over.id)
 
-    setContainers((prev) =>
-      moveAcrossContainers(prev, activeContainerId, overContainerId, String(active.id), String(over.id))
-    )
+    // Resolve container ids from `prev`, not the render-time `containers`
+    // closure — pointermove fires fast enough that several dragOver events
+    // can queue before a re-render lands, and a stale closure here would
+    // look up the item's pre-move container and silently no-op the update.
+    setContainers((prev) => {
+      const activeContainerId = findContainer(prev, activeId)
+      const overContainerId = findContainer(prev, overId)
+      if (!activeContainerId || !overContainerId || activeContainerId === overContainerId) return prev
+      return moveAcrossContainers(prev, activeContainerId, overContainerId, activeId, overId)
+    })
   }
 
   function handleDragEnd(event: DragEndEvent) {

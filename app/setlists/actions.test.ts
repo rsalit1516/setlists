@@ -90,6 +90,16 @@ describe('moveItemToSection', () => {
     })
     expect(revalidatePath).toHaveBeenCalledWith('/setlists/sl-1')
   })
+
+  it('rejects a destination list that is missing the moved item, without writing anything', async () => {
+    await expect(
+      moveItemToSection('sl-1', 'x', { section: 'MAIN', setNumber: 2 }, ['a', 'b'], ['c'])
+    ).rejects.toThrow('itemId must be included in destinationOrderedIds')
+
+    expect(prisma.setlistItem.update).not.toHaveBeenCalled()
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
 })
 
 describe('markSectionPlayed', () => {

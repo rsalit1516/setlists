@@ -45,8 +45,11 @@ export default async function SetlistPage({
 
   const allExistingIds = new Set(setlist.items.map((i) => i.songId))
 
-  // How many set sections to display — at least 1, at least the occupied max, or param
-  const displaySets = Math.max(maxSetNumber(setlist.items), setsParam ? parseInt(setsParam) : 1, 1)
+  // How many set sections to display — at least 1, at least the occupied max, or param.
+  // parseInt can yield NaN on a malformed ?sets= value; Math.max would then
+  // propagate NaN into Array.from({ length: displaySets }), so fall back to 1.
+  const setsFromParam = setsParam ? parseInt(setsParam) : 1
+  const displaySets = Math.max(maxSetNumber(setlist.items), Number.isNaN(setsFromParam) ? 1 : setsFromParam, 1)
 
   return (
     <div className="mx-auto px-4 py-6 md:flex md:max-w-5xl md:gap-6">

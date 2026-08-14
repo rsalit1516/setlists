@@ -82,6 +82,14 @@ export async function moveItemToSection(
   destinationOrderedIds: string[],
   sourceOrderedIds: string[]
 ): Promise<void> {
+  // The caller always builds destinationOrderedIds by inserting itemId into
+  // its new container, but if it's ever missing the item silently keeps its
+  // old section/setNumber while everything around it re-numbers — fail loud
+  // instead of writing that half-moved state.
+  if (!destinationOrderedIds.includes(itemId)) {
+    throw new Error('moveItemToSection: itemId must be included in destinationOrderedIds')
+  }
+
   const destinationUpdates = destinationOrderedIds.map((id, index) =>
     prisma.setlistItem.update({
       where: { id },
