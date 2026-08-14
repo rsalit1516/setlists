@@ -167,7 +167,7 @@
    */
   @page {
     size: landscape;
-    margin: 0.5in;
+    margin: 0.25in;
   }
   header,
   nav {
@@ -175,9 +175,15 @@
   }
 }
 
-/* Print setlist layout — used by app/gigs/[id]/page.tsx */
-.print-layout      { font-family: Calibri, 'Gill Sans MT', Arial, sans-serif; }
-.print-header      { text-align: center; margin-bottom: 0.35in; }
+/*
+ * Print setlist layout — used by app/gigs/[id]/page.tsx.
+ * `color: #000` is required here, not optional: this app is dark-theme-only
+ * (see `:root` above), so without an explicit override song titles would
+ * inherit `text-foreground` — a near-white color meant for a dark background
+ * — and print as light gray instead of solid black (issue #91).
+ */
+.print-layout      { font-family: Calibri, 'Gill Sans MT', Arial, sans-serif; color: #000; }
+.print-header      { text-align: center; margin-bottom: 0.2in; }
 .print-venue       { font-size: 34pt; font-weight: bold; line-height: 1.1; }
 .print-date        { font-size: 22pt; margin-top: 0.08in; }
 /*

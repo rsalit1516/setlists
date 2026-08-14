@@ -3,12 +3,12 @@ import type { PrintLayout } from '@/lib/setlist-print'
 
 const styles = StyleSheet.create({
   page: {
-    padding: 36,
+    padding: 18,
     fontFamily: 'Helvetica',
   },
   header: {
     textAlign: 'center',
-    marginBottom: 25,
+    marginBottom: 14,
   },
   venue: {
     fontSize: 34,
