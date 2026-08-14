@@ -1,5 +1,6 @@
 import { AddSongForm } from './add-song-form'
 import { SortableSongList } from './sortable-song-list'
+import { containerId } from './board-utils'
 import { markSectionPlayed } from '@/app/setlists/actions'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -60,7 +61,7 @@ export function SetlistSection({
       </div>
 
       {/* Song rows */}
-      <SortableSongList items={items} setlistId={setlistId} revision={revision} />
+      <SortableSongList items={items} revision={revision} containerId={containerId(section, setNumber)} />
 
       {/* Add song — hidden on tablet/desktop where the side panel is used */}
       <div className="px-4 pb-3 pt-2 md:hidden">

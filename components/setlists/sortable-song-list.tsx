@@ -1,24 +1,10 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import {
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core'
-import {
-  SortableContext,
-  arrayMove,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
+import { useDroppable } from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical } from 'lucide-react'
-import { moveItem, removeItem, reorderItems, togglePlayed } from '@/app/setlists/actions'
+import { moveItem, removeItem, togglePlayed } from '@/app/setlists/actions'
 import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
 import type { SetlistItem } from '@/lib/types'
 
@@ -149,55 +135,33 @@ function SortableRow({
   )
 }
 
+// Renders one section's rows as a droppable + sortable container. The
+// DndContext lives one level up in SetlistBoard, spanning every section, so
+// a drag can cross from one set into another (#82) — this component only
+// registers itself as a drop target and reports within-container reorders
+// up through its parent's shared drag handlers.
 export function SortableSongList({
   items,
-  setlistId,
   revision,
+  containerId,
 }: {
   items: SetlistItem[]
-  setlistId: string
   revision: boolean
+  containerId: string
 }) {
-  const [ordered, setOrdered] = useState(items)
-  const [prevItems, setPrevItems] = useState(items)
-  const [, startTransition] = useTransition()
-
-  if (items !== prevItems) {
-    setPrevItems(items)
-    setOrdered(items)
-  }
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  )
-
-  if (items.length === 0) {
-    return <p className="px-4 py-3 text-sm text-muted-foreground italic">No songs yet</p>
-  }
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-
-    const oldIndex = ordered.findIndex((i) => i.id === active.id)
-    const newIndex = ordered.findIndex((i) => i.id === over.id)
-    if (oldIndex === -1 || newIndex === -1) return
-
-    const next = arrayMove(ordered, oldIndex, newIndex)
-    setOrdered(next)
-    startTransition(() => reorderItems(setlistId, next.map((i) => i.id)))
-  }
+  const { setNodeRef, isOver } = useDroppable({ id: containerId })
 
   return (
-    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-      <SortableContext items={ordered.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-        <ul className="divide-y">
-          {ordered.map((item, idx) => (
-            <SortableRow key={item.id} item={item} idx={idx} count={ordered.length} revision={revision} />
-          ))}
-        </ul>
-      </SortableContext>
-    </DndContext>
+    <SortableContext id={containerId} items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+      <ul ref={setNodeRef} className={`divide-y transition-colors ${isOver ? 'bg-accent/40' : ''}`}>
+        {items.length === 0 ? (
+          <li className="px-4 py-3 text-sm text-muted-foreground italic">No songs yet</li>
+        ) : (
+          items.map((item, idx) => (
+            <SortableRow key={item.id} item={item} idx={idx} count={items.length} revision={revision} />
+          ))
+        )}
+      </ul>
+    </SortableContext>
   )
 }

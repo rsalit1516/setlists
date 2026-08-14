@@ -4,7 +4,7 @@ import { getSetlist } from '@/lib/services/setlists'
 import { getSongs } from '@/lib/services/songs'
 import { getGenres } from '@/lib/services/genres'
 import { selectableSongs } from '@/lib/songs-selectable'
-import { SetlistSection } from '@/components/setlists/setlist-section'
+import { SetlistBoard } from '@/components/setlists/setlist-board'
 import { RenameForm } from '@/components/setlists/rename-form'
 import { SongPickerPanel } from '@/components/setlists/song-picker-panel'
 import { markSectionPlayed } from '@/app/setlists/actions'
@@ -12,12 +12,8 @@ import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { SetlistItem } from '@/lib/types'
 
-function groupBySection(items: SetlistItem[]) {
-  const soundcheck = items.filter((i) => i.section === 'SOUNDCHECK')
-  const main = items.filter((i) => i.section === 'MAIN')
-  const encore = items.filter((i) => i.section === 'ENCORE')
-  const maxSet = main.reduce((m, i) => Math.max(m, i.setNumber), 0)
-  return { soundcheck, main, encore, maxSet }
+function maxSetNumber(items: SetlistItem[]) {
+  return items.reduce((m, i) => (i.section === 'MAIN' ? Math.max(m, i.setNumber) : m), 0)
 }
 
 function formatDate(d: Date) {
@@ -48,10 +44,12 @@ export default async function SetlistPage({
   const allSongs = selectableSongs(songs)
 
   const allExistingIds = new Set(setlist.items.map((i) => i.songId))
-  const { soundcheck, main, encore, maxSet } = groupBySection(setlist.items)
 
-  // How many set sections to display — at least 1, at least the occupied max, or param
-  const displaySets = Math.max(maxSet, setsParam ? parseInt(setsParam) : 1, 1)
+  // How many set sections to display — at least 1, at least the occupied max, or param.
+  // parseInt can yield NaN on a malformed ?sets= value; Math.max would then
+  // propagate NaN into Array.from({ length: displaySets }), so fall back to 1.
+  const setsFromParam = setsParam ? parseInt(setsParam) : 1
+  const displaySets = Math.max(maxSetNumber(setlist.items), Number.isNaN(setsFromParam) ? 1 : setsFromParam, 1)
 
   return (
     <div className="mx-auto px-4 py-6 md:flex md:max-w-5xl md:gap-6">
@@ -111,55 +109,13 @@ export default async function SetlistPage({
           </div>
         )}
 
-        <div className="space-y-4">
-          <SetlistSection
-            label="Soundcheck"
-            items={soundcheck}
-            setlistId={setlist.id}
-            section="SOUNDCHECK"
-            setNumber={1}
-            allSongs={allSongs}
-            revision={revision}
-          />
-
-          {Array.from({ length: displaySets }, (_, idx) => {
-            const setNum = idx + 1
-            return (
-              <SetlistSection
-                key={setNum}
-                label={`Set ${setNum}`}
-                items={main.filter((i) => i.setNumber === setNum)}
-                setlistId={setlist.id}
-                section="MAIN"
-                setNumber={setNum}
-                allSongs={allSongs}
-                revision={revision}
-              />
-            )
-          })}
-
-          {/* Add another set */}
-          {!revision && (
-            <div className="flex justify-center">
-              <Link
-                href={`/setlists/${id}?sets=${displaySets + 1}`}
-                className={buttonVariants({ variant: 'ghost', size: 'sm' })}
-              >
-                + Add Set {displaySets + 1}
-              </Link>
-            </div>
-          )}
-
-          <SetlistSection
-            label="Encore"
-            items={encore}
-            setlistId={setlist.id}
-            section="ENCORE"
-            setNumber={1}
-            allSongs={allSongs}
-            revision={revision}
-          />
-        </div>
+        <SetlistBoard
+          setlistId={setlist.id}
+          items={setlist.items}
+          displaySets={displaySets}
+          allSongs={allSongs}
+          revision={revision}
+        />
       </div>
 
       {/* Song picker — tablet/desktop only, hidden in revision mode */}

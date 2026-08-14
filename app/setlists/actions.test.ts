@@ -14,7 +14,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
-import { reorderItems, markSectionPlayed } from './actions'
+import { reorderItems, markSectionPlayed, moveItemToSection } from './actions'
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -45,6 +45,60 @@ describe('reorderItems', () => {
 
     expect(prisma.setlistItem.update).not.toHaveBeenCalled()
     expect(revalidatePath).toHaveBeenCalledWith('/setlists/sl-1')
+  })
+})
+
+describe('moveItemToSection', () => {
+  it('sets section/setNumber on the moved item and re-sequences both the destination and source lists', async () => {
+    vi.mocked(prisma.setlistItem.update).mockResolvedValue({} as never)
+
+    await moveItemToSection('sl-1', 'x', { section: 'MAIN', setNumber: 2 }, ['a', 'x', 'b'], ['c', 'd'])
+
+    expect(prisma.setlistItem.update).toHaveBeenNthCalledWith(1, {
+      where: { id: 'a' },
+      data: { order: 0 },
+    })
+    expect(prisma.setlistItem.update).toHaveBeenNthCalledWith(2, {
+      where: { id: 'x' },
+      data: { order: 1, section: 'MAIN', setNumber: 2 },
+    })
+    expect(prisma.setlistItem.update).toHaveBeenNthCalledWith(3, {
+      where: { id: 'b' },
+      data: { order: 2 },
+    })
+    expect(prisma.setlistItem.update).toHaveBeenNthCalledWith(4, {
+      where: { id: 'c' },
+      data: { order: 0 },
+    })
+    expect(prisma.setlistItem.update).toHaveBeenNthCalledWith(5, {
+      where: { id: 'd' },
+      data: { order: 1 },
+    })
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1)
+    expect(revalidatePath).toHaveBeenCalledWith('/setlists/sl-1')
+  })
+
+  it('handles moving into an empty destination, leaving nothing behind in the source', async () => {
+    vi.mocked(prisma.setlistItem.update).mockResolvedValue({} as never)
+
+    await moveItemToSection('sl-1', 'x', { section: 'ENCORE', setNumber: 1 }, ['x'], [])
+
+    expect(prisma.setlistItem.update).toHaveBeenCalledTimes(1)
+    expect(prisma.setlistItem.update).toHaveBeenCalledWith({
+      where: { id: 'x' },
+      data: { order: 0, section: 'ENCORE', setNumber: 1 },
+    })
+    expect(revalidatePath).toHaveBeenCalledWith('/setlists/sl-1')
+  })
+
+  it('rejects a destination list that is missing the moved item, without writing anything', async () => {
+    await expect(
+      moveItemToSection('sl-1', 'x', { section: 'MAIN', setNumber: 2 }, ['a', 'b'], ['c'])
+    ).rejects.toThrow('itemId must be included in destinationOrderedIds')
+
+    expect(prisma.setlistItem.update).not.toHaveBeenCalled()
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 })
 
