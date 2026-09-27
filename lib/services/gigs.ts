@@ -118,8 +118,8 @@ export function groupGigsByMonth(gigs: GigSummary[], today: Date = new Date()): 
 }
 
 export async function getGigForPerformance(id: string): Promise<GigPerformanceData | null> {
-  return prisma.gig.findUnique({
-    where: { id },
+  return prisma.gig.findFirst({
+    where: { id, isActive: true },
     select: {
       id: true,
       date: true,
@@ -156,8 +156,8 @@ export async function getGigForPerformance(id: string): Promise<GigPerformanceDa
 }
 
 export async function getGig(id: string): Promise<GigWithDetails | null> {
-  const row: any = await prisma.gig.findUnique({
-    where: { id },
+  const row: any = await prisma.gig.findFirst({
+    where: { id, isActive: true },
     include: {
       venue: true,
       setlist: {

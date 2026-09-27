@@ -59,6 +59,7 @@ function CompactGigRow({ gig }: { gig: GigSummary }) {
         action={deleteAction}
         variant="icon"
         ariaLabel="Delete gig"
+        className="-my-2.5 inline-flex size-11 shrink-0 items-center justify-center rounded-md text-lg hover:bg-muted"
         description={`Remove the gig at ${gig.venue.name} on ${formatDate(gig.date)}?`}
       />
     </div>
