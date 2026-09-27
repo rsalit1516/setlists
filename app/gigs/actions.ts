@@ -141,9 +141,14 @@ export async function updateGig(_state: GigActionState, formData: FormData): Pro
 }
 
 export async function deleteGig(id: string): Promise<void> {
-  await prisma.expense.updateMany({ where: { gigId: id }, data: { isActive: false } })
-  await prisma.gigMusician.updateMany({ where: { gigId: id }, data: { isActive: false } })
-  await prisma.gig.update({ where: { id }, data: { isActive: false } })
+  // The setlist goes too: it's strictly 1:1 with its gig (#41), so leaving it
+  // active would surface a dead gig in New Gig's copy-from picker (#93).
+  await prisma.$transaction([
+    prisma.expense.updateMany({ where: { gigId: id }, data: { isActive: false } }),
+    prisma.gigMusician.updateMany({ where: { gigId: id }, data: { isActive: false } }),
+    prisma.setlist.updateMany({ where: { gig: { id } }, data: { isActive: false } }),
+    prisma.gig.update({ where: { id }, data: { isActive: false } }),
+  ])
   revalidatePath('/gigs')
   redirect('/gigs')
 }

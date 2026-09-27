@@ -6,6 +6,10 @@ vi.mock('@/lib/db', () => ({
       create: vi.fn(),
       update: vi.fn(),
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    expense: {
+      updateMany: vi.fn(),
     },
     venue: {
       findUnique: vi.fn(),
@@ -13,6 +17,7 @@ vi.mock('@/lib/db', () => ({
     setlist: {
       create: vi.fn(),
       findUnique: vi.fn(),
+      updateMany: vi.fn(),
     },
     musician: {
       findMany: vi.fn(),
@@ -24,6 +29,9 @@ vi.mock('@/lib/db', () => ({
       updateMany: vi.fn(),
       findMany: vi.fn(),
     },
+    // Array form only: resolves the already-built operations, which is all
+    // deleteGig needs to prove its writes are grouped into one transaction.
+    $transaction: vi.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
   },
 }))
 
@@ -43,6 +51,7 @@ import { revalidatePath } from 'next/cache'
 import {
   createGig,
   updateGig,
+  deleteGig,
   bulkAddMusicians,
   syncGigMusicians,
   updateMusicianPayment,
@@ -508,7 +517,7 @@ describe('markAllMusiciansPaid', () => {
 
   it("splits the gig's current net evenly across active musicians and stamps the chosen date", async () => {
     // net = amountPaid(400) + tips(50) + otherRevenue(0) - expenses(50) = 400, split across 2 musicians = 200
-    vi.mocked(prisma.gig.findUnique).mockResolvedValue(mockGigRow as never)
+    vi.mocked(prisma.gig.findFirst).mockResolvedValue(mockGigRow as never)
     vi.mocked(prisma.gigMusician.updateMany).mockResolvedValue({ count: 2 } as never)
     const fd = new FormData()
     fd.set('gigId', 'gig-1')
@@ -524,7 +533,7 @@ describe('markAllMusiciansPaid', () => {
   })
 
   it('does nothing when the gig has no active musicians', async () => {
-    vi.mocked(prisma.gig.findUnique).mockResolvedValue({ ...mockGigRow, musicians: [] } as never)
+    vi.mocked(prisma.gig.findFirst).mockResolvedValue({ ...mockGigRow, musicians: [] } as never)
     const fd = new FormData()
     fd.set('gigId', 'gig-1')
     fd.set('paidAt', '2026-08-20')
@@ -540,12 +549,12 @@ describe('markAllMusiciansPaid', () => {
 
     await markAllMusiciansPaid(fd)
 
-    expect(prisma.gig.findUnique).not.toHaveBeenCalled()
+    expect(prisma.gig.findFirst).not.toHaveBeenCalled()
     expect(prisma.gigMusician.updateMany).not.toHaveBeenCalled()
   })
 
   it('does nothing when the gig does not exist', async () => {
-    vi.mocked(prisma.gig.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.gig.findFirst).mockResolvedValue(null)
     const fd = new FormData()
     fd.set('gigId', 'nonexistent')
     fd.set('paidAt', '2026-08-20')
@@ -553,5 +562,30 @@ describe('markAllMusiciansPaid', () => {
     await markAllMusiciansPaid(fd)
 
     expect(prisma.gigMusician.updateMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('deleteGig', () => {
+  beforeEach(() => {
+    vi.mocked(prisma.expense.updateMany).mockResolvedValue({ count: 1 } as never)
+    vi.mocked(prisma.gigMusician.updateMany).mockResolvedValue({ count: 2 } as never)
+    vi.mocked(prisma.setlist.updateMany).mockResolvedValue({ count: 1 } as never)
+    vi.mocked(prisma.gig.update).mockResolvedValue({} as never)
+  })
+
+  it('soft-deletes the gig and its expenses, musicians and setlist in one transaction', async () => {
+    await expect(deleteGig('gig-1')).rejects.toThrow('REDIRECT:/gigs')
+
+    expect(prisma.expense.updateMany).toHaveBeenCalledWith({ where: { gigId: 'gig-1' }, data: { isActive: false } })
+    expect(prisma.gigMusician.updateMany).toHaveBeenCalledWith({ where: { gigId: 'gig-1' }, data: { isActive: false } })
+    expect(prisma.setlist.updateMany).toHaveBeenCalledWith({ where: { gig: { id: 'gig-1' } }, data: { isActive: false } })
+    expect(prisma.gig.update).toHaveBeenCalledWith({ where: { id: 'gig-1' }, data: { isActive: false } })
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(prisma.$transaction).mock.calls[0][0]).toHaveLength(4)
+  })
+
+  it('revalidates the gigs list before redirecting back to it', async () => {
+    await expect(deleteGig('gig-1')).rejects.toThrow('REDIRECT:/gigs')
+    expect(revalidatePath).toHaveBeenCalledWith('/gigs')
   })
 })
