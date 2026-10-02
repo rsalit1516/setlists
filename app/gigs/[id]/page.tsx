@@ -146,6 +146,9 @@ export default async function GigPage({
             <span> · {formatTimeRange(gig.startTime, gig.endTime)}</span>
           )}
         </p>
+        {gig.setlistCreator && (
+          <p className="mt-1 text-sm text-muted-foreground">Setlist by {gig.setlistCreator.name}</p>
+        )}
         {gig.notes && (
           <p className="mt-1 text-sm text-muted-foreground">{gig.notes}</p>
         )}

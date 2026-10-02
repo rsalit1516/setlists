@@ -73,7 +73,8 @@ model Musician {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  gigMusicians GigMusician[]
+  gigMusicians    GigMusician[]
+  setlistsCreated Gig[]         @relation("GigSetlistCreator")
 }
 
 model Setlist {
@@ -117,13 +118,15 @@ model Gig {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  venueId   String
-  setlistId String    @unique
+  venueId          String
+  setlistId        String  @unique
+  setlistCreatorId String?
 
-  venue     Venue         @relation(fields: [venueId], references: [id])
-  setlist   Setlist       @relation(fields: [setlistId], references: [id])
-  expenses  Expense[]
-  musicians GigMusician[]
+  venue          Venue         @relation(fields: [venueId], references: [id])
+  setlist        Setlist       @relation(fields: [setlistId], references: [id])
+  setlistCreator Musician?     @relation("GigSetlistCreator", fields: [setlistCreatorId], references: [id])
+  expenses       Expense[]
+  musicians      GigMusician[]
 }
 
 model Expense {

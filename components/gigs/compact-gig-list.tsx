@@ -32,17 +32,19 @@ function PayStatus({ gig, className }: { gig: GigSummary; className?: string }) 
 function CompactGigRow({ gig }: { gig: GigSummary }) {
   const deleteAction = deleteGig.bind(null, gig.id)
   const headcount = `${gig._count.musicians} musician${gig._count.musicians !== 1 ? 's' : ''}`
+  const creator = gig.setlistCreator ? `Setlist: ${gig.setlistCreator.name}` : null
 
   return (
     <div className="flex items-center gap-2 rounded-md px-2 py-2.5 transition-colors hover:bg-muted/40">
       <Link href={`/gigs/${gig.id}`} className="min-w-0 flex-1">
-        {/* Below sm: 2-line stack — date + pay status, then venue + headcount */}
+        {/* Below sm: 2-line stack — date + pay status, then venue + setlist creator + headcount */}
         <div className="flex items-baseline justify-between gap-3 sm:hidden">
           <span className="font-medium">{formatDate(gig.date)}</span>
           <PayStatus gig={gig} className="text-sm" />
         </div>
         <div className="mt-0.5 flex items-baseline justify-between gap-3 sm:hidden">
           <span className="truncate text-sm text-muted-foreground">{gig.venue.name}</span>
+          {creator && <span className="max-w-[45%] truncate text-sm text-muted-foreground">{creator}</span>}
           <span className="shrink-0 text-sm text-muted-foreground">{headcount}</span>
         </div>
 
@@ -51,6 +53,9 @@ function CompactGigRow({ gig }: { gig: GigSummary }) {
         <div className="hidden sm:flex sm:items-center sm:gap-4">
           <span className="w-32 shrink-0 font-medium">{formatDate(gig.date)}</span>
           <span className="min-w-0 flex-1 truncate text-muted-foreground">{gig.venue.name}</span>
+          {creator && (
+            <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{creator}</span>
+          )}
           <span className="w-28 shrink-0 text-right text-sm text-muted-foreground">{headcount}</span>
           <PayStatus gig={gig} className="w-40 shrink-0 text-right text-sm" />
         </div>
