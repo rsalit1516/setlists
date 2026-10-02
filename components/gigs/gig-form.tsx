@@ -59,6 +59,13 @@ export function GigForm({
     ? new Set(gig.musicians.map((m) => m.musicianId))
     : new Set(musicians.filter((m) => DEFAULT_MUSICIAN_NAMES.includes(m.name)).map((m) => m.id))
 
+  // A deactivated musician drops out of `musicians`, but must stay selectable
+  // here — otherwise saving an older gig would silently clear its creator.
+  const creatorOptions =
+    gig?.setlistCreator && !musicians.some((m) => m.id === gig.setlistCreator!.id)
+      ? [...musicians, gig.setlistCreator].sort((a, b) => a.name.localeCompare(b.name))
+      : musicians
+
   function getUncheckConfirmMessage(musicianId: string): string | null {
     const gm = gig?.musicians.find((m) => m.musicianId === musicianId)
     if (!gm) return null
@@ -177,6 +184,23 @@ export function GigForm({
             )}
           </div>
         )}
+
+        <div>
+          <label className="mb-1 block text-sm font-medium">Setlist created by</label>
+          <Select name="setlistCreatorId" defaultValue={gig?.setlistCreatorId ?? null}>
+            <SelectTrigger aria-label="Setlist created by" className="w-full">
+              <SelectValue>
+                {(value: string | null) => creatorOptions.find((m) => m.id === value)?.name ?? 'None'}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={null}>None</SelectItem>
+              {creatorOptions.map((m) => (
+                <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         <div>
           <label className="mb-1 block text-sm font-medium">Amount Contracted ($)</label>

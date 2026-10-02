@@ -85,6 +85,29 @@ describe('getGigs', () => {
   })
 })
 
+describe('setlist creator', () => {
+  it('getGigs includes only the setlist creator name', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([mockGigSummary] as never)
+    await getGigs()
+    const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as any
+    expect(call.include.setlistCreator).toEqual({ select: { name: true } })
+  })
+
+  it('getGigsInRange includes only the setlist creator name', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([mockGigSummary] as never)
+    await getGigsInRange(new Date('2026-05-01'), new Date('2026-06-01'))
+    const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as any
+    expect(call.include.setlistCreator).toEqual({ select: { name: true } })
+  })
+
+  it('getGig includes the full setlist creator, so the edit form can show a deactivated one', async () => {
+    vi.mocked(prisma.gig.findFirst).mockResolvedValue(mockGig as never)
+    await getGig('gig-1')
+    const call = vi.mocked(prisma.gig.findFirst).mock.calls[0][0] as any
+    expect(call.include.setlistCreator).toBe(true)
+  })
+})
+
 describe('hasAnyGigs', () => {
   it('returns true when at least one active gig exists', async () => {
     vi.mocked(prisma.gig.count).mockResolvedValue(3)

@@ -119,6 +119,7 @@ export type GigSummary = {
   otherRevenue: string | null
   venue: { name: string }
   setlist: { name: string }
+  setlistCreator: { name: string } | null
   _count: { musicians: number }
 }
 
@@ -176,8 +177,10 @@ export type GigWithDetails = {
   otherRevenue: string | null
   venueId: string
   setlistId: string
+  setlistCreatorId: string | null
   venue: Venue
   setlist: { id: string; name: string; items: GigSetlistItem[] }
+  setlistCreator: Musician | null
   expenses: Expense[]
   musicians: GigMusician[]
   createdAt: Date

@@ -50,7 +50,9 @@ function makeGig(overrides: Partial<GigWithDetails> = {}): GigWithDetails {
     otherRevenue: null,
     venueId: 'v-1',
     setlistId: 'sl-1',
+    setlistCreatorId: null,
     venue: mockVenues[0],
+    setlistCreator: null,
     setlist: { id: 'sl-1', name: 'Friday Night', items: [] },
     expenses: [],
     musicians: [],
@@ -142,7 +144,9 @@ describe('GigForm — setlist picker', () => {
       otherRevenue: null,
       venueId: 'v-1',
       setlistId: 'sl-1',
+      setlistCreatorId: null,
       venue: mockVenues[0],
+      setlistCreator: null,
       setlist: { id: 'sl-1', name: 'Friday Night', items: [] },
       expenses: [],
       musicians: [],
@@ -181,7 +185,9 @@ describe('GigForm — financials fields', () => {
       otherRevenue: '15',
       venueId: 'v-1',
       setlistId: 'sl-1',
+      setlistCreatorId: null,
       venue: mockVenues[0],
+      setlistCreator: null,
       setlist: { id: 'sl-1', name: 'Friday Night', items: [] },
       expenses: [],
       musicians: [],
@@ -211,7 +217,9 @@ describe('GigForm — financials fields', () => {
       otherRevenue: null,
       venueId: 'v-1',
       setlistId: 'sl-1',
+      setlistCreatorId: null,
       venue: mockVenues[0],
+      setlistCreator: null,
       setlist: { id: 'sl-1', name: 'Friday Night', items: [] },
       expenses: [],
       musicians: [],
@@ -349,5 +357,62 @@ describe('GigForm — musicians (Edit Gig)', () => {
     expect(confirmSpy).not.toHaveBeenCalled()
     expect(screen.getByLabelText('Richard Salit')).not.toBeChecked()
     confirmSpy.mockRestore()
+  })
+})
+
+describe('GigForm — setlist creator', () => {
+  const roster = [
+    makeMusician({ id: 'm-1', name: 'Andrew Guerrero' }),
+    makeMusician({ id: 'm-2', name: 'Jeff Zbar' }),
+  ]
+
+  function creatorInput() {
+    return document.querySelector('input[name="setlistCreatorId"]') as HTMLInputElement
+  }
+
+  it('defaults to None on a new gig and submits a blank creator', () => {
+    render(<GigForm venues={mockVenues} setlists={[]} musicians={roster} action={noopAction} />)
+
+    expect(screen.getByRole('combobox', { name: 'Setlist created by' })).toHaveTextContent('None')
+    expect(creatorInput().value).toBe('')
+  })
+
+  it('offers None followed by the active roster', async () => {
+    const user = userEvent.setup()
+    render(<GigForm venues={mockVenues} setlists={[]} musicians={roster} action={noopAction} />)
+
+    await user.click(screen.getByRole('combobox', { name: 'Setlist created by' }))
+
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'None',
+      'Andrew Guerrero',
+      'Jeff Zbar',
+    ])
+  })
+
+  it("pre-selects the gig's current setlist creator when editing", () => {
+    const gig = makeGig({ setlistCreatorId: 'm-2', setlistCreator: roster[1] })
+    render(<GigForm venues={mockVenues} musicians={roster} gig={gig} action={noopAction} />)
+
+    expect(screen.getByRole('combobox', { name: 'Setlist created by' })).toHaveTextContent('Jeff Zbar')
+    expect(creatorInput().value).toBe('m-2')
+  })
+
+  it('keeps a since-deactivated creator selectable so saving the gig does not drop them', async () => {
+    const user = userEvent.setup()
+    const former = makeMusician({ id: 'm-9', name: 'Former Member', isActive: false })
+    const gig = makeGig({ setlistCreatorId: 'm-9', setlistCreator: former })
+    render(<GigForm venues={mockVenues} musicians={roster} gig={gig} action={noopAction} />)
+
+    expect(screen.getByRole('combobox', { name: 'Setlist created by' })).toHaveTextContent('Former Member')
+    expect(creatorInput().value).toBe('m-9')
+
+    await user.click(screen.getByRole('combobox', { name: 'Setlist created by' }))
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'None',
+      'Andrew Guerrero',
+      'Former Member',
+      'Jeff Zbar',
+    ])
   })
 })
