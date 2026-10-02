@@ -53,7 +53,9 @@ function CompactGigRow({ gig }: { gig: GigSummary }) {
         <div className="hidden sm:flex sm:items-center sm:gap-4">
           <span className="w-32 shrink-0 font-medium">{formatDate(gig.date)}</span>
           <span className="min-w-0 flex-1 truncate text-muted-foreground">{gig.venue.name}</span>
-          <span className="w-40 shrink-0 truncate text-sm text-muted-foreground">{creator}</span>
+          {creator && (
+            <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{creator}</span>
+          )}
           <span className="w-28 shrink-0 text-right text-sm text-muted-foreground">{headcount}</span>
           <PayStatus gig={gig} className="w-40 shrink-0 text-right text-sm" />
         </div>
