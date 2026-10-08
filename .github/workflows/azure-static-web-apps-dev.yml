@@ -1,0 +1,44 @@
+name: Deploy to dev (Azure Static Web Apps)
+
+# Deploys `develop` to a separate Static Web App backed by the dev Supabase project. The dev
+# database is disposable: see docs/environments.md for how to reset and reseed it.
+on:
+  push:
+    branches:
+      - develop
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+jobs:
+  build_and_deploy_job:
+    name: Build and Deploy Job (dev)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          lfs: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm ci
+      - name: Apply pending database migrations (dev database)
+        run: npx prisma migrate deploy
+        env:
+          DIRECT_URL: ${{ secrets.DEV_DIRECT_URL }}
+      - name: Build And Deploy
+        id: builddeploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "/"
+          api_location: ""
+          output_location: ""
+        env:
+          DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
