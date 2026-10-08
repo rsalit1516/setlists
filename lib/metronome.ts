@@ -17,7 +17,11 @@ export function startBeatScheduler({
   let next = now() + FIRST_BEAT_DELAY_SECONDS
 
   function tick() {
-    while (next < now() + LOOKAHEAD_SECONDS) {
+    const current = now()
+    if (next < current) {
+      next += Math.ceil((current - next) / interval) * interval
+    }
+    while (next < current + LOOKAHEAD_SECONDS) {
       onBeat(next)
       next += interval
     }
