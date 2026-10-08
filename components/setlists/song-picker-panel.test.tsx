@@ -116,10 +116,10 @@ describe('SongPickerPanel', () => {
     const user = userEvent.setup()
     render(<SongPickerPanel {...defaultProps} displaySets={2} />)
     await user.click(screen.getByRole('combobox', { name: /add to/i }))
-    expect(screen.getByRole('option', { name: 'Soundcheck' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Set 1' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Set 2' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Encore' })).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: 'Soundcheck' })).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: 'Set 1' })).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: 'Set 2' })).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: 'Encore' })).toBeInTheDocument()
   })
 
   it('does not render a genre filter row when there are no genres', () => {
