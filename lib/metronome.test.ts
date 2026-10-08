@@ -20,6 +20,19 @@ describe('startBeatScheduler', () => {
     for (let i = 1; i < beats.length; i++) expect(beats[i] - beats[i - 1]).toBeCloseTo(0.5, 10)
   })
 
+  it('skips missed beats after a stalled tick instead of replaying them in a burst', () => {
+    let clock = 0
+    const beats: number[] = []
+    startBeatScheduler({ bpm: 120, now: () => clock, onBeat: (t) => beats.push(t) })
+    beats.length = 0
+
+    clock = 30
+    vi.advanceTimersByTime(25)
+
+    expect(beats.length).toBeLessThanOrEqual(1)
+    for (const t of beats) expect(t).toBeGreaterThanOrEqual(30)
+  })
+
   it('stops scheduling after the returned stop function is called', () => {
     let clock = 0
     const onBeat = vi.fn()

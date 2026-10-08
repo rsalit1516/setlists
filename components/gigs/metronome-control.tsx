@@ -9,7 +9,7 @@ import {
 } from '@/lib/metronome'
 import { cn } from '@/lib/utils'
 
-function playClick(ctx: AudioContext, time: number) {
+function playClick(ctx: AudioContext, time: number, pending: Set<OscillatorNode>) {
   const osc = ctx.createOscillator()
   const gain = ctx.createGain()
   osc.frequency.value = 1000
@@ -19,6 +19,8 @@ function playClick(ctx: AudioContext, time: number) {
   gain.connect(ctx.destination)
   osc.start(time)
   osc.stop(time + 0.06)
+  pending.add(osc)
+  osc.onended = () => pending.delete(osc)
 }
 
 // Mount with key={song.id}: unmounting is what stops the metronome when the song changes, so the
@@ -35,16 +37,16 @@ export function MetronomeControl({ bpm }: { bpm: number }) {
 
   useEffect(() => {
     if (!running) return
-    const ctx = ctxRef.current ?? new AudioContext()
-    ctxRef.current = ctx
-    ctx.resume().catch(() => {})
+    const ctx = ctxRef.current
+    if (!ctx) return
 
+    const pendingClicks = new Set<OscillatorNode>()
     const timeouts = new Set<ReturnType<typeof setTimeout>>()
     const stop = startBeatScheduler({
       bpm,
       now: () => ctx.currentTime,
       onBeat: (time) => {
-        if (settingsRef.current.click) playClick(ctx, time)
+        if (settingsRef.current.click) playClick(ctx, time, pendingClicks)
         if (settingsRef.current.flash) {
           const id = setTimeout(
             () => {
@@ -61,6 +63,8 @@ export function MetronomeControl({ bpm }: { bpm: number }) {
     return () => {
       stop()
       timeouts.forEach(clearTimeout)
+      // Clicks are queued up to 100 ms ahead; stopping at 0 cancels any that haven't sounded yet.
+      pendingClicks.forEach((osc) => osc.stop(0))
     }
   }, [running, bpm])
 
@@ -70,6 +74,15 @@ export function MetronomeControl({ bpm }: { bpm: number }) {
     },
     []
   )
+
+  function toggleRunning() {
+    if (!running) {
+      // Must happen inside the tap's user activation, or iOS Safari leaves the context suspended.
+      ctxRef.current ??= new AudioContext()
+      ctxRef.current.resume().catch(() => {})
+    }
+    setRunning(!running)
+  }
 
   function updateSettings(patch: Partial<MetronomeSettings>) {
     const next = { ...settingsRef.current, ...patch }
@@ -96,10 +109,13 @@ export function MetronomeControl({ bpm }: { bpm: number }) {
         aria-pressed={running}
         aria-label={running ? `Stop metronome at ${bpm} BPM` : `Start metronome at ${bpm} BPM`}
         className={cn(
-          'flex min-h-11 items-center gap-1.5 rounded-md px-3 tabular-nums',
+          'relative flex min-h-11 items-center gap-1.5 rounded-md px-3 tabular-nums',
           running ? 'bg-white/20 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'
         )}
       >
+        {running && settings.flash && beat > 0 && (
+          <span key={beat} aria-hidden className="metronome-pulse pointer-events-none absolute inset-0 rounded-md" />
+        )}
         <span aria-hidden>♩</span>
         {bpm} BPM
       </button>
