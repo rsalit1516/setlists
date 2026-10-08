@@ -85,7 +85,14 @@ export function MetronomeControl({ bpm }: { bpm: number }) {
       )}
       <button
         type="button"
-        onClick={() => setRunning((r) => !r)}
+        onClick={() => {
+          if (!running) {
+            const ctx = ctxRef.current ?? new AudioContext()
+            ctxRef.current = ctx
+            ctx.resume().catch(() => {})
+          }
+          setRunning((r) => !r)
+        }}
         aria-pressed={running}
         aria-label={running ? `Stop metronome at ${bpm} BPM` : `Start metronome at ${bpm} BPM`}
         className={cn(
