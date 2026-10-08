@@ -16,6 +16,7 @@ const gig: GigPerformanceData = {
       song: {
         title: 'Friend of the Devil',
         key: 'G',
+        bpm: 108,
         // Mirrors what getGigForPerformance actually hands this component:
         // already-sanitized HTML (see lib/services/gigs.ts), one <p> per line.
         lyrics: '<p>She\'s got a "cheap sunglasses" line</p><p>And a second line, don\'t stop</p>',
@@ -31,6 +32,7 @@ const gig: GigPerformanceData = {
       song: {
         title: 'Bertha',
         key: 'A',
+        bpm: null,
         lyrics: null,
         chartFileUrl: 'https://blob.example.com/charts/bertha.pdf',
         chartFileType: 'application/pdf',
@@ -59,6 +61,14 @@ describe('PerformanceView', () => {
     expect(await screen.findByRole('heading', { name: 'Friend of the Devil' })).toBeInTheDocument()
     expect(screen.getByText(/cheap sunglasses/)).toBeInTheDocument()
     expect(screen.getByText(/don't stop/)).toBeInTheDocument()
+  })
+
+  it('shows the BPM in the header only for songs that have one', async () => {
+    render(<PerformanceView gig={gig} />)
+    expect(await screen.findByText('108 BPM')).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByText('Next ▶')[0])
+    expect(screen.queryByText(/BPM/)).not.toBeInTheDocument()
   })
 
   it('renders sanitized lyrics HTML as real markup, not escaped text', async () => {
@@ -128,6 +138,7 @@ describe('PerformanceView', () => {
           song: {
             title: 'Bertha',
             key: 'A',
+            bpm: null,
             lyrics: null,
             chartFileUrl: 'https://blob.example.com/charts/bertha.pdf',
             chartFileType: 'application/pdf',
@@ -152,7 +163,7 @@ describe('PerformanceView', () => {
           order: 0,
           section: 'MAIN',
           setNumber: 1,
-          song: { title: 'Silent Song', key: null, lyrics: null, chartFileUrl: null, chartFileType: null },
+          song: { title: 'Silent Song', key: null, bpm: null, lyrics: null, chartFileUrl: null, chartFileType: null },
         },
       ],
     }
@@ -177,7 +188,7 @@ describe('PerformanceView', () => {
           order: 2,
           section: 'MAIN',
           setNumber: 1,
-          song: { title: 'Sugar Magnolia', key: 'G', lyrics: '<p>Sunshine daydream</p>', chartFileUrl: null, chartFileType: null },
+          song: { title: 'Sugar Magnolia', key: 'G', bpm: null, lyrics: '<p>Sunshine daydream</p>', chartFileUrl: null, chartFileType: null },
         },
       ],
     }

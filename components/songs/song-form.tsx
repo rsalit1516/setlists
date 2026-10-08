@@ -119,10 +119,10 @@ export function SongForm({
             id="bpm"
             name="bpm"
             type="number"
-            min="1"
-            max="300"
+            inputMode="numeric"
             defaultValue={song?.bpm ?? ''}
           />
+          <p className="text-xs text-muted-foreground">30–300, or leave blank if unknown</p>
         </div>
       </div>
 

@@ -136,7 +136,7 @@ export async function getGigForPerformance(id: string): Promise<GigPerformanceDa
               section: true,
               setNumber: true,
               song: {
-                select: { title: true, key: true, lyrics: true, chartFileUrl: true, chartFileType: true },
+                select: { title: true, key: true, bpm: true, lyrics: true, chartFileUrl: true, chartFileType: true },
               },
             },
             orderBy: [{ setNumber: 'asc' }, { order: 'asc' }],

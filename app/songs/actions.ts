@@ -7,6 +7,7 @@ import { cookies } from 'next/headers'
 import { uploadChartFile, deleteChartFile } from '@/lib/services/azure-blob'
 import { sanitizeLyricsHtml } from '@/lib/services/sanitize-lyrics'
 import { SONGS_GENRES_COOKIE, parseGenreFilterValue, toggleGenreId } from '@/lib/songs-genre-filter'
+import { parseBpm } from '@/lib/bpm'
 import type { SongStatus } from '@/lib/types'
 
 export type SongActionState = { error: string } | null
@@ -22,6 +23,9 @@ function parseDuration(value: string | null): number | null {
 }
 
 function parseSongFormData(formData: FormData) {
+  const bpm = parseBpm(formData.get('bpm') as string | null)
+  if ('error' in bpm) return bpm
+
   return {
     title: (formData.get('title') as string).trim(),
     artist: (formData.get('artist') as string).trim() || null,
@@ -30,7 +34,7 @@ function parseSongFormData(formData: FormData) {
     status: (formData.get('status') as SongStatus) ?? 'WISH',
     keyboardRequired: formData.get('keyboardRequired') === 'true',
     durationSeconds: parseDuration(formData.get('duration') as string | null),
-    bpm: formData.get('bpm') ? parseInt(formData.get('bpm') as string) || null : null,
+    bpm: bpm.bpm,
     lyrics: sanitizeLyricsHtml(formData.get('lyrics') as string | null),
   }
 }
@@ -70,6 +74,7 @@ export async function createSong(
   formData: FormData
 ): Promise<SongActionState> {
   const data = parseSongFormData(formData)
+  if ('error' in data) return data
   if (!data.title) return { error: 'Title is required.' }
   const genreIds = parseGenreIds(formData)
 
@@ -102,6 +107,7 @@ export async function updateSong(
 ): Promise<SongActionState> {
   const id = formData.get('id') as string
   const data = parseSongFormData(formData)
+  if ('error' in data) return data
   if (!data.title) return { error: 'Title is required.' }
   const genreIds = parseGenreIds(formData)
 
