@@ -3,14 +3,20 @@ import { render, screen, fireEvent, act } from '@testing-library/react'
 import { MetronomeControl } from './metronome-control'
 
 const oscillatorStart = vi.fn()
+const oscillatorStop = vi.fn()
+const contextCreated = vi.fn()
 
 class FakeAudioContext {
+  constructor() {
+    contextCreated()
+  }
   currentTime = 0
   destination = {}
   resume = vi.fn().mockResolvedValue(undefined)
   close = vi.fn().mockResolvedValue(undefined)
   createOscillator() {
-    return { frequency: { value: 0 }, connect: vi.fn(), start: oscillatorStart, stop: vi.fn() }
+    const osc = { frequency: { value: 0 }, connect: vi.fn(), start: oscillatorStart, stop: oscillatorStop, onended: null }
+    return osc
   }
   createGain() {
     return { gain: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() }, connect: vi.fn() }
@@ -21,6 +27,8 @@ beforeEach(() => {
   vi.useFakeTimers()
   localStorage.clear()
   oscillatorStart.mockClear()
+  oscillatorStop.mockClear()
+  contextCreated.mockClear()
   vi.stubGlobal('AudioContext', FakeAudioContext)
 })
 afterEach(() => {
@@ -83,5 +91,39 @@ describe('MetronomeControl', () => {
     })
 
     expect(container.querySelector('.metronome-flash')).not.toBeInTheDocument()
+  })
+
+  it('creates the audio context synchronously in the start tap, so iOS treats it as user-activated', () => {
+    render(<MetronomeControl bpm={120} />)
+    expect(contextCreated).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /start metronome/i }))
+
+    expect(contextCreated).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels already-queued clicks when stopped', () => {
+    render(<MetronomeControl bpm={120} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Metronome settings' }))
+    fireEvent.click(screen.getByLabelText('Click'))
+    fireEvent.click(screen.getByRole('button', { name: /start metronome/i }))
+    act(() => {
+      vi.advanceTimersByTime(30)
+    })
+    oscillatorStop.mockClear()
+
+    fireEvent.click(screen.getByRole('button', { name: /stop metronome/i }))
+
+    expect(oscillatorStop).toHaveBeenCalledWith(0)
+  })
+
+  it('pulses the button itself on each beat', () => {
+    const { container } = render(<MetronomeControl bpm={120} />)
+    fireEvent.click(screen.getByRole('button', { name: /start metronome/i }))
+    act(() => {
+      vi.advanceTimersByTime(100)
+    })
+
+    expect(container.querySelector('button .metronome-pulse')).toBeInTheDocument()
   })
 })

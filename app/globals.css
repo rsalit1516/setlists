@@ -271,3 +271,9 @@
   to { box-shadow: inset 0 0 0 10px rgb(251 191 36 / 0); }
 }
 .metronome-flash { animation: metronome-flash 100ms ease-out forwards; }
+
+@keyframes metronome-pulse {
+  from { background-color: rgb(251 191 36 / 0.45); }
+  to { background-color: rgb(251 191 36 / 0); }
+}
+.metronome-pulse { animation: metronome-pulse 100ms ease-out forwards; }
