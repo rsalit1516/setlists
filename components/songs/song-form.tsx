@@ -9,7 +9,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
-  SelectTrigger,
+SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
 import { LyricsEditor } from '@/components/songs/lyrics-editor'

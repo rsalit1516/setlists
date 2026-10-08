@@ -5,6 +5,7 @@ import type { TouchEvent as ReactTouchEvent } from 'react'
 import Link from 'next/link'
 import type { GigPerformanceData, PerformanceSong } from '@/lib/types'
 import { PerformanceSongList } from '@/components/gigs/performance-song-list'
+import { MetronomeControl } from '@/components/gigs/metronome-control'
 
 const CHART_CACHE = 'performance-chart-files'
 
@@ -114,6 +115,7 @@ export function PerformanceView({ gig }: { gig: GigPerformanceData }) {
   useEffect(() => {
     if (phase !== 'ready') return
     function handleKey(e: KeyboardEvent) {
+      if (e.target instanceof Element && e.target.closest('[data-no-nav]')) return
       if (sidebarOpen) {
         if (e.key === 'Escape') setSidebarOpen(false)
         return
