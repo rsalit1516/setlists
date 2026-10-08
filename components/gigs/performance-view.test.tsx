@@ -71,6 +71,32 @@ describe('PerformanceView', () => {
     expect(screen.queryByText(/BPM/)).not.toBeInTheDocument()
   })
 
+  it('stops the metronome when the song changes, and Space on the metronome button does not advance the song', async () => {
+    vi.stubGlobal('AudioContext', class {
+      currentTime = 0
+      resume = vi.fn().mockResolvedValue(undefined)
+      close = vi.fn().mockResolvedValue(undefined)
+    })
+    const twoBpm: GigPerformanceData = {
+      ...gig,
+      items: gig.items.map((item) => ({ ...item, song: { ...item.song, bpm: 100 } })),
+    }
+    render(<PerformanceView gig={twoBpm} />)
+    await screen.findByRole('heading', { name: 'Friend of the Devil' })
+
+    const start = screen.getByRole('button', { name: /start metronome/i })
+    fireEvent.click(start)
+    expect(screen.getByRole('button', { name: /stop metronome/i })).toBeInTheDocument()
+
+    fireEvent.keyDown(screen.getByRole('button', { name: /stop metronome/i }), { key: ' ' })
+    expect(screen.getByRole('heading', { name: 'Friend of the Devil' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByText('Next ▶')[0])
+    expect(screen.getByRole('heading', { name: 'Bertha' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /start metronome/i })).toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
+
   it('renders sanitized lyrics HTML as real markup, not escaped text', async () => {
     const { container } = render(<PerformanceView gig={gig} />)
     await screen.findByRole('heading', { name: 'Friend of the Devil' })

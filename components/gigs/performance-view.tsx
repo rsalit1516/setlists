@@ -5,6 +5,7 @@ import type { TouchEvent as ReactTouchEvent } from 'react'
 import Link from 'next/link'
 import type { GigPerformanceData, PerformanceSong } from '@/lib/types'
 import { PerformanceSongList } from '@/components/gigs/performance-song-list'
+import { MetronomeControl } from '@/components/gigs/metronome-control'
 
 const CHART_CACHE = 'performance-chart-files'
 
@@ -114,6 +115,7 @@ export function PerformanceView({ gig }: { gig: GigPerformanceData }) {
   useEffect(() => {
     if (phase !== 'ready') return
     function handleKey(e: KeyboardEvent) {
+      if (e.target instanceof Element && e.target.closest('[data-no-nav]')) return
       if (sidebarOpen) {
         if (e.key === 'Escape') setSidebarOpen(false)
         return
@@ -207,7 +209,7 @@ export function PerformanceView({ gig }: { gig: GigPerformanceData }) {
         </span>
         <h1 className="min-w-0 flex-1 truncate text-center text-sm font-semibold">{current.song.title}</h1>
         {current.song.key && <span className="shrink-0 text-white/60">{current.song.key}</span>}
-        {current.song.bpm && <span className="shrink-0 tabular-nums text-white/60">{current.song.bpm} BPM</span>}
+        {current.song.bpm && <MetronomeControl key={current.id} bpm={current.song.bpm} />}
       </div>
 
       {/* Tab bar */}
