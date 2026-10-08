@@ -75,15 +75,6 @@ export function MetronomeControl({ bpm }: { bpm: number }) {
     []
   )
 
-  function toggleRunning() {
-    if (!running) {
-      // Must happen inside the tap's user activation, or iOS Safari leaves the context suspended.
-      ctxRef.current ??= new AudioContext()
-      ctxRef.current.resume().catch(() => {})
-    }
-    setRunning(!running)
-  }
-
   function updateSettings(patch: Partial<MetronomeSettings>) {
     const next = { ...settingsRef.current, ...patch }
     settingsRef.current = next
