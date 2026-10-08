@@ -151,6 +151,7 @@ export type PerformanceSong = {
   song: {
     title: string
     key: string | null
+    bpm: number | null
     lyrics: string | null
     chartFileUrl: string | null
     chartFileType: string | null
