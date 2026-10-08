@@ -73,6 +73,7 @@ function buildFormData(overrides: Record<string, string> = {}, musicianIds: stri
     tips: '',
     otherRevenue: '',
     notes: '',
+    setlistCreatorId: '',
     ...overrides,
   }
   const fd = new FormData()
@@ -96,6 +97,7 @@ describe('updateGig', () => {
       tips: '40',
       otherRevenue: '15',
       notes: 'Bring extra cables',
+      setlistCreatorId: 'musician-1',
     })
 
     await expect(updateGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/gig-1')
@@ -113,12 +115,13 @@ describe('updateGig', () => {
         tips: 40,
         otherRevenue: 15,
         notes: 'Bring extra cables',
+        setlistCreatorId: 'musician-1',
       },
     })
     expect(revalidatePath).toHaveBeenCalledWith('/gigs')
   })
 
-  it('stores null for blank amount fields, notes, and time fields instead of empty strings', async () => {
+  it('stores null for blank amount fields, notes, time fields, and setlist creator instead of empty strings', async () => {
     const fd = buildFormData()
 
     await expect(updateGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/gig-1')
@@ -126,6 +129,7 @@ describe('updateGig', () => {
     expect(prisma.gig.update).toHaveBeenCalledWith({
       where: { id: 'gig-1' },
       data: expect.objectContaining({
+        setlistCreatorId: null,
         startTime: null,
         endTime: null,
         amountContracted: null,
@@ -292,6 +296,26 @@ describe('createGig', () => {
         tips: null,
         otherRevenue: null,
       }),
+    })
+  })
+
+  it('stores the chosen setlist creator on the created gig', async () => {
+    const fd = buildFormData({ createSetlist: 'true', setlistCreatorId: 'musician-1' })
+
+    await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
+
+    expect(prisma.gig.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ setlistCreatorId: 'musician-1' }),
+    })
+  })
+
+  it('stores null for a blank setlist creator instead of an empty string', async () => {
+    const fd = buildFormData({ createSetlist: 'true' })
+
+    await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
+
+    expect(prisma.gig.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ setlistCreatorId: null }),
     })
   })
 

@@ -21,6 +21,7 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
   const tipsStr = formData.get('tips') as string
   const otherRevenueStr = formData.get('otherRevenue') as string
   const notes = formData.get('notes') as string
+  const setlistCreatorId = (formData.get('setlistCreatorId') as string) || null
   // Deduplicated: createMany below has no ON CONFLICT clause, so a duplicate
   // musicianId would violate @@unique([gigId, musicianId]) and fail the whole
   // gig creation.
@@ -87,6 +88,7 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
       paidAt: paidAtStr ? new Date(paidAtStr + 'T12:00:00') : null,
       tips: tipsStr ? parseFloat(tipsStr) : null,
       otherRevenue: otherRevenueStr ? parseFloat(otherRevenueStr) : null,
+      setlistCreatorId,
     },
   })
 
@@ -112,6 +114,7 @@ export async function updateGig(_state: GigActionState, formData: FormData): Pro
   const tipsStr = formData.get('tips') as string
   const otherRevenueStr = formData.get('otherRevenue') as string
   const notes = formData.get('notes') as string
+  const setlistCreatorId = (formData.get('setlistCreatorId') as string) || null
 
   if (!id) return { error: 'Gig not found.' }
   if (!venueId) return { error: 'Venue is required.' }
@@ -133,6 +136,7 @@ export async function updateGig(_state: GigActionState, formData: FormData): Pro
       tips: tipsStr ? parseFloat(tipsStr) : null,
       otherRevenue: otherRevenueStr ? parseFloat(otherRevenueStr) : null,
       notes: notes || null,
+      setlistCreatorId,
     },
   })
 

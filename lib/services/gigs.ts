@@ -44,6 +44,7 @@ export async function getGigs(): Promise<GigSummary[]> {
     include: {
       venue: { select: { name: true } },
       setlist: { select: { name: true } },
+      setlistCreator: { select: { name: true } },
       _count: { select: { musicians: { where: { isActive: true } } } },
     },
   })
@@ -73,6 +74,7 @@ export async function getGigsInRange(start: Date, end: Date): Promise<GigSummary
     include: {
       venue: { select: { name: true } },
       setlist: { select: { name: true } },
+      setlistCreator: { select: { name: true } },
       _count: { select: { musicians: { where: { isActive: true } } } },
     },
   })
@@ -160,6 +162,7 @@ export async function getGig(id: string): Promise<GigWithDetails | null> {
     where: { id, isActive: true },
     include: {
       venue: true,
+      setlistCreator: true,
       setlist: {
           include: {
             items: {
