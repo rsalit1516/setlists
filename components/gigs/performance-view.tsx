@@ -209,7 +209,7 @@ export function PerformanceView({ gig }: { gig: GigPerformanceData }) {
         </span>
         <h1 className="min-w-0 flex-1 truncate text-center text-sm font-semibold">{current.song.title}</h1>
         {current.song.key && <span className="shrink-0 text-white/60">{current.song.key}</span>}
-        {current.song.bpm && <MetronomeControl key={current.id} bpm={current.song.bpm} />}
+        {current.song.bpm && <span className="shrink-0 tabular-nums text-white/60">{current.song.bpm} BPM</span>}
       </div>
 
       {/* Tab bar */}

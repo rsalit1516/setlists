@@ -9,7 +9,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
-  SelectTrigger,
+SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
 import { LyricsEditor } from '@/components/songs/lyrics-editor'
@@ -122,7 +122,7 @@ export function SongForm({
             inputMode="numeric"
             defaultValue={song?.bpm ?? ''}
           />
-          <p className="text-xs text-muted-foreground">30�300, or leave blank if unknown</p>
+          <p className="text-xs text-muted-foreground">30–300, or leave blank if unknown</p>
         </div>
       </div>
 
@@ -185,7 +185,7 @@ export function SongForm({
       {/* Actions */}
       <div className="flex gap-3 pt-2">
         <Button type="submit" disabled={pending}>
-          {pending ? 'Saving…' : song ? 'Save Changes' : 'Add Song'}
+          {pending ? 'Savingâ€¦' : song ? 'Save Changes' : 'Add Song'}
         </Button>
         <Link href="/songs" className={buttonVariants({ variant: 'outline' })}>
           Cancel
