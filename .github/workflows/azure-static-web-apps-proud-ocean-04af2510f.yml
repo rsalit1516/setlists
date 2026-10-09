@@ -3,7 +3,7 @@ name: Deploy to production (Azure Static Web Apps)
 # Production only. PR previews were removed: a hybrid Next.js app reads DATABASE_URL at request time
 # from the Azure resource's Environment variables, which every staging environment inherits, so a
 # preview of this app always talks to the production database. Try changes on the dev site instead
-# (azure-static-web-apps-dev.yml, deployed from `develop`).
+# (azure-static-web-apps-zealous-bush-0f685670f.yml, deployed from `develop`).
 on:
   push:
     branches:

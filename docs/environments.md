@@ -6,7 +6,7 @@
 | Site | Dev Static Web App (separate Azure resource, Free tier) | `Setlists` static web app |
 | Database | Dev Supabase project — disposable, fake seed data | Production Supabase project — real data |
 | Deploys | Automatically on push to `develop` | On push to `main`, **after a required reviewer approves** |
-| Workflow | `azure-static-web-apps-dev.yml` | `azure-static-web-apps-proud-ocean-04af2510f.yml` |
+| Workflow | `azure-static-web-apps-zealous-bush-0f685670f.yml` | `azure-static-web-apps-proud-ocean-04af2510f.yml` |
 
 PRs into `develop` and `main` run `ci.yml` (type-check, lint, tests, build). There are no PR preview
 sites: a hybrid Next.js app reads `DATABASE_URL` at request time from the Azure resource's
@@ -50,10 +50,11 @@ To add the seed data to a database without wiping it: `ALLOW_SEED=true npx prism
 1. Azure portal → Create a resource → Static Web App. Plan: **Free**. Same resource group as production
    or a new one.
 2. Source: GitHub, this repo, **branch `develop`**. Build preset: Next.js. App location `/`, leave the
-   output location empty. (Azure will add its own workflow file to the repo: delete it, we use
-   `azure-static-web-apps-dev.yml`.)
-3. After creation: resource → Overview → *Manage deployment token* → copy it into a GitHub secret named
-   `AZURE_STATIC_WEB_APPS_API_TOKEN_DEV`.
+   output location empty. Azure commits its own workflow file and a deploy-token secret
+   (`AZURE_STATIC_WEB_APPS_API_TOKEN_<NAME>`) to the repo. Our `azure-static-web-apps-zealous-bush-0f685670f.yml`
+   replaces Azure's generated file (which doesn't pass `DATABASE_URL` to the build, so builds fail with
+   "DATABASE_URL is not set") and reads that generated secret. Don't re-accept Azure's version.
+3. Nothing else to copy: the generated token secret is already used by our workflow.
 4. Resource → Settings → Environment variables → add the same names the production app has
    (`DATABASE_URL` = the **dev** transaction pooler string, plus any Azure Blob / other settings). The
    app reads these at request time.
