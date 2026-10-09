@@ -71,6 +71,34 @@ describe('PerformanceView', () => {
     expect(screen.queryByText(/BPM/)).not.toBeInTheDocument()
   })
 
+  it('stops the metronome when the song changes, and Space on its button does not advance the song', async () => {
+    vi.stubGlobal(
+      'AudioContext',
+      class {
+        currentTime = 0
+        resume = vi.fn().mockResolvedValue(undefined)
+        close = vi.fn().mockResolvedValue(undefined)
+      }
+    )
+    const bothWithBpm: GigPerformanceData = {
+      ...gig,
+      items: gig.items.map((item) => ({ ...item, song: { ...item.song, bpm: 100 } })),
+    }
+    render(<PerformanceView gig={bothWithBpm} />)
+    await screen.findByRole('heading', { name: 'Friend of the Devil' })
+
+    fireEvent.click(screen.getByRole('button', { name: /start metronome/i }))
+    const stop = screen.getByRole('button', { name: /stop metronome/i })
+
+    fireEvent.keyDown(stop, { key: ' ' })
+    expect(screen.getByRole('heading', { name: 'Friend of the Devil' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByText('Next ▶')[0])
+    expect(screen.getByRole('heading', { name: 'Bertha' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /start metronome/i })).toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
+
   it('renders sanitized lyrics HTML as real markup, not escaped text', async () => {
     const { container } = render(<PerformanceView gig={gig} />)
     await screen.findByRole('heading', { name: 'Friend of the Devil' })

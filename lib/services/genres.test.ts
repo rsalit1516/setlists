@@ -52,7 +52,7 @@ describe('getGenre', () => {
 
 describe('getGenresWithSongCounts', () => {
   it('flattens _count.songs into songCount on each genre', async () => {
-    vi.mocked(prisma.genre.findMany).mockResolvedValue([{ ...mockGenre, _count: { songs: 4 } }])
+    vi.mocked(prisma.genre.findMany).mockResolvedValue([{ ...mockGenre, _count: { songs: 4 } }] as never)
 
     const result = await getGenresWithSongCounts()
 

@@ -38,7 +38,7 @@ export function deriveMusicianPayoutStatus(
 }
 
 export async function getGigs(): Promise<GigSummary[]> {
-  const rows: any[] = await prisma.gig.findMany({
+  const rows = await prisma.gig.findMany({
     where: { isActive: true },
     orderBy: { date: 'desc' },
     include: {
@@ -68,7 +68,7 @@ export async function hasAnyGigs(): Promise<boolean> {
 // Half-open range [start, end) — used by the Month calendar view so it only
 // queries the visible month instead of the full gig history.
 export async function getGigsInRange(start: Date, end: Date): Promise<GigSummary[]> {
-  const rows: any[] = await prisma.gig.findMany({
+  const rows = await prisma.gig.findMany({
     where: { isActive: true, date: { gte: start, lt: end } },
     orderBy: { date: 'asc' },
     include: {
@@ -158,7 +158,7 @@ export async function getGigForPerformance(id: string): Promise<GigPerformanceDa
 }
 
 export async function getGig(id: string): Promise<GigWithDetails | null> {
-  const row: any = await prisma.gig.findFirst({
+  const row = await prisma.gig.findFirst({
     where: { id, isActive: true },
     include: {
       venue: true,
@@ -187,7 +187,7 @@ export async function getGig(id: string): Promise<GigWithDetails | null> {
     amountPaid: toStr(row.amountPaid),
     tips: toStr(row.tips),
     otherRevenue: toStr(row.otherRevenue),
-    expenses: row.expenses.map((e: any) => ({ ...e, amount: toStr(e.amount)! })),
-    musicians: row.musicians.map((m: any) => ({ ...m, amountPaid: toStr(m.amountPaid) })),
+    expenses: row.expenses.map((e) => ({ ...e, amount: toStr(e.amount)! })),
+    musicians: row.musicians.map((m) => ({ ...m, amountPaid: toStr(m.amountPaid) })),
   }
 }
