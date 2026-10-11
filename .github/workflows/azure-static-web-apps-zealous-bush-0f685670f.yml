@@ -15,6 +15,11 @@ jobs:
   build_and_deploy_job:
     name: Build and Deploy Job (dev)
     runs-on: ubuntu-latest
+    # id-token: the dev app's deployment authorization policy is "GitHub" (OIDC), so a deploy token
+    # alone is rejected; the job must also present a GitHub identity token.
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,6 +35,12 @@ jobs:
         run: npx prisma migrate deploy
         env:
           DIRECT_URL: ${{ secrets.DEV_DIRECT_URL }}
+      - name: Get GitHub ID token
+        uses: actions/github-script@v7
+        id: idtoken
+        with:
+          script: return await core.getIDToken()
+          result-encoding: string
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
@@ -40,5 +51,6 @@ jobs:
           app_location: "/"
           api_location: ""
           output_location: ""
+          github_id_token: ${{ steps.idtoken.outputs.result }}
         env:
           DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}

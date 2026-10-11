@@ -54,7 +54,10 @@ To add the seed data to a database without wiping it: `ALLOW_SEED=true npx prism
    (`AZURE_STATIC_WEB_APPS_API_TOKEN_<NAME>`) to the repo. Our `azure-static-web-apps-zealous-bush-0f685670f.yml`
    replaces Azure's generated file (which doesn't pass `DATABASE_URL` to the build, so builds fail with
    "DATABASE_URL is not set") and reads that generated secret. Don't re-accept Azure's version.
-3. Nothing else to copy: the generated token secret is already used by our workflow.
+3. Nothing else to copy: the generated token secret is already used by our workflow. The dev app's
+   deployment authorization policy is **GitHub** (OIDC), so the workflow also needs `id-token: write` and
+   the "Get GitHub ID token" step; a deploy token alone is rejected with "No matching Static Web App was
+   found or the api key was invalid".
 4. Resource → Settings → Environment variables → add the same names the production app has
    (`DATABASE_URL` = the **dev** transaction pooler string, plus any Azure Blob / other settings). The
    app reads these at request time.
