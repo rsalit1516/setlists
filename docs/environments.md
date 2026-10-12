@@ -25,16 +25,18 @@ read production data.
 
 ## Resetting the dev database
 
-The dev database can be wiped any time. From a machine with the dev connection strings in `.env`
-(**never the production ones** — check `DIRECT_URL` before running):
+The dev database can be wiped any time. The easiest way needs no credentials on your machine:
 
-```bash
-ALLOW_SEED=true npx prisma migrate reset
-```
+- **Actions → "Seed dev database" → Run workflow**, tick **reset** to wipe first (leave it unticked to
+  just add the seed data). It only reads the `DEV_*` secrets, so it can't touch production.
+  GitHub lists manual workflows only once the file is on the default branch (`main`), so until the
+  first release after it was added, run it with `gh workflow run seed-dev.yml --ref develop`.
+- A push to `develop` that changes `prisma/seed.ts` re-seeds automatically (idempotent).
 
-This drops everything, reapplies all migrations and runs `prisma/seed.ts` (fake songs, a gig,
-musicians). `ALLOW_SEED=true` is required, so the seed refuses to run if you haven't opted in.
-To add the seed data to a database without wiping it: `ALLOW_SEED=true npx prisma db seed`.
+From a machine with the dev connection strings in `.env` instead (**never the production ones** —
+check `DIRECT_URL` first): `ALLOW_SEED=true npx prisma migrate reset --skip-seed && ALLOW_SEED=true npx prisma db seed`.
+Prisma 7 no longer seeds automatically on reset, so the seed is always a separate step.
+`ALLOW_SEED=true` is required, so the seed refuses to run if you haven't opted in.
 
 ## One-time setup
 
