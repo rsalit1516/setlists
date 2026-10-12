@@ -1,0 +1,55 @@
+name: Seed dev database
+
+# Seeds (and optionally wipes) the DEV Supabase project only: it reads the DEV_* secrets and nothing
+# else, so it cannot touch production. See docs/environments.md.
+#
+# - Manual: Actions > "Seed dev database" > Run workflow (tick "reset" to wipe everything first).
+#   GitHub only lists manual workflows once the file is on the default branch (main), so until the
+#   next release use the push trigger below or `gh workflow run seed-dev.yml --ref develop`.
+# - Automatic: a push to develop that changes the seed script re-runs it (it is idempotent).
+on:
+  workflow_dispatch:
+    inputs:
+      reset:
+        description: "Wipe the dev database first (drops all data, reapplies migrations)"
+        type: boolean
+        default: false
+  push:
+    branches:
+      - develop
+    paths:
+      - prisma/seed.ts
+      - .github/workflows/seed-dev.yml
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    name: Seed dev database
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Reset dev database
+        if: github.event_name == 'workflow_dispatch' && inputs.reset
+        run: npx prisma migrate reset --force --skip-seed
+        env:
+          DIRECT_URL: ${{ secrets.DEV_DIRECT_URL }}
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+        env:
+          DIRECT_URL: ${{ secrets.DEV_DIRECT_URL }}
+      - name: Seed
+        run: npx prisma db seed
+        env:
+          DIRECT_URL: ${{ secrets.DEV_DIRECT_URL }}
+          # The seed script connects with DATABASE_URL; the session pooler is fine for a one-off.
+          DATABASE_URL: ${{ secrets.DEV_DIRECT_URL }}
+          ALLOW_SEED: "true"
