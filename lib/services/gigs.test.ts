@@ -57,6 +57,7 @@ const mockGigSummary = {
   ...mockGig,
   venue: { name: 'The Jazz Club' },
   setlist: { name: 'Friday Night' },
+  setlistCreator: null,
   _count: { musicians: 0 },
 }
 
@@ -89,22 +90,22 @@ describe('setlist creator', () => {
   it('getGigs includes only the setlist creator name', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([mockGigSummary] as never)
     await getGigs()
-    const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as any
-    expect(call.include.setlistCreator).toEqual({ select: { name: true } })
+    const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as object
+    expect(call).toMatchObject({ include: { setlistCreator: { select: { name: true } } } })
   })
 
   it('getGigsInRange includes only the setlist creator name', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([mockGigSummary] as never)
     await getGigsInRange(new Date('2026-05-01'), new Date('2026-06-01'))
-    const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as any
-    expect(call.include.setlistCreator).toEqual({ select: { name: true } })
+    const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as object
+    expect(call).toMatchObject({ include: { setlistCreator: { select: { name: true } } } })
   })
 
   it('getGig includes the full setlist creator, so the edit form can show a deactivated one', async () => {
     vi.mocked(prisma.gig.findFirst).mockResolvedValue(mockGig as never)
     await getGig('gig-1')
-    const call = vi.mocked(prisma.gig.findFirst).mock.calls[0][0] as any
-    expect(call.include.setlistCreator).toBe(true)
+    const call = vi.mocked(prisma.gig.findFirst).mock.calls[0][0] as object
+    expect(call).toMatchObject({ include: { setlistCreator: true } })
   })
 })
 
@@ -169,19 +170,19 @@ describe('getGig', () => {
   it('only fetches active (non-removed) setlist items', async () => {
     vi.mocked(prisma.gig.findFirst).mockResolvedValue(mockGig as never)
     await getGig('gig-1')
-    const call = vi.mocked(prisma.gig.findFirst).mock.calls[0][0] as any
-    expect(call.include.setlist.include.items.where).toEqual({ isActive: true })
+    const call = vi.mocked(prisma.gig.findFirst).mock.calls[0][0] as object
+    expect(call).toMatchObject({ include: { setlist: { include: { items: { where: { isActive: true } } } } } })
   })
 
   it('nests the roster musician on each active GigMusician', async () => {
     vi.mocked(prisma.gig.findFirst).mockResolvedValue(mockGig as never)
     await getGig('gig-1')
-    const call = vi.mocked(prisma.gig.findFirst).mock.calls[0][0] as any
-    expect(call.include.musicians).toEqual({
+    const call = vi.mocked(prisma.gig.findFirst).mock.calls[0][0] as object
+    expect(call).toMatchObject({ include: { musicians: {
       where: { isActive: true },
       orderBy: { createdAt: 'asc' },
       include: { musician: true },
-    })
+    } } })
   })
 
   it('converts tips and otherRevenue to strings', async () => {

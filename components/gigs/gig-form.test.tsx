@@ -92,9 +92,9 @@ describe('GigForm — setlist picker', () => {
     fireEvent.click(screen.getByLabelText('Copy an existing setlist'))
     await user.click(screen.getByRole('combobox', { name: 'Setlist' }))
 
-    expect(screen.getByRole('option', { name: 'Friday Night — 12 songs' })).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: 'Friday Night — 12 songs' })).toBeInTheDocument()
     expect(
-      screen.getByRole('option', { name: 'Greatest Hits — 8 songs · The Jazz Club, May 1, 2026' })
+      await screen.findByRole('option', { name: 'Greatest Hits — 8 songs · The Jazz Club, May 1, 2026' })
     ).toBeInTheDocument()
   })
 
@@ -383,7 +383,7 @@ describe('GigForm — setlist creator', () => {
 
     await user.click(screen.getByRole('combobox', { name: 'Setlist created by' }))
 
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
       'None',
       'Andrew Guerrero',
       'Jeff Zbar',
@@ -408,7 +408,7 @@ describe('GigForm — setlist creator', () => {
     expect(creatorInput().value).toBe('m-9')
 
     await user.click(screen.getByRole('combobox', { name: 'Setlist created by' }))
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
       'None',
       'Andrew Guerrero',
       'Former Member',

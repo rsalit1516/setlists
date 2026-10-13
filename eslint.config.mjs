@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    ".claude/worktrees/**",
+    // one-off data-import scripts and a plain node build helper, not app code
+    "prisma/import*.ts",
+    "scripts/**",
   ]),
 ]);
 

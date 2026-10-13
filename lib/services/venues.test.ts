@@ -17,6 +17,7 @@ const mockVenue = {
   name: 'The Fillmore',
   address: '1805 Geary Blvd, San Francisco, CA',
   notes: null,
+  isActive: true,
   createdAt: new Date(),
   updatedAt: new Date(),
 }

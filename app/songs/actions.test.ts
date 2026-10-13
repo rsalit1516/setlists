@@ -128,6 +128,29 @@ describe('createSong', () => {
     expect(prisma.song.create).not.toHaveBeenCalled()
   })
 
+  it('stores a valid BPM as a number', async () => {
+    vi.mocked(prisma.song.create).mockResolvedValue({ id: 'song-1' } as never)
+    await expect(createSong(null, buildFormData({ bpm: '108' }))).rejects.toThrow('REDIRECT:/songs')
+    expect(prisma.song.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ bpm: 108 }) })
+    )
+  })
+
+  it('stores null when BPM is 0, so a wrong value can be cleared', async () => {
+    vi.mocked(prisma.song.create).mockResolvedValue({ id: 'song-1' } as never)
+    await expect(createSong(null, buildFormData({ bpm: '0' }))).rejects.toThrow('REDIRECT:/songs')
+    expect(prisma.song.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ bpm: null }) })
+    )
+  })
+
+  it('returns a validation error and never touches the database when BPM is out of range', async () => {
+    const result = await createSong(null, buildFormData({ bpm: '12' }))
+
+    expect(result).toEqual({ error: expect.stringContaining('BPM must be between 30 and 300') })
+    expect(prisma.song.create).not.toHaveBeenCalled()
+  })
+
   it('connects the selected genres', async () => {
     vi.mocked(prisma.song.create).mockResolvedValue({ id: 'song-1' } as never)
     const fd = buildFormDataWithGenres(['genre-1', 'genre-2'])
@@ -233,6 +256,13 @@ describe('updateSong', () => {
       where: { id: 'song-1' },
       data: expect.objectContaining({ genres: { set: [{ id: 'genre-2' }] } }),
     })
+  })
+
+  it('rejects an out-of-range BPM on edit without writing', async () => {
+    const result = await updateSong(null, buildFormData({ id: 'song-1', bpm: '301' }))
+
+    expect(result).toEqual({ error: expect.stringContaining('BPM must be between 30 and 300') })
+    expect(prisma.song.update).not.toHaveBeenCalled()
   })
 
   it('moves a song to SHELVED', async () => {

@@ -1,5 +1,8 @@
 # Azure Static Web Apps: staging environment quota (Free tier)
 
+> **Note:** PR previews on the production app were removed (see `docs/environments.md`), so this
+> failure mode no longer applies to it. Kept for reference in case previews return.
+
 The Setlists app (`Setlists` static web app, `Setlists-prod-rg` resource group) runs on the
 Azure Static Web Apps **Free tier**. Free tier caps how many concurrent staging (preview)
 environments the app can have — one per open PR against `main`, provisioned by
