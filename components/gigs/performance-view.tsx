@@ -180,7 +180,7 @@ export function PerformanceView({ gig }: { gig: GigPerformanceData }) {
 
   return (
     <div
-      className="fixed inset-0 flex flex-col overscroll-none bg-black text-white"
+      className="fixed inset-0 z-20 flex flex-col overscroll-none bg-black text-white"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
