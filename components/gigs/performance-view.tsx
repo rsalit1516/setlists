@@ -244,6 +244,11 @@ export function PerformanceView({ gig }: { gig: GigPerformanceData }) {
           {view === 'lyrics' ? (
             hasLyrics ? (
               <div className="h-full overflow-y-auto px-6 py-8">
+                {current.song.lyricsSource === 'IMPORTED' && (
+                  <p className="mx-auto mb-4 max-w-2xl text-sm text-amber-300">
+                    Imported automatically — not yet reviewed by the band.
+                  </p>
+                )}
                 <div
                   className="rich-text-content mx-auto max-w-2xl text-2xl leading-relaxed sm:text-3xl"
                   dangerouslySetInnerHTML={{ __html: current.song.lyrics! }}
