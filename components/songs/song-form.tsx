@@ -13,6 +13,7 @@ SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
 import { LyricsEditor } from '@/components/songs/lyrics-editor'
+import { FindLyricsButton } from '@/components/songs/find-lyrics-button'
 import { GenreCheckboxList } from '@/components/songs/genre-checkbox-list'
 import { cn } from '@/lib/utils'
 import type { SongActionState } from '@/app/songs/actions'
@@ -157,7 +158,19 @@ export function SongForm({
       {/* Lyrics / notes */}
       <div className="space-y-1.5">
         <Label htmlFor="lyrics-editor">Lyrics / Notes</Label>
-        <LyricsEditor id="lyrics-editor" name="lyrics" defaultValue={song?.lyrics ?? ''} />
+        {song?.lyricsSource === 'IMPORTED' && (
+          <p className="rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+            Imported automatically — please review before relying on these lyrics. Editing them marks
+            them as band-entered.
+          </p>
+        )}
+        {song && !song.lyrics && <FindLyricsButton songId={song.id} />}
+        <LyricsEditor
+          key={song?.lyrics ?? 'empty'}
+          id="lyrics-editor"
+          name="lyrics"
+          defaultValue={song?.lyrics ?? ''}
+        />
       </div>
 
       {/* Chart file */}

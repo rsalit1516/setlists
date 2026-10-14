@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { uploadChartFile, deleteChartFile } from '@/lib/services/azure-blob'
 import { sanitizeLyricsHtml } from '@/lib/services/sanitize-lyrics'
+import { importLyricsForSong, type ImportOutcome } from '@/lib/services/lyrics-import'
 import { SONGS_GENRES_COOKIE, parseGenreFilterValue, toggleGenreId } from '@/lib/songs-genre-filter'
 import { parseBpm } from '@/lib/bpm'
 import type { SongStatus } from '@/lib/types'
@@ -36,6 +37,26 @@ function parseSongFormData(formData: FormData) {
     durationSeconds: parseDuration(formData.get('duration') as string | null),
     bpm: bpm.bpm,
     lyrics: sanitizeLyricsHtml(formData.get('lyrics') as string | null),
+  }
+}
+
+// The editor re-serializes a blank line as <p></p> where the importer stores
+// <p><br></p>; without this an untouched imported lyric would flip to MANUAL
+// on any unrelated save.
+function lyricsChanged(previous: string | null, next: string | null): boolean {
+  const canon = (value: string | null) => (value ?? '').replace(/<p><br\s*\/?><\/p>/g, '<p></p>')
+  return canon(previous) !== canon(next)
+}
+
+function lyricsProvenance(
+  current: { lyrics: string | null } | null,
+  lyrics: string | null
+): { lyricsSource: 'MANUAL' | null; lyricsSourceUrl: null; lyricsImportedAt: null } | null {
+  if (!lyricsChanged(current?.lyrics ?? null, lyrics)) return null
+  return {
+    lyricsSource: lyrics ? 'MANUAL' : null,
+    lyricsSourceUrl: null,
+    lyricsImportedAt: null,
   }
 }
 
@@ -81,7 +102,11 @@ export async function createSong(
   let song
   try {
     song = await prisma.song.create({
-      data: { ...data, genres: { connect: genreIds.map((genreId) => ({ id: genreId })) } },
+      data: {
+        ...data,
+        ...lyricsProvenance(null, data.lyrics),
+        genres: { connect: genreIds.map((genreId) => ({ id: genreId })) },
+      },
     })
   } catch {
     return { error: 'Failed to create song.' }
@@ -112,8 +137,13 @@ export async function updateSong(
   const genreIds = parseGenreIds(formData)
 
   let chartUpdate
+  let provenance
   try {
-    const current = await prisma.song.findUnique({ where: { id }, select: { chartFileUrl: true } })
+    const current = await prisma.song.findUnique({
+      where: { id },
+      select: { chartFileUrl: true, lyrics: true },
+    })
+    provenance = lyricsProvenance(current, data.lyrics)
     chartUpdate = await resolveChartFile(formData, id, current?.chartFileUrl ?? null)
   } catch (err) {
     return { error: errorMessage(err, 'Failed to upload chart file.') }
@@ -122,7 +152,7 @@ export async function updateSong(
   try {
     await prisma.song.update({
       where: { id },
-      data: { ...data, ...chartUpdate, genres: { set: genreIds.map((genreId) => ({ id: genreId })) } },
+      data: { ...data, ...chartUpdate, ...provenance, genres: { set: genreIds.map((genreId) => ({ id: genreId })) } },
     })
   } catch {
     return { error: 'Failed to update song.' }
@@ -130,6 +160,17 @@ export async function updateSong(
 
   revalidatePath('/songs')
   redirect('/songs')
+}
+
+export async function findLyrics(id: string): Promise<{ outcome: ImportOutcome }> {
+  let outcome: ImportOutcome
+  try {
+    outcome = await importLyricsForSong(id)
+  } catch {
+    outcome = 'error'
+  }
+  if (outcome === 'imported') revalidatePath(`/songs/${id}`)
+  return { outcome }
 }
 
 export async function deleteSong(id: string): Promise<void> {

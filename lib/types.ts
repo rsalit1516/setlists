@@ -1,5 +1,6 @@
 export type SongStatus = 'READY' | 'IN_PROGRESS' | 'WISH' | 'SHELVED'
-export type SetSection = 'SOUNDCHECK' | 'MAIN' | 'ENCORE'
+export type LyricsSource = 'MANUAL' | 'IMPORTED'
+export type SetSection ='SOUNDCHECK' | 'MAIN' | 'ENCORE'
 
 export const SONG_STATUS_LABELS: Record<SongStatus, string> = {
   READY: 'Ready',
@@ -79,6 +80,9 @@ export type Song = {
   lyricsUrl: string | null
   chartsUrl: string | null
   lyrics: string | null
+  lyricsSource: LyricsSource | null
+  lyricsSourceUrl: string | null
+  lyricsImportedAt: Date | null
   chartFileUrl: string | null
   chartFileType: string | null
   chartFileName: string | null
@@ -153,6 +157,7 @@ export type PerformanceSong = {
     key: string | null
     bpm: number | null
     lyrics: string | null
+    lyricsSource?: LyricsSource | null
     chartFileUrl: string | null
     chartFileType: string | null
   }

@@ -206,6 +206,23 @@ describe('PerformanceView', () => {
     expect(screen.getByText('No chart uploaded for this song.')).toBeInTheDocument()
   })
 
+  it('flags auto-imported lyrics as not yet reviewed, and shows no flag otherwise', async () => {
+    const importedGig: GigPerformanceData = {
+      ...gig,
+      items: gig.items.map((item, i) =>
+        i === 0 ? { ...item, song: { ...item.song, lyrics: '<p>Imported</p>', lyricsSource: 'IMPORTED' } } : item
+      ),
+    }
+    const { unmount } = render(<PerformanceView gig={importedGig} />)
+    await screen.findByRole('heading', { name: 'Friend of the Devil' })
+    expect(screen.getByText(/not yet reviewed by the band/)).toBeInTheDocument()
+    unmount()
+
+    render(<PerformanceView gig={gig} />)
+    await screen.findByRole('heading', { name: 'Friend of the Devil' })
+    expect(screen.queryByText(/not yet reviewed by the band/)).not.toBeInTheDocument()
+  })
+
   it('jumps to a song selected from the desktop sidebar', async () => {
     const threeSongGig: GigPerformanceData = {
       ...gig,
