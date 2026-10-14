@@ -11,7 +11,7 @@ async function main() {
   const summary = await importMissingLyrics({ dryRun: !apply, limit })
 
   for (const r of summary.results) {
-    console.log(`${r.outcome.padEnd(9)} ${r.title}${r.artist ? ` — ${r.artist}` : ''}`)
+    console.log(`${r.outcome.padEnd(9)} ${r.title}${r.artist ? ` — ${r.artist}` : ''}${r.error ? `  [${r.error}]` : ''}`)
   }
   console.log(
     `\n${summary.dryRun ? 'DRY RUN — nothing written. ' : ''}` +

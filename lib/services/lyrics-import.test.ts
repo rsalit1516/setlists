@@ -112,8 +112,39 @@ describe('fetchLyrics', () => {
 
   it('throws when the provider responds with an error status', async () => {
     await expect(
-      fetchLyrics({ title: 'Cheap Sunglasses', artist: null, durationSeconds: null }, fetchReturning(null, false))
+      fetchLyrics({ title: 'Cheap Sunglasses', artist: null, durationSeconds: null }, fetchReturning(null, false), 0)
     ).rejects.toThrow('LRCLIB search failed: 500')
+  })
+
+  it('retries once after a 429 and succeeds', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 429, json: async () => null })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [track()] }) as unknown as typeof fetch
+
+    const result = await fetchLyrics({ title: 'Cheap Sunglasses', artist: 'ZZ Top', durationSeconds: 325 }, fetchImpl, 0)
+
+    expect(result).not.toBeNull()
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries once after a network failure, then surfaces the original message', async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new Error('fetch failed')) as unknown as typeof fetch
+
+    await expect(
+      fetchLyrics({ title: 'Cheap Sunglasses', artist: null, durationSeconds: null }, fetchImpl, 0)
+    ).rejects.toThrow('fetch failed')
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not retry a 4xx other than 429', async () => {
+    const fetchImpl = fetchReturning(null, false)
+    vi.mocked(fetchImpl).mockResolvedValue({ ok: false, status: 404, json: async () => null } as never)
+
+    await expect(
+      fetchLyrics({ title: 'Cheap Sunglasses', artist: null, durationSeconds: null }, fetchImpl, 0)
+    ).rejects.toThrow('LRCLIB search failed: 404')
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -171,11 +202,13 @@ describe('importMissingLyrics', () => {
     const fetchImpl = vi
       .fn()
       .mockRejectedValueOnce(new Error('network'))
+      .mockRejectedValueOnce(new Error('network'))
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] }) as unknown as typeof fetch
 
-    const summary = await importMissingLyrics({ fetchImpl, delayMs: 0 })
+    const summary = await importMissingLyrics({ fetchImpl, delayMs: 0, retryDelayMs: 0 })
 
     expect(summary).toMatchObject({ imported: 0, noMatch: 1, errors: 1 })
+    expect(summary.results[0]).toMatchObject({ outcome: 'error', error: 'network' })
   })
 
   it('passes the limit through to the query', async () => {

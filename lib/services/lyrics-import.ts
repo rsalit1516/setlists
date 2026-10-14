@@ -5,6 +5,7 @@ const LRCLIB_SEARCH_URL = 'https://lrclib.net/api/search'
 const LRCLIB_TRACK_URL = 'https://lrclib.net/api/get'
 const USER_AGENT = 'setlists-app (https://github.com/rsalit1516/setlists)'
 const DURATION_TOLERANCE_SECONDS = 10
+const REQUEST_TIMEOUT_MS = 15000
 
 type LrclibTrack = {
   id: number
@@ -26,7 +27,7 @@ export type ImportSummary = {
   imported: number
   noMatch: number
   errors: number
-  results: { id: string; title: string; artist: string | null; outcome: ImportOutcome }[]
+  results: { id: string; title: string; artist: string | null; outcome: ImportOutcome; error?: string }[]
 }
 
 function normalize(value: string): string {
@@ -77,19 +78,40 @@ export function pickBestMatch(lookup: LyricsLookup, candidates: LrclibTrack[]): 
   )
 }
 
+// LRCLIB is a community-run service that intermittently answers 429/5xx or
+// stalls under load; one backed-off retry clears most of those.
+async function searchWithRetry(url: string, fetchImpl: typeof fetch, retryDelayMs = 3000): Promise<Response> {
+  let lastError: Error = new Error('LRCLIB search failed')
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await sleep(retryDelayMs)
+    let res: Response
+    try {
+      res = await fetchImpl(url, {
+        headers: { 'User-Agent': USER_AGENT },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      })
+    } catch (err) {
+      lastError = err instanceof Error ? err : lastError
+      continue
+    }
+    if (res.ok) return res
+    lastError = new Error(`LRCLIB search failed: ${res.status}`)
+    if (res.status !== 429 && res.status < 500) throw lastError
+  }
+  throw lastError
+}
+
 export async function fetchLyrics(
   lookup: LyricsLookup,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  retryDelayMs = 3000
 ): Promise<FetchedLyrics | null> {
   if (isMedley(lookup.title)) return null
 
   const params = new URLSearchParams({ track_name: lookup.title })
   if (lookup.artist) params.set('artist_name', lookup.artist.split('/')[0].trim())
 
-  const res = await fetchImpl(`${LRCLIB_SEARCH_URL}?${params}`, {
-    headers: { 'User-Agent': USER_AGENT },
-  })
-  if (!res.ok) throw new Error(`LRCLIB search failed: ${res.status}`)
+  const res = await searchWithRetry(`${LRCLIB_SEARCH_URL}?${params}`, fetchImpl, retryDelayMs)
 
   const match = pickBestMatch(lookup, (await res.json()) as LrclibTrack[])
   if (!match?.plainLyrics) return null
@@ -107,9 +129,15 @@ function sleep(ms: number): Promise<void> {
 // Never overwrites: only songs with empty lyrics are considered, and the write
 // is guarded on `lyrics: null` so a band member's edit made mid-run wins.
 export async function importMissingLyrics(
-  options: { dryRun?: boolean; limit?: number; delayMs?: number; fetchImpl?: typeof fetch } = {}
+  options: {
+    dryRun?: boolean
+    limit?: number
+    delayMs?: number
+    retryDelayMs?: number
+    fetchImpl?: typeof fetch
+  } = {}
 ): Promise<ImportSummary> {
-  const { dryRun = false, limit, delayMs = 1000, fetchImpl = fetch } = options
+  const { dryRun = false, limit, delayMs = 1000, retryDelayMs = 3000, fetchImpl = fetch } = options
 
   const songs = await prisma.song.findMany({
     where: { isActive: true, lyrics: null },
@@ -124,8 +152,9 @@ export async function importMissingLyrics(
     if (index > 0 && delayMs > 0) await sleep(delayMs)
 
     let outcome: ImportOutcome
+    let error: string | undefined
     try {
-      const found = await fetchLyrics(song, fetchImpl)
+      const found = await fetchLyrics(song, fetchImpl, retryDelayMs)
       if (!found) {
         outcome = 'no-match'
       } else {
@@ -142,14 +171,15 @@ export async function importMissingLyrics(
         }
         outcome = 'imported'
       }
-    } catch {
+    } catch (err) {
       outcome = 'error'
+      error = err instanceof Error ? err.message : String(err)
     }
 
     if (outcome === 'imported') summary.imported++
     else if (outcome === 'no-match') summary.noMatch++
     else summary.errors++
-    summary.results.push({ id: song.id, title: song.title, artist: song.artist, outcome })
+    summary.results.push({ id: song.id, title: song.title, artist: song.artist, outcome, ...(error ? { error } : {}) })
   }
 
   return summary
