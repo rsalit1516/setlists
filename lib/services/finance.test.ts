@@ -16,6 +16,8 @@ type MockGig = {
   date: Date
   venue: { name: string }
   amountContracted: string | null
+  cancelledAt: Date | null
+  cancellationFee: string | null
   amountPaid: string | null
   tips: string | null
   otherRevenue: string | null
@@ -29,6 +31,8 @@ function makeGig(overrides: Partial<MockGig> = {}): MockGig {
     date: new Date('2026-05-15T12:00:00'),
     venue: { name: 'The Jazz Club' },
     amountContracted: '800.00',
+    cancelledAt: null,
+    cancellationFee: null,
     amountPaid: '800.00',
     tips: '50.00',
     otherRevenue: null,
@@ -113,6 +117,27 @@ describe('getFinanceReport', () => {
     const report = await getFinanceReport(new Date('2026-08-05T12:00:00'))
     expect(report.currentYearGigs[0].net).toBe(360)
     expect(report.currentYearGigs[0].totalMusicianPayouts).toBe(1000)
+  })
+
+  it('uses the cancellation fee as the expected amount for a cancelled gig, and 0 when it has none', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([
+      makeGig({
+        id: 'g1', date: new Date('2026-01-01T12:00:00'), amountContracted: '800.00',
+        cancelledAt: new Date('2026-01-01T12:00:00'), cancellationFee: '400.00',
+      }),
+      makeGig({
+        id: 'g2', date: new Date('2026-02-01T12:00:00'), amountContracted: '600.00',
+        cancelledAt: new Date('2026-02-01T12:00:00'), cancellationFee: null,
+      }),
+      makeGig({ id: 'g3', date: new Date('2026-03-01T12:00:00'), amountContracted: '500.00' }),
+    ] as never)
+    const report = await getFinanceReport(new Date('2026-08-05T12:00:00'))
+    const byId = Object.fromEntries(report.currentYearGigs.map((g) => [g.id, g]))
+    expect(byId.g1.expectedAmount).toBe('400.00')
+    expect(byId.g1.amountContracted).toBe('800.00')
+    expect(byId.g2.expectedAmount).toBeNull()
+    expect(byId.g3.expectedAmount).toBe('500.00')
+    expect(report.currentYearTotals.totalExpected).toBe(900)
   })
 
   it('rolls up current-year gigs into currentYearTotals', async () => {

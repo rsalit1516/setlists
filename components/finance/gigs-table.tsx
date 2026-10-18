@@ -46,11 +46,11 @@ const columns: DataTableColumn<FinanceGigRow>[] = [
     sortValue: (g) => g.venueName.toLowerCase(),
   },
   {
-    key: 'contracted',
-    header: 'Contracted',
+    key: 'expected',
+    header: 'Expected',
     align: 'right',
-    render: (g) => fmtStr(g.amountContracted),
-    sortValue: (g) => (g.amountContracted ? parseFloat(g.amountContracted) : 0),
+    render: (g) => fmtStr(g.expectedAmount),
+    sortValue: (g) => (g.expectedAmount ? parseFloat(g.expectedAmount) : 0),
   },
   {
     key: 'paid',
@@ -112,7 +112,7 @@ export function FinanceGigsTable({ data, totals }: { data: FinanceGigRow[]; tota
             <span className="truncate text-sm text-muted-foreground">{g.venueName}</span>
           </div>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-            <StatRow label="Contracted" value={fmtStr(g.amountContracted)} />
+            <StatRow label="Expected" value={fmtStr(g.expectedAmount)} />
             <StatRow label="Paid by venue" value={fmtStr(g.amountPaid)} />
             <StatRow label="Tips" value={fmtStr(g.tips)} />
             <StatRow label="Other revenue" value={fmtStr(g.otherRevenue)} />
@@ -128,7 +128,7 @@ export function FinanceGigsTable({ data, totals }: { data: FinanceGigRow[]; tota
       footer={
         <TableRow>
           <TableCell colSpan={2}>Total ({totals.gigCount})</TableCell>
-          <TableCell className="text-right">{fmt(totals.totalContracted)}</TableCell>
+          <TableCell className="text-right">{fmt(totals.totalExpected)}</TableCell>
           <TableCell className="text-right">{fmt(totals.totalPaidByVenue)}</TableCell>
           <TableCell className="text-right">{fmt(totals.totalTips)}</TableCell>
           <TableCell className="text-right">{fmt(totals.totalOtherRevenue)}</TableCell>
@@ -143,7 +143,7 @@ export function FinanceGigsTable({ data, totals }: { data: FinanceGigRow[]; tota
             Total ({totals.gigCount} gig{totals.gigCount !== 1 ? 's' : ''})
           </div>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-            <StatRow label="Contracted" value={fmt(totals.totalContracted)} />
+            <StatRow label="Expected" value={fmt(totals.totalExpected)} />
             <StatRow label="Paid by venue" value={fmt(totals.totalPaidByVenue)} />
             <StatRow label="Tips" value={fmt(totals.totalTips)} />
             <StatRow label="Other revenue" value={fmt(totals.totalOtherRevenue)} />

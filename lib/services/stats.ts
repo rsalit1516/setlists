@@ -1,5 +1,6 @@
 import prisma from '@/lib/db'
 import { getSongs } from '@/lib/services/songs'
+import { expectedAmount } from '@/lib/gig-money'
 import type {
   MostPlayedSong,
   ReadySongNeverPlayed,
@@ -178,38 +179,49 @@ export async function getStaleInProgressSongs(
     .sort((a, b) => b.daysSinceUpdate - a.daysSinceUpdate)
 }
 
-// Column-to-column comparison (amountPaid < amountContracted) isn't
+// Column-to-column comparison (amountPaid < expected amount) isn't
 // expressible in a Prisma `where` without raw SQL, so the "owed" filter runs
-// in JS after fetching active past gigs that have a contracted amount.
+// in JS after fetching active past gigs that might have an expected amount
+// (contracted, or a cancellation fee — see expectedAmount).
 // `now` is injectable so tests don't depend on the real clock; callers omit it.
 export async function getUnpaidGigs(now: Date = new Date()): Promise<UnpaidGig[]> {
   const rows = await prisma.gig.findMany({
     where: {
       isActive: true,
       date: { lte: now },
-      amountContracted: { not: null },
+      OR: [{ amountContracted: { not: null } }, { cancellationFee: { not: null } }],
     },
     orderBy: { date: 'asc' },
     select: {
       id: true,
       date: true,
       amountContracted: true,
+      cancelledAt: true,
+      cancellationFee: true,
       amountPaid: true,
       venue: { select: { name: true } },
     },
   })
 
   return rows
-    .map((r) => {
-      const amountContracted = toStr(r.amountContracted)!
+    .flatMap((r) => {
+      const expected = expectedAmount({
+        cancelledAt: r.cancelledAt,
+        cancellationFee: toStr(r.cancellationFee),
+        amountContracted: toStr(r.amountContracted),
+      })
+      return expected === null ? [] : [{ r, expected }]
+    })
+    .map(({ r, expected }) => {
       const amountPaid = toStr(r.amountPaid)
       const paid = amountPaid ? parseFloat(amountPaid) : 0
-      const outstandingBalance = parseFloat(amountContracted) - paid
+      const outstandingBalance = parseFloat(expected) - paid
       return {
         id: r.id,
         date: r.date,
         venueName: r.venue.name,
-        amountContracted,
+        expectedAmount: expected,
+        isCancelled: r.cancelledAt !== null,
         amountPaid,
         outstandingBalance,
         paidStatus: (paid === 0 ? 'unpaid' : 'partial') as UnpaidGig['paidStatus'],

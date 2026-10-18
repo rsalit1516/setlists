@@ -87,6 +87,8 @@ type MockGig = {
   id: string
   date: Date
   amountContracted: string | null
+  cancelledAt: Date | null
+  cancellationFee: string | null
   amountPaid: string | null
   venue: { name: string }
 }
@@ -96,6 +98,8 @@ function makeGig(overrides: Partial<MockGig> = {}): MockGig {
     id: 'gig-1',
     date: new Date('2026-05-15T12:00:00'),
     amountContracted: '800.00',
+    cancelledAt: null,
+    cancellationFee: null,
     amountPaid: null,
     venue: { name: 'The Jazz Club' },
     ...overrides,
@@ -514,17 +518,17 @@ describe('getStaleInProgressSongs', () => {
 })
 
 describe('getUnpaidGigs', () => {
-  it('only fetches active past gigs with a contracted amount, oldest-first', async () => {
+  it('only fetches active past gigs with a contracted amount or cancellation fee, oldest-first', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([])
     await getUnpaidGigs(NOW)
     type FindManyArgs = {
-      where: { isActive: unknown; date: { lte: unknown }; amountContracted: { not: unknown } }
+      where: { isActive: unknown; date: { lte: unknown }; OR: unknown }
       orderBy: { date: unknown }
     }
     const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as unknown as FindManyArgs
     expect(call.where.isActive).toBe(true)
     expect(call.where.date.lte).toBe(NOW)
-    expect(call.where.amountContracted.not).toBeNull()
+    expect(call.where.OR).toEqual([{ amountContracted: { not: null } }, { cancellationFee: { not: null } }])
     expect(call.orderBy.date).toBe('asc')
   })
 
@@ -538,7 +542,8 @@ describe('getUnpaidGigs', () => {
         id: 'gig-1',
         date: new Date('2026-05-15T12:00:00'),
         venueName: 'The Jazz Club',
-        amountContracted: '800.00',
+        expectedAmount: '800.00',
+        isCancelled: false,
         amountPaid: null,
         outstandingBalance: 800,
         paidStatus: 'unpaid',
@@ -586,6 +591,32 @@ describe('getUnpaidGigs', () => {
     ] as never)
     const result = await getUnpaidGigs(NOW)
     expect(result.map((g) => g.id)).toEqual(['gig-old', 'gig-new'])
+  })
+
+  it('owes the cancellation fee, not the contracted amount, for a cancelled gig', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([
+      makeGig({ amountContracted: '800.00', cancelledAt: new Date('2026-05-15T12:00:00'), cancellationFee: '400.00' }),
+    ] as never)
+    const result = await getUnpaidGigs(NOW)
+    expect(result).toHaveLength(1)
+    expect(result[0].expectedAmount).toBe('400.00')
+    expect(result[0].isCancelled).toBe(true)
+    expect(result[0].outstandingBalance).toBe(400)
+    expect(result[0].paidStatus).toBe('unpaid')
+  })
+
+  it('excludes a cancelled gig whose fee has been received', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([
+      makeGig({ cancelledAt: new Date('2026-05-15T12:00:00'), cancellationFee: '400.00', amountPaid: '400.00' }),
+    ] as never)
+    expect(await getUnpaidGigs(NOW)).toEqual([])
+  })
+
+  it('never lists a cancelled gig with no fee, even if it has a contracted amount', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([
+      makeGig({ amountContracted: '800.00', cancelledAt: new Date('2026-05-15T12:00:00'), cancellationFee: null }),
+    ] as never)
+    expect(await getUnpaidGigs(NOW)).toEqual([])
   })
 
   it('returns an empty list when nothing is owed', async () => {

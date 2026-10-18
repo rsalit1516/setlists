@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { buildPrintLayout } from '@/lib/setlist-print'
 import { toDateInputValue } from '@/lib/dates'
+import { expectedAmount } from '@/lib/gig-money'
 import { musicianPaymentLossWarning } from '@/lib/musician-payment-warning'
 import type { GigSetlistItem } from '@/lib/types'
 
@@ -304,11 +305,17 @@ export default async function GigPage({
               <span className="text-muted-foreground">Contracted</span>
               <span>{fmt(gig.amountContracted)}</span>
             </div>
-            {gig.cancellationFee && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Cancellation fee</span>
-                <span>{fmt(gig.cancellationFee)}</span>
-              </div>
+            {gig.cancelledAt && (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Cancellation fee</span>
+                  <span>{fmt(gig.cancellationFee)}</span>
+                </div>
+                <div className="flex justify-between font-medium">
+                  <span className="text-muted-foreground">Owed</span>
+                  <span>{fmt(expectedAmount(gig))}</span>
+                </div>
+              </>
             )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Paid by venue</span>
