@@ -205,6 +205,7 @@ export type FinanceGigRow = {
   date: Date
   venueName: string
   amountContracted: string | null
+  expectedAmount: string | null
   amountPaid: string | null
   tips: string | null
   otherRevenue: string | null
@@ -216,7 +217,7 @@ export type FinanceGigRow = {
 export type FinanceYearSummary = {
   year: number
   gigCount: number
-  totalContracted: number
+  totalExpected: number
   totalPaidByVenue: number
   totalTips: number
   totalOtherRevenue: number
@@ -265,7 +266,8 @@ export type UnpaidGig = {
   id: string
   date: Date
   venueName: string
-  amountContracted: string
+  expectedAmount: string
+  isCancelled: boolean
   amountPaid: string | null
   outstandingBalance: number
   paidStatus: 'unpaid' | 'partial'

@@ -39,7 +39,12 @@ const columns: DataTableColumn<UnpaidGig>[] = [
   {
     key: 'venue',
     header: 'Venue',
-    render: (g) => <span className="font-medium">{g.venueName}</span>,
+    render: (g) => (
+      <span className="font-medium">
+        {g.venueName}
+        {g.isCancelled && <span className="ml-2 text-xs font-normal text-muted-foreground">Cancelled</span>}
+      </span>
+    ),
     sortValue: (g) => g.venueName.toLowerCase(),
   },
   {
@@ -53,11 +58,11 @@ const columns: DataTableColumn<UnpaidGig>[] = [
     sortValue: (g) => PAID_STATUS_BADGE[g.paidStatus].label,
   },
   {
-    key: 'contracted',
-    header: 'Contracted',
+    key: 'expected',
+    header: 'Expected',
     align: 'right',
-    render: (g) => formatMoney(g.amountContracted),
-    sortValue: (g) => parseFloat(g.amountContracted),
+    render: (g) => formatMoney(g.expectedAmount),
+    sortValue: (g) => parseFloat(g.expectedAmount),
   },
   {
     key: 'paid',
@@ -92,10 +97,13 @@ export function UnpaidGigsTable({ data }: { data: UnpaidGig[] }) {
               {PAID_STATUS_BADGE[g.paidStatus].label}
             </Badge>
           </div>
-          <div className="mb-2 text-sm text-muted-foreground">{formatDate(g.date)}</div>
+          <div className="mb-2 text-sm text-muted-foreground">
+            {formatDate(g.date)}
+            {g.isCancelled && ' · Cancelled (fee)'}
+          </div>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-            <dt className="text-muted-foreground">Contracted</dt>
-            <dd className="text-right">{formatMoney(g.amountContracted)}</dd>
+            <dt className="text-muted-foreground">Expected</dt>
+            <dd className="text-right">{formatMoney(g.expectedAmount)}</dd>
             <dt className="text-muted-foreground">Paid</dt>
             <dd className="text-right">{g.amountPaid ? formatMoney(g.amountPaid) : '—'}</dd>
             <dt className="font-medium">Outstanding</dt>

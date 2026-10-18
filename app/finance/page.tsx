@@ -34,7 +34,7 @@ function YearStatCard({ summary }: { summary: FinanceYearSummary }) {
         </span>
       </div>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-        <StatRow label="Contracted" value={fmt(summary.totalContracted)} />
+        <StatRow label="Expected" value={fmt(summary.totalExpected)} />
         <StatRow label="Paid by venue" value={fmt(summary.totalPaidByVenue)} />
         <StatRow label="Tips" value={fmt(summary.totalTips)} />
         <StatRow label="Other revenue" value={fmt(summary.totalOtherRevenue)} />
@@ -80,7 +80,7 @@ export default async function FinancePage() {
                     <TableRow key={y.year}>
                       <TableCell className="font-medium">{y.year}</TableCell>
                       <TableCell className="text-right text-muted-foreground">{y.gigCount}</TableCell>
-                      <TableCell className="text-right">{fmt(y.totalContracted)}</TableCell>
+                      <TableCell className="text-right">{fmt(y.totalExpected)}</TableCell>
                       <TableCell className="text-right">{fmt(y.totalPaidByVenue)}</TableCell>
                       <TableCell className="text-right">{fmt(y.totalTips)}</TableCell>
                       <TableCell className="text-right">{fmt(y.totalOtherRevenue)}</TableCell>

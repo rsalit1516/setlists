@@ -1,5 +1,6 @@
 import prisma from '@/lib/db'
 import type { FinanceGigRow, FinanceReport, FinanceYearSummary } from '@/lib/types'
+import { expectedAmount } from '@/lib/gig-money'
 import { calculateGigNet, calculateTotalExpenses } from './gigs'
 
 // Decimal fields come back from Prisma as Decimal | null — typed `unknown` here
@@ -8,6 +9,8 @@ type GigFinanceRow = {
   id: string
   date: Date
   amountContracted: unknown
+  cancelledAt: Date | null
+  cancellationFee: unknown
   amountPaid: unknown
   tips: unknown
   otherRevenue: unknown
@@ -29,7 +32,7 @@ function emptyYearSummary(year: number): FinanceYearSummary {
   return {
     year,
     gigCount: 0,
-    totalContracted: 0,
+    totalExpected: 0,
     totalPaidByVenue: 0,
     totalTips: 0,
     totalOtherRevenue: 0,
@@ -43,7 +46,7 @@ function addGigToSummary(summary: FinanceYearSummary, row: FinanceGigRow): Finan
   return {
     ...summary,
     gigCount: summary.gigCount + 1,
-    totalContracted: summary.totalContracted + (row.amountContracted ? parseFloat(row.amountContracted) : 0),
+    totalExpected: summary.totalExpected + (row.expectedAmount ? parseFloat(row.expectedAmount) : 0),
     totalPaidByVenue: summary.totalPaidByVenue + (row.amountPaid ? parseFloat(row.amountPaid) : 0),
     totalTips: summary.totalTips + (row.tips ? parseFloat(row.tips) : 0),
     totalOtherRevenue: summary.totalOtherRevenue + (row.otherRevenue ? parseFloat(row.otherRevenue) : 0),
@@ -81,6 +84,11 @@ export async function getFinanceReport(now: Date = new Date()): Promise<FinanceR
       date: r.date,
       venueName: r.venue.name,
       amountContracted: toStr(r.amountContracted),
+      expectedAmount: expectedAmount({
+        cancelledAt: r.cancelledAt,
+        cancellationFee: toStr(r.cancellationFee),
+        amountContracted: toStr(r.amountContracted),
+      }),
       amountPaid: revenue.amountPaid,
       tips: revenue.tips,
       otherRevenue: revenue.otherRevenue,
