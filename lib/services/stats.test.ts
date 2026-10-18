@@ -57,6 +57,10 @@ function makeSong(overrides: Partial<MockSong> = {}): MockSong {
 
 // One row per gig, most-recent-first, matching the real orderBy: { date: 'desc' }.
 // `playedSongIds` is that gig's played songIds; pass [] for a gig with no matches.
+// Filler for "a gig that was actually performed" in position-based tests —
+// gigs with no played songs are skipped, so a bare [] no longer counts as a gig.
+const F = ['filler']
+
 function makeGigs(...playedSongIds: string[][]): MockGigRow[] {
   return playedSongIds.map((songIds) => ({ setlist: { items: songIds.map((songId) => ({ songId })) } }))
 }
@@ -117,6 +121,34 @@ describe('getMostPlayedSongs', () => {
     expect(call.where.wasPlayed).toBe(true)
     expect(call.where.section).toEqual({ not: 'SOUNDCHECK' })
     expect(call.where.setlist.gig.isActive).toBe(true)
+  })
+
+  it('trusts wasPlayed rather than gig cancellation, so a fully cancelled gig contributes nothing', async () => {
+    vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([])
+    const result = await getMostPlayedSongs()
+    expect(result).toEqual([])
+    const call = vi.mocked(prisma.setlistItem.findMany).mock.calls[0][0] as unknown as {
+      where: { setlist: { gig: Record<string, unknown> } }
+    }
+    expect(call.where.setlist.gig).not.toHaveProperty('cancelledAt')
+  })
+
+  it('keeps the real plays from a partially played cancelled gig', async () => {
+    // The query returns only items marked wasPlayed; a mid-gig rain-out's two
+    // played songs count even though the gig has a cancelledAt.
+    vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([
+      makeItem('song-1'),
+      makeItem('song-2'),
+    ] as never)
+    vi.mocked(prisma.song.findMany).mockResolvedValue([
+      makeSong({ id: 'song-1', title: 'A' }),
+      makeSong({ id: 'song-2', title: 'B' }),
+    ] as never)
+    const result = await getMostPlayedSongs()
+    expect(result.map((s) => [s.songId, s.playCount])).toEqual([
+      ['song-1', 1],
+      ['song-2', 1],
+    ])
   })
 
   it('skips the song lookup entirely when nothing has been played', async () => {
@@ -328,7 +360,7 @@ describe('getStaleReadySongs', () => {
   it('excludes a Ready song played within the window', async () => {
     // 10 gigs (indices 0-9); song-1 played at index 5 — inside the default window of 10.
     vi.mocked(prisma.gig.findMany).mockResolvedValue(
-      makeGigs([], [], [], [], [], ['song-1'], [], [], [], []) as never
+      makeGigs(F, F, F, F, F, ['song-1'], F, F, F, F) as never
     )
     vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
     const result = await getStaleReadySongs()
@@ -338,7 +370,7 @@ describe('getStaleReadySongs', () => {
   it('includes a Ready song last played at or beyond the window boundary', async () => {
     // 11 gigs (indices 0-10); song-1's only play is at index 10 — outside the window of 10.
     vi.mocked(prisma.gig.findMany).mockResolvedValue(
-      makeGigs([], [], [], [], [], [], [], [], [], [], ['song-1']) as never
+      makeGigs(F, F, F, F, F, F, F, F, F, F, ['song-1']) as never
     )
     vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
     const result = await getStaleReadySongs()
@@ -357,7 +389,7 @@ describe('getStaleReadySongs', () => {
   it('sorts never-played first, then by gigsSinceLastPlayed descending', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue(
       // index 0..14; song-a last played at index 12, song-b at index 15 (never, i.e. absent)
-      makeGigs(...Array.from({ length: 13 }, (_, i) => (i === 12 ? ['song-a'] : []))) as never
+      makeGigs(...Array.from({ length: 13 }, (_, i) => (i === 12 ? ['song-a'] : F))) as never
     )
     vi.mocked(prisma.song.findMany).mockResolvedValue([
       makeSong({ id: 'song-a', title: 'A Song' }),
@@ -369,7 +401,7 @@ describe('getStaleReadySongs', () => {
 
   it('breaks ties by title ascending when gigsSinceLastPlayed is equal', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue(
-      makeGigs(...Array.from({ length: 13 }, (_, i) => (i === 12 ? ['song-z', 'song-a'] : []))) as never
+      makeGigs(...Array.from({ length: 13 }, (_, i) => (i === 12 ? ['song-z', 'song-a'] : F))) as never
     )
     vi.mocked(prisma.song.findMany).mockResolvedValue([
       makeSong({ id: 'song-z', title: 'Zzz Song' }),
@@ -382,11 +414,31 @@ describe('getStaleReadySongs', () => {
   it('respects a custom gigWindow parameter', async () => {
     // 5 gigs (indices 0-4); song-1 played at index 2 — inside a window of 3, outside a window of 2.
     vi.mocked(prisma.gig.findMany).mockResolvedValue(
-      makeGigs([], [], ['song-1'], [], []) as never
+      makeGigs(F, F, ['song-1'], F, F) as never
     )
     vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
     expect(await getStaleReadySongs(3)).toEqual([])
     expect((await getStaleReadySongs(2))[0]?.songId).toBe('song-1')
+  })
+
+  it('skips gigs with no played songs (cancelled / rained out) when counting gigs since last played', async () => {
+    // Raw positions: song-1 at index 12. Only 2 of the 12 gigs before it were
+    // actually performed, so it is 2 performed gigs back, not 12 — inside the window.
+    vi.mocked(prisma.gig.findMany).mockResolvedValue(
+      makeGigs([], [], [], [], F, [], [], [], [], [], [], F, ['song-1']) as never
+    )
+    vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
+    expect(await getStaleReadySongs()).toEqual([])
+    expect((await getStaleReadySongs(2))[0]).toMatchObject({ songId: 'song-1', gigsSinceLastPlayed: 2 })
+  })
+
+  it('keeps the plays from a partially played cancelled gig in the sequence', async () => {
+    // A mid-gig rain-out that still has one played song is a real (short) gig.
+    vi.mocked(prisma.gig.findMany).mockResolvedValue(
+      makeGigs(['song-2'], ['song-1']) as never
+    )
+    vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
+    expect((await getStaleReadySongs(1))[0]).toMatchObject({ songId: 'song-1', gigsSinceLastPlayed: 1 })
   })
 
   it('defaults gigWindow to DEFAULT_STALE_GIG_WINDOW', async () => {
@@ -556,6 +608,27 @@ describe('getScheduleGaps', () => {
     expect(call.where.date.gte).toBe(NOW)
     expect(call.where.date.lte).toEqual(new Date('2026-09-05T12:00:00'))
     expect(call.orderBy.date).toBe('asc')
+  })
+
+  it('excludes cancelled gigs so they cannot hide an open stretch of calendar', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([])
+    await getScheduleGaps(1, 14, NOW)
+    type FindManyArgs = { where: { cancelledAt: unknown } }
+    const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as unknown as FindManyArgs
+    expect(call.where.cancelledAt).toBeNull()
+  })
+
+  it('reports the gap a cancelled gig would have covered once it is filtered out', async () => {
+    // A cancelled gig at +10 days is dropped by the query, leaving only the +30 gig.
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([
+      makeUpcomingGig({ id: 'gig-2', date: daysFromNow(30), venue: { name: 'Venue B' } }),
+    ] as never)
+    const result = await getScheduleGaps(2, 14, NOW)
+    expect(result[0]).toEqual({
+      from: { type: 'today' },
+      to: { type: 'gig', gigId: 'gig-2', venueName: 'Venue B', date: daysFromNow(30) },
+      days: 30,
+    })
   })
 
   it('flags an open-ended gap from today when nothing is scheduled at all', async () => {
