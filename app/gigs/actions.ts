@@ -20,6 +20,9 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
   const paidAtStr = formData.get('paidAt') as string
   const tipsStr = formData.get('tips') as string
   const otherRevenueStr = formData.get('otherRevenue') as string
+  const isCancelled = formData.get('cancelled') === 'on'
+  const cancelledAtStr = formData.get('cancelledAt') as string
+  const cancellationFeeStr = formData.get('cancellationFee') as string
   const notes = formData.get('notes') as string
   const setlistCreatorId = (formData.get('setlistCreatorId') as string) || null
   // Deduplicated: createMany below has no ON CONFLICT clause, so a duplicate
@@ -88,6 +91,9 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
       paidAt: paidAtStr ? new Date(paidAtStr + 'T12:00:00') : null,
       tips: tipsStr ? parseFloat(tipsStr) : null,
       otherRevenue: otherRevenueStr ? parseFloat(otherRevenueStr) : null,
+      // Un-cancelling clears the date but keeps the fee, so toggling back on restores it.
+      cancelledAt: isCancelled && cancelledAtStr ? new Date(cancelledAtStr + 'T12:00:00') : null,
+      cancellationFee: cancellationFeeStr ? parseFloat(cancellationFeeStr) : null,
       setlistCreatorId,
     },
   })
@@ -113,6 +119,9 @@ export async function updateGig(_state: GigActionState, formData: FormData): Pro
   const paidAtStr = formData.get('paidAt') as string
   const tipsStr = formData.get('tips') as string
   const otherRevenueStr = formData.get('otherRevenue') as string
+  const isCancelled = formData.get('cancelled') === 'on'
+  const cancelledAtStr = formData.get('cancelledAt') as string
+  const cancellationFeeStr = formData.get('cancellationFee') as string
   const notes = formData.get('notes') as string
   const setlistCreatorId = (formData.get('setlistCreatorId') as string) || null
 
@@ -135,6 +144,9 @@ export async function updateGig(_state: GigActionState, formData: FormData): Pro
       paidAt: paidAtStr ? new Date(paidAtStr + 'T12:00:00') : null,
       tips: tipsStr ? parseFloat(tipsStr) : null,
       otherRevenue: otherRevenueStr ? parseFloat(otherRevenueStr) : null,
+      // Un-cancelling clears the date but keeps the fee, so toggling back on restores it.
+      cancelledAt: isCancelled && cancelledAtStr ? new Date(cancelledAtStr + 'T12:00:00') : null,
+      cancellationFee: cancellationFeeStr ? parseFloat(cancellationFeeStr) : null,
       notes: notes || null,
       setlistCreatorId,
     },

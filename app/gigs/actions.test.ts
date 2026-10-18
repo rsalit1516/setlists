@@ -119,6 +119,8 @@ describe('updateGig', () => {
         paidAt: new Date('2026-08-16T12:00:00'),
         tips: 40,
         otherRevenue: 15,
+        cancelledAt: null,
+        cancellationFee: null,
         notes: 'Bring extra cables',
         setlistCreatorId: 'musician-1',
       },
@@ -144,6 +146,31 @@ describe('updateGig', () => {
         otherRevenue: null,
         notes: null,
       }),
+    })
+  })
+
+  it('writes cancelledAt and cancellationFee when the Cancelled toggle is on', async () => {
+    const fd = buildFormData({ cancelled: 'on', cancelledAt: '2026-10-16', cancellationFee: '150' })
+
+    await expect(updateGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/gig-1')
+
+    expect(prisma.gig.update).toHaveBeenCalledWith({
+      where: { id: 'gig-1' },
+      data: expect.objectContaining({
+        cancelledAt: new Date('2026-10-16T12:00:00'),
+        cancellationFee: 150,
+      }),
+    })
+  })
+
+  it('clears cancelledAt but keeps the fee when the Cancelled toggle is off', async () => {
+    const fd = buildFormData({ cancelledAt: '2026-10-16', cancellationFee: '150' })
+
+    await expect(updateGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/gig-1')
+
+    expect(prisma.gig.update).toHaveBeenCalledWith({
+      where: { id: 'gig-1' },
+      data: expect.objectContaining({ cancelledAt: null, cancellationFee: 150 }),
     })
   })
 
@@ -300,6 +327,25 @@ describe('createGig', () => {
         paidAt: null,
         tips: null,
         otherRevenue: null,
+      }),
+    })
+  })
+
+  it('writes cancelledAt and cancellationFee for a cancelled gig', async () => {
+    const fd = buildFormData({
+      setlistId: 'setlist-1',
+      createSetlist: '',
+      cancelled: 'on',
+      cancelledAt: '2026-10-16',
+      cancellationFee: '150.50',
+    })
+
+    await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
+
+    expect(prisma.gig.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        cancelledAt: new Date('2026-10-16T12:00:00'),
+        cancellationFee: 150.5,
       }),
     })
   })

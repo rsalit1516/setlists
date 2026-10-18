@@ -41,6 +41,7 @@ export function GigForm({
   defaultSetlistId?: string
 }) {
   const [state, formAction, pending] = useActionState(action, null)
+  const [cancelled, setCancelled] = useState(Boolean(gig?.cancelledAt))
   const [setlistMode, setSetlistMode] = useState<'new' | 'copy'>(
     defaultSetlistId ? 'copy' : 'new'
   )
@@ -248,6 +249,44 @@ export function GigForm({
                 name="otherRevenue"
                 placeholder="0.00"
                 defaultValue={gig?.otherRevenue ?? ''}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t pt-4">
+          <label className="flex min-h-11 items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              name="cancelled"
+              checked={cancelled}
+              onChange={(e) => setCancelled(e.target.checked)}
+              className="size-4"
+            />
+            Cancelled
+          </label>
+          {/* Kept mounted (just hidden) so the fee still submits when the toggle is off —
+              un-cancelling clears the date but preserves the fee. */}
+          <div className={cancelled ? 'mt-2 grid grid-cols-2 gap-3' : 'hidden'}>
+            <div>
+              <label htmlFor="cancelledAt" className="mb-1 block text-sm font-medium">Cancelled on</label>
+              <Input
+                id="cancelledAt"
+                type="date"
+                name="cancelledAt"
+                defaultValue={toDateInputValue(gig?.cancelledAt) || toDateInputValue(new Date())}
+              />
+            </div>
+            <div>
+              <label htmlFor="cancellationFee" className="mb-1 block text-sm font-medium">Cancellation fee ($)</label>
+              <Input
+                id="cancellationFee"
+                type="number"
+                step="0.01"
+                min="0"
+                name="cancellationFee"
+                placeholder="0.00"
+                defaultValue={gig?.cancellationFee ?? ''}
               />
             </div>
           </div>
