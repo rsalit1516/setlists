@@ -111,8 +111,13 @@ async function getGigsSinceLastPlayedBySongId(): Promise<Map<string, number>> {
     },
   })
 
+  // A gig with no played songs (e.g. cancelled or rained out before anything
+  // was marked played) isn't a performance, so it must not count as a gig
+  // that went by — drop it before indexing by position.
+  const performedGigs = gigs.filter((gig) => gig.setlist.items.length > 0)
+
   const gigsSinceLastPlayed = new Map<string, number>()
-  gigs.forEach((gig, gigIndex) => {
+  performedGigs.forEach((gig, gigIndex) => {
     for (const item of gig.setlist.items) {
       if (!gigsSinceLastPlayed.has(item.songId)) {
         gigsSinceLastPlayed.set(item.songId, gigIndex)
@@ -213,7 +218,7 @@ export async function getUnpaidGigs(now: Date = new Date()): Promise<UnpaidGig[]
     .filter((g) => g.outstandingBalance > 0)
 }
 
-// Walks active upcoming gigs (today through the lookahead window) in date
+// Walks active, non-cancelled upcoming gigs (today through the lookahead window) in date
 // order, flagging any stretch longer than gapDays — including the leading
 // stretch from "today" to the first gig, and a trailing open-ended stretch
 // if nothing is scheduled between the last known gig and the end of the
@@ -229,7 +234,7 @@ export async function getScheduleGaps(
   const windowEnd = addMonths(now, lookaheadMonths)
 
   const gigs = await prisma.gig.findMany({
-    where: { isActive: true, date: { gte: now, lte: windowEnd } },
+    where: { isActive: true, cancelledAt: null, date: { gte: now, lte: windowEnd } },
     orderBy: { date: 'asc' },
     select: { id: true, date: true, venue: { select: { name: true } } },
   })
