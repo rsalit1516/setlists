@@ -144,6 +144,13 @@ export default async function GigPage({
         <h1 className="font-heading text-[clamp(28px,4vw,38px)] font-bold leading-tight">
           {gig.venue.name}
         </h1>
+        {gig.cancelledAt && (
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <Badge variant="destructive">Cancelled</Badge>
+            <span>on {formatDate(gig.cancelledAt)}</span>
+            {gig.cancellationFee && <span>· Cancellation fee {fmt(gig.cancellationFee)}</span>}
+          </p>
+        )}
         <p className="mt-1.5 text-sm text-muted-foreground">
           {formatDate(gig.date)}
           {formatTimeRange(gig.startTime, gig.endTime) && (
@@ -297,6 +304,12 @@ export default async function GigPage({
               <span className="text-muted-foreground">Contracted</span>
               <span>{fmt(gig.amountContracted)}</span>
             </div>
+            {gig.cancellationFee && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Cancellation fee</span>
+                <span>{fmt(gig.cancellationFee)}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Paid by venue</span>
               <span>{fmt(gig.amountPaid)}</span>

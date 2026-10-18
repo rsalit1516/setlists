@@ -122,6 +122,8 @@ model Gig {
   paidAt           DateTime?
   tips             Decimal?
   otherRevenue     Decimal?
+  cancelledAt      DateTime?
+  cancellationFee  Decimal?
   isActive         Boolean   @default(true)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt

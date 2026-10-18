@@ -15,6 +15,8 @@ function makeGig(overrides: Partial<GigSummary> = {}): GigSummary {
     paidAt: null,
     tips: null,
     otherRevenue: null,
+    cancelledAt: null,
+    cancellationFee: null,
     venue: { name: 'The Jazz Club' },
     setlist: { name: 'The Jazz Club - 08-15-26' },
     setlistCreator: null,
@@ -43,5 +45,20 @@ describe('CompactGigList — setlist creator', () => {
     renderList(makeGig())
 
     expect(screen.queryByText(/Setlist:/)).not.toBeInTheDocument()
+  })
+})
+
+describe('CompactGigList — cancelled gigs', () => {
+  it('shows a Cancelled badge and the cancellation fee', () => {
+    renderList(makeGig({ cancelledAt: new Date('2026-08-14T12:00:00'), cancellationFee: '150.00' }))
+
+    expect(screen.getAllByText('Cancelled')).toHaveLength(2)
+    expect(screen.getAllByText('$150.00 Cancel fee')).toHaveLength(2)
+  })
+
+  it('shows no badge for a gig that is not cancelled', () => {
+    renderList(makeGig())
+
+    expect(screen.queryByText('Cancelled')).not.toBeInTheDocument()
   })
 })

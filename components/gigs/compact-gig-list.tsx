@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { deleteGig } from '@/app/gigs/actions'
 import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
+import { Badge } from '@/components/ui/badge'
 import { MonthSection } from '@/components/gigs/month-section'
 import { cn } from '@/lib/utils'
 import type { GigMonthGroup, GigSummary } from '@/lib/types'
@@ -11,7 +12,19 @@ function formatDate(d: Date) {
   })
 }
 
+function CancelledBadge({ gig }: { gig: GigSummary }) {
+  if (!gig.cancelledAt) return null
+  return <Badge variant="destructive">Cancelled</Badge>
+}
+
 function PayStatus({ gig, className }: { gig: GigSummary; className?: string }) {
+  if (gig.cancelledAt && gig.cancellationFee) {
+    return (
+      <span className={cn('whitespace-nowrap text-amber-600 dark:text-amber-400', className)}>
+        ${parseFloat(gig.cancellationFee).toFixed(2)} Cancel fee
+      </span>
+    )
+  }
   if (gig.amountPaid) {
     return (
       <span className={cn('whitespace-nowrap text-green-600 dark:text-green-400', className)}>
@@ -39,7 +52,9 @@ function CompactGigRow({ gig }: { gig: GigSummary }) {
       <Link href={`/gigs/${gig.id}`} className="min-w-0 flex-1">
         {/* Below sm: 2-line stack — date + pay status, then venue + setlist creator + headcount */}
         <div className="flex items-baseline justify-between gap-3 sm:hidden">
-          <span className="font-medium">{formatDate(gig.date)}</span>
+          <span className="font-medium">
+            {formatDate(gig.date)} <CancelledBadge gig={gig} />
+          </span>
           <PayStatus gig={gig} className="text-sm" />
         </div>
         <div className="mt-0.5 flex items-baseline justify-between gap-3 sm:hidden">
@@ -52,7 +67,9 @@ function CompactGigRow({ gig }: { gig: GigSummary }) {
             pay status sit in fixed-width right-aligned columns */}
         <div className="hidden sm:flex sm:items-center sm:gap-4">
           <span className="w-32 shrink-0 font-medium">{formatDate(gig.date)}</span>
-          <span className="min-w-0 flex-1 truncate text-muted-foreground">{gig.venue.name}</span>
+          <span className="min-w-0 flex-1 truncate text-muted-foreground">
+            {gig.venue.name} <CancelledBadge gig={gig} />
+          </span>
           {creator && (
             <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{creator}</span>
           )}
