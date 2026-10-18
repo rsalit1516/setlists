@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Every GitHub issue ("story") is implemented in its own git worktree — never commit directly on `main` for issue work. Before writing any code for an issue, create/enter a worktree via the `EnterWorktree` tool (or `git worktree add .claude/worktrees/<slug> -b issue-<n>-<slug>` if working outside this harness).
 - Name the worktree/branch after the issue: `issue-<number>-<short-slug>` (e.g. `issue-17-gig-payment-fields`).
+- **Branch from `develop`, not `main`.** Update `develop` first (`git fetch origin`) and base the worktree on `origin/develop`. If the harness creates the worktree from `main`, rebase/reset it onto `origin/develop` before writing code.
 - Leave the worktree in place until the PR merges. Don't remove a worktree with uncommitted or unmerged work without checking with the user first.
 
 ## Workflow — Finishing a Story
@@ -17,6 +18,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Don't merge directly, even for solo-developer changes. Commit the finished work in its worktree, push the branch, and open a PR with `gh pr create` — leave the merge itself to the user via the GitHub UI.
 - This applies even when the change looks trivial. The PR is the review checkpoint: it's where the user reads the diff, can request a second AI review, and keeps a handle on a codebase they didn't type line-by-line.
 - Write the PR body to reference the issue it closes (e.g. `Closes #40`) and summarize what changed and how it was verified (tests run, lint/typecheck status).
+
+## Workflow — Staged Releases (develop → main)
+
+Changes ship in two stages. Full detail (environments, approval, DB reset) is in `docs/environments.md`.
+
+1. **Story PR → `develop`.** Open with `gh pr create --base develop`. **Never target `main` with story work.** CI must pass. The user merges it; the dev site then auto-deploys and migrates the seeded dev database.
+2. **Test on the dev site.** The user verifies the change against the dev site (fake seed data). If the change needs new seed data, update `prisma/seed.ts` in the same PR.
+3. **Release PR `develop` → `main`.** Only once the user says the change is tested. Open with `gh pr create --base main --head develop`. List the included story PRs/issues in the body. After merging, the production deploy waits for the user's approval in GitHub Actions.
+
+- Don't open the release PR on your own initiative; wait for the user to ask or confirm testing is done.
+- Hotfixes are the only exception to branching from `develop`: confirm with the user first.
+- Keep `develop` from drifting behind `main`: after a release or any direct `main` change, `main` must be merged back into `develop`.
 
 ## Commands
 
