@@ -7,6 +7,7 @@ import {
   deriveMusicianPayoutStatus,
 } from '@/lib/services/gigs'
 import { getMusicians } from '@/lib/services/musicians'
+import { getSetlists } from '@/lib/services/setlists'
 import {
   addExpense,
   removeExpense,
@@ -16,6 +17,7 @@ import {
   updateMusicianPayment,
   markAllMusiciansPaid,
 } from '@/app/gigs/actions'
+import { CopySetlistDialog } from '@/components/gigs/copy-setlist-dialog'
 import { EditFinancialsForm } from '@/components/gigs/edit-financials-form'
 import { MusicianCheckboxList } from '@/components/gigs/musician-checkbox-list'
 import { PrintMenuItem } from '@/components/gigs/print-button'
@@ -31,6 +33,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { buildPrintLayout } from '@/lib/setlist-print'
 import { toDateInputValue } from '@/lib/dates'
+import { expectedAmount } from '@/lib/gig-money'
 import { musicianPaymentLossWarning } from '@/lib/musician-payment-warning'
 import type { GigSetlistItem } from '@/lib/types'
 
@@ -105,8 +108,10 @@ export default async function GigPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [gig, roster] = await Promise.all([getGig(id), getMusicians()])
+  const [gig, roster, setlists] = await Promise.all([getGig(id), getMusicians(), getSetlists()])
   if (!gig) notFound()
+
+  const copySources = setlists.filter((sl) => sl.id !== gig.setlist.id && sl._count.items > 0)
 
   const addedMusicianIds = new Set(gig.musicians.map((m) => m.musicianId))
   const availableMusicians = roster.filter((m) => !addedMusicianIds.has(m.id))
@@ -140,6 +145,13 @@ export default async function GigPage({
         <h1 className="font-heading text-[clamp(28px,4vw,38px)] font-bold leading-tight">
           {gig.venue.name}
         </h1>
+        {gig.cancelledAt && (
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <Badge variant="destructive">Cancelled</Badge>
+            <span>on {formatDate(gig.cancelledAt)}</span>
+            {gig.cancellationFee && <span>· Cancellation fee {fmt(gig.cancellationFee)}</span>}
+          </p>
+        )}
         <p className="mt-1.5 text-sm text-muted-foreground">
           {formatDate(gig.date)}
           {formatTimeRange(gig.startTime, gig.endTime) && (
@@ -163,6 +175,11 @@ export default async function GigPage({
           <Link href={`/setlists/${gig.setlist.id}`} className="text-foreground hover:underline">
             Edit Setlist
           </Link>
+          <CopySetlistDialog
+            gigId={gig.id}
+            sources={copySources}
+            existingSongCount={gig.setlist.items.length}
+          />
           <DropdownMenu>
             <DropdownMenuTrigger className="flex items-center gap-1 rounded-sm text-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50">
               Export <span className="text-[10px]">▾</span>
@@ -191,6 +208,14 @@ export default async function GigPage({
             <Link href={`/setlists/${gig.setlist.id}`} className="underline">
               Edit setlist
             </Link>
+            {' or '}
+            <CopySetlistDialog
+              gigId={gig.id}
+              sources={copySources}
+              existingSongCount={0}
+              triggerLabel="copy from another setlist"
+              triggerClassName="text-muted-foreground underline"
+            />
           </p>
         ) : (
           <>
@@ -280,6 +305,18 @@ export default async function GigPage({
               <span className="text-muted-foreground">Contracted</span>
               <span>{fmt(gig.amountContracted)}</span>
             </div>
+            {gig.cancelledAt && (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Cancellation fee</span>
+                  <span>{fmt(gig.cancellationFee)}</span>
+                </div>
+                <div className="flex justify-between font-medium">
+                  <span className="text-muted-foreground">Owed</span>
+                  <span>{fmt(expectedAmount(gig))}</span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Paid by venue</span>
               <span>{fmt(gig.amountPaid)}</span>

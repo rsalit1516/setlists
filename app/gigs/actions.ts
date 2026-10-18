@@ -20,6 +20,9 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
   const paidAtStr = formData.get('paidAt') as string
   const tipsStr = formData.get('tips') as string
   const otherRevenueStr = formData.get('otherRevenue') as string
+  const isCancelled = formData.get('cancelled') === 'on'
+  const cancelledAtStr = formData.get('cancelledAt') as string
+  const cancellationFeeStr = formData.get('cancellationFee') as string
   const notes = formData.get('notes') as string
   const setlistCreatorId = (formData.get('setlistCreatorId') as string) || null
   // Deduplicated: createMany below has no ON CONFLICT clause, so a duplicate
@@ -88,6 +91,9 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
       paidAt: paidAtStr ? new Date(paidAtStr + 'T12:00:00') : null,
       tips: tipsStr ? parseFloat(tipsStr) : null,
       otherRevenue: otherRevenueStr ? parseFloat(otherRevenueStr) : null,
+      // Un-cancelling clears the date but keeps the fee, so toggling back on restores it.
+      cancelledAt: isCancelled && cancelledAtStr ? new Date(cancelledAtStr + 'T12:00:00') : null,
+      cancellationFee: cancellationFeeStr ? parseFloat(cancellationFeeStr) : null,
       setlistCreatorId,
     },
   })
@@ -113,6 +119,9 @@ export async function updateGig(_state: GigActionState, formData: FormData): Pro
   const paidAtStr = formData.get('paidAt') as string
   const tipsStr = formData.get('tips') as string
   const otherRevenueStr = formData.get('otherRevenue') as string
+  const isCancelled = formData.get('cancelled') === 'on'
+  const cancelledAtStr = formData.get('cancelledAt') as string
+  const cancellationFeeStr = formData.get('cancellationFee') as string
   const notes = formData.get('notes') as string
   const setlistCreatorId = (formData.get('setlistCreatorId') as string) || null
 
@@ -135,6 +144,9 @@ export async function updateGig(_state: GigActionState, formData: FormData): Pro
       paidAt: paidAtStr ? new Date(paidAtStr + 'T12:00:00') : null,
       tips: tipsStr ? parseFloat(tipsStr) : null,
       otherRevenue: otherRevenueStr ? parseFloat(otherRevenueStr) : null,
+      // Un-cancelling clears the date but keeps the fee, so toggling back on restores it.
+      cancelledAt: isCancelled && cancelledAtStr ? new Date(cancelledAtStr + 'T12:00:00') : null,
+      cancellationFee: cancellationFeeStr ? parseFloat(cancellationFeeStr) : null,
       notes: notes || null,
       setlistCreatorId,
     },
@@ -155,6 +167,49 @@ export async function deleteGig(id: string): Promise<void> {
   ])
   revalidatePath('/gigs')
   redirect('/gigs')
+}
+
+export async function copySetlistToGig(gigId: string, sourceSetlistId: string): Promise<GigActionState> {
+  const gig = await prisma.gig.findUnique({
+    where: { id: gigId },
+    select: { setlistId: true, isActive: true },
+  })
+  if (!gig || !gig.isActive) return { error: 'Gig not found.' }
+  if (gig.setlistId === sourceSetlistId) return { error: 'Cannot copy a setlist onto itself.' }
+
+  const source = await prisma.setlist.findUnique({
+    where: { id: sourceSetlistId },
+    select: {
+      isActive: true,
+      items: {
+        where: { isActive: true },
+        select: { songId: true, section: true, setNumber: true, order: true },
+      },
+    },
+  })
+  if (!source || !source.isActive) return { error: 'Source setlist not found.' }
+  if (source.items.length === 0) return { error: 'Source setlist has no songs.' }
+
+  // One transaction so a failed clone can't leave the gig with its old songs
+  // already soft-deleted.
+  await prisma.$transaction([
+    prisma.setlistItem.updateMany({
+      where: { setlistId: gig.setlistId, isActive: true },
+      data: { isActive: false },
+    }),
+    prisma.setlistItem.createMany({
+      data: source.items.map((item) => ({
+        setlistId: gig.setlistId,
+        songId: item.songId,
+        section: item.section as SetSection,
+        setNumber: item.setNumber,
+        order: item.order,
+      })),
+    }),
+  ])
+
+  revalidatePath(`/gigs/${gigId}`)
+  return null
 }
 
 export async function addExpense(formData: FormData): Promise<void> {

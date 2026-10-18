@@ -1,5 +1,6 @@
 import prisma from '@/lib/db'
 import { getSongs } from '@/lib/services/songs'
+import { expectedAmount } from '@/lib/gig-money'
 import type {
   MostPlayedSong,
   ReadySongNeverPlayed,
@@ -111,8 +112,13 @@ async function getGigsSinceLastPlayedBySongId(): Promise<Map<string, number>> {
     },
   })
 
+  // A gig with no played songs (e.g. cancelled or rained out before anything
+  // was marked played) isn't a performance, so it must not count as a gig
+  // that went by — drop it before indexing by position.
+  const performedGigs = gigs.filter((gig) => gig.setlist.items.length > 0)
+
   const gigsSinceLastPlayed = new Map<string, number>()
-  gigs.forEach((gig, gigIndex) => {
+  performedGigs.forEach((gig, gigIndex) => {
     for (const item of gig.setlist.items) {
       if (!gigsSinceLastPlayed.has(item.songId)) {
         gigsSinceLastPlayed.set(item.songId, gigIndex)
@@ -173,38 +179,49 @@ export async function getStaleInProgressSongs(
     .sort((a, b) => b.daysSinceUpdate - a.daysSinceUpdate)
 }
 
-// Column-to-column comparison (amountPaid < amountContracted) isn't
+// Column-to-column comparison (amountPaid < expected amount) isn't
 // expressible in a Prisma `where` without raw SQL, so the "owed" filter runs
-// in JS after fetching active past gigs that have a contracted amount.
+// in JS after fetching active past gigs that might have an expected amount
+// (contracted, or a cancellation fee — see expectedAmount).
 // `now` is injectable so tests don't depend on the real clock; callers omit it.
 export async function getUnpaidGigs(now: Date = new Date()): Promise<UnpaidGig[]> {
   const rows = await prisma.gig.findMany({
     where: {
       isActive: true,
       date: { lte: now },
-      amountContracted: { not: null },
+      OR: [{ amountContracted: { not: null } }, { cancellationFee: { not: null } }],
     },
     orderBy: { date: 'asc' },
     select: {
       id: true,
       date: true,
       amountContracted: true,
+      cancelledAt: true,
+      cancellationFee: true,
       amountPaid: true,
       venue: { select: { name: true } },
     },
   })
 
   return rows
-    .map((r) => {
-      const amountContracted = toStr(r.amountContracted)!
+    .flatMap((r) => {
+      const expected = expectedAmount({
+        cancelledAt: r.cancelledAt,
+        cancellationFee: toStr(r.cancellationFee),
+        amountContracted: toStr(r.amountContracted),
+      })
+      return expected === null ? [] : [{ r, expected }]
+    })
+    .map(({ r, expected }) => {
       const amountPaid = toStr(r.amountPaid)
       const paid = amountPaid ? parseFloat(amountPaid) : 0
-      const outstandingBalance = parseFloat(amountContracted) - paid
+      const outstandingBalance = parseFloat(expected) - paid
       return {
         id: r.id,
         date: r.date,
         venueName: r.venue.name,
-        amountContracted,
+        expectedAmount: expected,
+        isCancelled: r.cancelledAt !== null,
         amountPaid,
         outstandingBalance,
         paidStatus: (paid === 0 ? 'unpaid' : 'partial') as UnpaidGig['paidStatus'],
@@ -213,7 +230,7 @@ export async function getUnpaidGigs(now: Date = new Date()): Promise<UnpaidGig[]
     .filter((g) => g.outstandingBalance > 0)
 }
 
-// Walks active upcoming gigs (today through the lookahead window) in date
+// Walks active, non-cancelled upcoming gigs (today through the lookahead window) in date
 // order, flagging any stretch longer than gapDays — including the leading
 // stretch from "today" to the first gig, and a trailing open-ended stretch
 // if nothing is scheduled between the last known gig and the end of the
@@ -229,7 +246,7 @@ export async function getScheduleGaps(
   const windowEnd = addMonths(now, lookaheadMonths)
 
   const gigs = await prisma.gig.findMany({
-    where: { isActive: true, date: { gte: now, lte: windowEnd } },
+    where: { isActive: true, cancelledAt: null, date: { gte: now, lte: windowEnd } },
     orderBy: { date: 'asc' },
     select: { id: true, date: true, venue: { select: { name: true } } },
   })

@@ -11,6 +11,8 @@ const mockGigSummary: GigSummary = {
   paidAt: null,
   tips: null,
   otherRevenue: null,
+  cancelledAt: null,
+  cancellationFee: null,
   venue: { name: 'The Jazz Club' },
   setlist: { name: 'Friday Night' },
   setlistCreator: null,

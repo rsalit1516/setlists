@@ -24,6 +24,9 @@ export function EditFinancialsForm({ gig, action }: { gig: GigWithDetails; actio
       <input type="hidden" name="amountContracted" value={gig.amountContracted ?? ''} />
       <input type="hidden" name="notes" value={gig.notes ?? ''} />
       <input type="hidden" name="setlistCreatorId" value={gig.setlistCreatorId ?? ''} />
+      {gig.cancelledAt && <input type="hidden" name="cancelled" value="on" />}
+      <input type="hidden" name="cancelledAt" value={toDateInputValue(gig.cancelledAt)} />
+      <input type="hidden" name="cancellationFee" value={gig.cancellationFee ?? ''} />
 
       {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
 

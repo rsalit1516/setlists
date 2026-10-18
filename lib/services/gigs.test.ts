@@ -32,6 +32,8 @@ const mockGig = {
   paidAt: null,
   tips: '50.00',
   otherRevenue: null,
+  cancelledAt: null,
+  cancellationFee: null,
   venueId: 'v-1',
   setlistId: 'sl-1',
   venue: { id: 'v-1', name: 'The Jazz Club', address: null, notes: null, createdAt: new Date(), updatedAt: new Date() },
@@ -363,5 +365,35 @@ describe('deriveMusicianPayoutStatus', () => {
 
   it('returns "all" when every musician has been paid', () => {
     expect(deriveMusicianPayoutStatus([{ paidAt: new Date() }, { paidAt: new Date() }])).toBe('all')
+  })
+})
+
+describe('cancellation fields', () => {
+  const cancelled = { ...mockGig, cancelledAt: new Date('2026-10-16'), cancellationFee: '150.00' }
+
+  it('getGigs converts cancellationFee to a string and passes cancelledAt through', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([{ ...mockGigSummary, ...cancelled }] as never)
+    const [result] = await getGigs()
+    expect(result.cancellationFee).toBe('150.00')
+    expect(result.cancelledAt).toEqual(new Date('2026-10-16'))
+  })
+
+  it('getGigsInRange converts cancellationFee to a string', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([{ ...mockGigSummary, ...cancelled }] as never)
+    const [result] = await getGigsInRange(new Date(2026, 9, 1), new Date(2026, 10, 1))
+    expect(result.cancellationFee).toBe('150.00')
+  })
+
+  it('getGig converts cancellationFee to a string', async () => {
+    vi.mocked(prisma.gig.findFirst).mockResolvedValue(cancelled as never)
+    const result = await getGig('gig-1')
+    expect(result?.cancellationFee).toBe('150.00')
+    expect(result?.cancelledAt).toEqual(new Date('2026-10-16'))
+  })
+
+  it('leaves cancellationFee null for a gig that was never cancelled', async () => {
+    vi.mocked(prisma.gig.findFirst).mockResolvedValue(mockGig as never)
+    const result = await getGig('gig-1')
+    expect(result?.cancellationFee).toBeNull()
   })
 })

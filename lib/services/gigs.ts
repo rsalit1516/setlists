@@ -54,6 +54,7 @@ export async function getGigs(): Promise<GigSummary[]> {
     amountPaid: toStr(r.amountPaid),
     tips: toStr(r.tips),
     otherRevenue: toStr(r.otherRevenue),
+    cancellationFee: toStr(r.cancellationFee),
   }))
 }
 
@@ -84,6 +85,7 @@ export async function getGigsInRange(start: Date, end: Date): Promise<GigSummary
     amountPaid: toStr(r.amountPaid),
     tips: toStr(r.tips),
     otherRevenue: toStr(r.otherRevenue),
+    cancellationFee: toStr(r.cancellationFee),
   }))
 }
 
@@ -136,7 +138,7 @@ export async function getGigForPerformance(id: string): Promise<GigPerformanceDa
               section: true,
               setNumber: true,
               song: {
-                select: { title: true, key: true, bpm: true, lyrics: true, chartFileUrl: true, chartFileType: true },
+                select: { title: true, key: true, bpm: true, lyrics: true, lyricsSource: true, chartFileUrl: true, chartFileType: true },
               },
             },
             orderBy: [{ setNumber: 'asc' }, { order: 'asc' }],
@@ -187,6 +189,7 @@ export async function getGig(id: string): Promise<GigWithDetails | null> {
     amountPaid: toStr(row.amountPaid),
     tips: toStr(row.tips),
     otherRevenue: toStr(row.otherRevenue),
+    cancellationFee: toStr(row.cancellationFee),
     expenses: row.expenses.map((e) => ({ ...e, amount: toStr(e.amount)! })),
     musicians: row.musicians.map((m) => ({ ...m, amountPaid: toStr(m.amountPaid) })),
   }

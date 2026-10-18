@@ -14,6 +14,7 @@ import {
 import { MusicianCheckboxList } from '@/components/gigs/musician-checkbox-list'
 import { syncGigMusicians } from '@/app/gigs/actions'
 import { toDateInputValue } from '@/lib/dates'
+import { formatSetlistLabel } from '@/lib/setlist-label'
 import { musicianPaymentLossWarning } from '@/lib/musician-payment-warning'
 import { DEFAULT_MUSICIAN_NAMES } from '@/lib/musicians-defaults'
 import type { GigActionState } from '@/app/gigs/actions'
@@ -21,14 +22,6 @@ import type { GigWithDetails, Musician, SetlistSummary, Venue } from '@/lib/type
 
 const textareaClass =
   'flex min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none'
-
-function formatSetlistGigDate(d: Date) {
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function formatSetlistLabel(sl: SetlistSummary): string {
-  return `${sl.name} — ${sl._count.items} song${sl._count.items !== 1 ? 's' : ''}${sl.gig ? ` · ${sl.gig.venue.name}, ${formatSetlistGigDate(sl.gig.date)}` : ''}`
-}
 
 type FormAction = (state: GigActionState, formData: FormData) => Promise<GigActionState>
 
@@ -48,6 +41,7 @@ export function GigForm({
   defaultSetlistId?: string
 }) {
   const [state, formAction, pending] = useActionState(action, null)
+  const [cancelled, setCancelled] = useState(Boolean(gig?.cancelledAt))
   const [setlistMode, setSetlistMode] = useState<'new' | 'copy'>(
     defaultSetlistId ? 'copy' : 'new'
   )
@@ -255,6 +249,44 @@ export function GigForm({
                 name="otherRevenue"
                 placeholder="0.00"
                 defaultValue={gig?.otherRevenue ?? ''}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t pt-4">
+          <label className="flex min-h-11 items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              name="cancelled"
+              checked={cancelled}
+              onChange={(e) => setCancelled(e.target.checked)}
+              className="size-4"
+            />
+            Cancelled
+          </label>
+          {/* Kept mounted (just hidden) so the fee still submits when the toggle is off —
+              un-cancelling clears the date but preserves the fee. */}
+          <div className={cancelled ? 'mt-2 grid grid-cols-2 gap-3' : 'hidden'}>
+            <div>
+              <label htmlFor="cancelledAt" className="mb-1 block text-sm font-medium">Cancelled on</label>
+              <Input
+                id="cancelledAt"
+                type="date"
+                name="cancelledAt"
+                defaultValue={toDateInputValue(gig?.cancelledAt) || toDateInputValue(new Date())}
+              />
+            </div>
+            <div>
+              <label htmlFor="cancellationFee" className="mb-1 block text-sm font-medium">Cancellation fee ($)</label>
+              <Input
+                id="cancellationFee"
+                type="number"
+                step="0.01"
+                min="0"
+                name="cancellationFee"
+                placeholder="0.00"
+                defaultValue={gig?.cancellationFee ?? ''}
               />
             </div>
           </div>
