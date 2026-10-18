@@ -14,6 +14,7 @@ import {
 import { MusicianCheckboxList } from '@/components/gigs/musician-checkbox-list'
 import { syncGigMusicians } from '@/app/gigs/actions'
 import { toDateInputValue } from '@/lib/dates'
+import { formatSetlistLabel } from '@/lib/setlist-label'
 import { musicianPaymentLossWarning } from '@/lib/musician-payment-warning'
 import { DEFAULT_MUSICIAN_NAMES } from '@/lib/musicians-defaults'
 import type { GigActionState } from '@/app/gigs/actions'
@@ -21,14 +22,6 @@ import type { GigWithDetails, Musician, SetlistSummary, Venue } from '@/lib/type
 
 const textareaClass =
   'flex min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none'
-
-function formatSetlistGigDate(d: Date) {
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function formatSetlistLabel(sl: SetlistSummary): string {
-  return `${sl.name} — ${sl._count.items} song${sl._count.items !== 1 ? 's' : ''}${sl.gig ? ` · ${sl.gig.venue.name}, ${formatSetlistGigDate(sl.gig.date)}` : ''}`
-}
 
 type FormAction = (state: GigActionState, formData: FormData) => Promise<GigActionState>
 

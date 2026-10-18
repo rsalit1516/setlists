@@ -157,6 +157,49 @@ export async function deleteGig(id: string): Promise<void> {
   redirect('/gigs')
 }
 
+export async function copySetlistToGig(gigId: string, sourceSetlistId: string): Promise<GigActionState> {
+  const gig = await prisma.gig.findUnique({
+    where: { id: gigId },
+    select: { setlistId: true, isActive: true },
+  })
+  if (!gig || !gig.isActive) return { error: 'Gig not found.' }
+  if (gig.setlistId === sourceSetlistId) return { error: 'Cannot copy a setlist onto itself.' }
+
+  const source = await prisma.setlist.findUnique({
+    where: { id: sourceSetlistId },
+    select: {
+      isActive: true,
+      items: {
+        where: { isActive: true },
+        select: { songId: true, section: true, setNumber: true, order: true },
+      },
+    },
+  })
+  if (!source || !source.isActive) return { error: 'Source setlist not found.' }
+  if (source.items.length === 0) return { error: 'Source setlist has no songs.' }
+
+  // One transaction so a failed clone can't leave the gig with its old songs
+  // already soft-deleted.
+  await prisma.$transaction([
+    prisma.setlistItem.updateMany({
+      where: { setlistId: gig.setlistId, isActive: true },
+      data: { isActive: false },
+    }),
+    prisma.setlistItem.createMany({
+      data: source.items.map((item) => ({
+        setlistId: gig.setlistId,
+        songId: item.songId,
+        section: item.section as SetSection,
+        setNumber: item.setNumber,
+        order: item.order,
+      })),
+    }),
+  ])
+
+  revalidatePath(`/gigs/${gigId}`)
+  return null
+}
+
 export async function addExpense(formData: FormData): Promise<void> {
   const gigId = formData.get('gigId') as string
   const description = formData.get('description') as string

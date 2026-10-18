@@ -19,6 +19,10 @@ vi.mock('@/lib/db', () => ({
       findUnique: vi.fn(),
       updateMany: vi.fn(),
     },
+    setlistItem: {
+      updateMany: vi.fn(),
+      createMany: vi.fn(),
+    },
     musician: {
       findMany: vi.fn(),
     },
@@ -52,6 +56,7 @@ import {
   createGig,
   updateGig,
   deleteGig,
+  copySetlistToGig,
   bulkAddMusicians,
   syncGigMusicians,
   updateMusicianPayment,
@@ -611,5 +616,91 @@ describe('deleteGig', () => {
   it('revalidates the gigs list before redirecting back to it', async () => {
     await expect(deleteGig('gig-1')).rejects.toThrow('REDIRECT:/gigs')
     expect(revalidatePath).toHaveBeenCalledWith('/gigs')
+  })
+})
+
+describe('copySetlistToGig', () => {
+  const sourceItems = [
+    { songId: 'song-1', section: 'MAIN', setNumber: 1, order: 1 },
+    { songId: 'song-2', section: 'ENCORE', setNumber: 1, order: 1 },
+  ]
+
+  beforeEach(() => {
+    vi.mocked(prisma.gig.findUnique).mockResolvedValue({ setlistId: 'target-sl', isActive: true } as never)
+    vi.mocked(prisma.setlist.findUnique).mockResolvedValue({ isActive: true, items: sourceItems } as never)
+    vi.mocked(prisma.setlistItem.updateMany).mockResolvedValue({ count: 3 } as never)
+    vi.mocked(prisma.setlistItem.createMany).mockResolvedValue({ count: 2 } as never)
+  })
+
+  it('soft-deletes the target items and clones the source items in one transaction', async () => {
+    const result = await copySetlistToGig('gig-1', 'source-sl')
+
+    expect(result).toBeNull()
+    expect(prisma.setlistItem.updateMany).toHaveBeenCalledWith({
+      where: { setlistId: 'target-sl', isActive: true },
+      data: { isActive: false },
+    })
+    expect(prisma.setlistItem.createMany).toHaveBeenCalledWith({
+      data: sourceItems.map((item) => ({ setlistId: 'target-sl', ...item })),
+    })
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(prisma.$transaction).mock.calls[0][0]).toHaveLength(2)
+    expect(revalidatePath).toHaveBeenCalledWith('/gigs/gig-1')
+  })
+
+  it('works when the target setlist is empty', async () => {
+    vi.mocked(prisma.setlistItem.updateMany).mockResolvedValue({ count: 0 } as never)
+
+    expect(await copySetlistToGig('gig-1', 'source-sl')).toBeNull()
+    expect(prisma.setlistItem.createMany).toHaveBeenCalledTimes(1)
+  })
+
+  it('only reads active source items and never copies wasPlayed', async () => {
+    await copySetlistToGig('gig-1', 'source-sl')
+
+    expect(vi.mocked(prisma.setlist.findUnique).mock.calls[0][0]).toMatchObject({
+      select: { items: { where: { isActive: true } } },
+    })
+    const rows = vi.mocked(prisma.setlistItem.createMany).mock.calls[0][0]?.data as Record<string, unknown>[]
+    expect(rows.every((r) => !('wasPlayed' in r))).toBe(true)
+  })
+
+  it('rejects copying a gig onto its own setlist', async () => {
+    const result = await copySetlistToGig('gig-1', 'target-sl')
+
+    expect(result).toEqual({ error: expect.any(String) })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('rejects an empty source setlist', async () => {
+    vi.mocked(prisma.setlist.findUnique).mockResolvedValue({ isActive: true, items: [] } as never)
+
+    expect(await copySetlistToGig('gig-1', 'source-sl')).toEqual({ error: expect.any(String) })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('rejects an inactive or missing source setlist', async () => {
+    vi.mocked(prisma.setlist.findUnique).mockResolvedValue({ isActive: false, items: sourceItems } as never)
+    expect(await copySetlistToGig('gig-1', 'source-sl')).toEqual({ error: expect.any(String) })
+
+    vi.mocked(prisma.setlist.findUnique).mockResolvedValue(null as never)
+    expect(await copySetlistToGig('gig-1', 'source-sl')).toEqual({ error: expect.any(String) })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('rejects a missing or inactive gig', async () => {
+    vi.mocked(prisma.gig.findUnique).mockResolvedValue(null as never)
+    expect(await copySetlistToGig('gig-1', 'source-sl')).toEqual({ error: 'Gig not found.' })
+
+    vi.mocked(prisma.gig.findUnique).mockResolvedValue({ setlistId: 'target-sl', isActive: false } as never)
+    expect(await copySetlistToGig('gig-1', 'source-sl')).toEqual({ error: 'Gig not found.' })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('does not revalidate when the transaction fails', async () => {
+    vi.mocked(prisma.$transaction).mockRejectedValueOnce(new Error('db down'))
+
+    await expect(copySetlistToGig('gig-1', 'source-sl')).rejects.toThrow('db down')
+    expect(revalidatePath).not.toHaveBeenCalled()
   })
 })

@@ -7,6 +7,7 @@ import {
   deriveMusicianPayoutStatus,
 } from '@/lib/services/gigs'
 import { getMusicians } from '@/lib/services/musicians'
+import { getSetlists } from '@/lib/services/setlists'
 import {
   addExpense,
   removeExpense,
@@ -16,6 +17,7 @@ import {
   updateMusicianPayment,
   markAllMusiciansPaid,
 } from '@/app/gigs/actions'
+import { CopySetlistDialog } from '@/components/gigs/copy-setlist-dialog'
 import { EditFinancialsForm } from '@/components/gigs/edit-financials-form'
 import { MusicianCheckboxList } from '@/components/gigs/musician-checkbox-list'
 import { PrintMenuItem } from '@/components/gigs/print-button'
@@ -105,8 +107,10 @@ export default async function GigPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [gig, roster] = await Promise.all([getGig(id), getMusicians()])
+  const [gig, roster, setlists] = await Promise.all([getGig(id), getMusicians(), getSetlists()])
   if (!gig) notFound()
+
+  const copySources = setlists.filter((sl) => sl.id !== gig.setlist.id && sl._count.items > 0)
 
   const addedMusicianIds = new Set(gig.musicians.map((m) => m.musicianId))
   const availableMusicians = roster.filter((m) => !addedMusicianIds.has(m.id))
@@ -163,6 +167,11 @@ export default async function GigPage({
           <Link href={`/setlists/${gig.setlist.id}`} className="text-foreground hover:underline">
             Edit Setlist
           </Link>
+          <CopySetlistDialog
+            gigId={gig.id}
+            sources={copySources}
+            existingSongCount={gig.setlist.items.length}
+          />
           <DropdownMenu>
             <DropdownMenuTrigger className="flex items-center gap-1 rounded-sm text-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50">
               Export <span className="text-[10px]">▾</span>
@@ -191,6 +200,14 @@ export default async function GigPage({
             <Link href={`/setlists/${gig.setlist.id}`} className="underline">
               Edit setlist
             </Link>
+            {' or '}
+            <CopySetlistDialog
+              gigId={gig.id}
+              sources={copySources}
+              existingSongCount={0}
+              triggerLabel="copy from another setlist"
+              triggerClassName="text-muted-foreground underline"
+            />
           </p>
         ) : (
           <>
