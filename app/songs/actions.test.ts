@@ -32,10 +32,13 @@ vi.mock('@/lib/services/azure-blob', () => ({
 
 vi.mock('next/headers', () => ({ cookies: vi.fn() }))
 
+vi.mock('@/lib/services/lyrics-import', () => ({ importLyricsForSong: vi.fn() }))
+
 import prisma from '@/lib/db'
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
-import { createSong, updateSong, toggleSongsGenreFilter } from './actions'
+import { importLyricsForSong } from '@/lib/services/lyrics-import'
+import { createSong, updateSong, findLyrics, toggleSongsGenreFilter } from './actions'
 import { SONGS_GENRES_COOKIE } from '@/lib/songs-genre-filter'
 
 beforeEach(() => vi.clearAllMocks())
@@ -125,6 +128,29 @@ describe('createSong', () => {
     const result = await createSong(null, fd)
 
     expect(result).toEqual({ error: 'Title is required.' })
+    expect(prisma.song.create).not.toHaveBeenCalled()
+  })
+
+  it('stores a valid BPM as a number', async () => {
+    vi.mocked(prisma.song.create).mockResolvedValue({ id: 'song-1' } as never)
+    await expect(createSong(null, buildFormData({ bpm: '108' }))).rejects.toThrow('REDIRECT:/songs')
+    expect(prisma.song.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ bpm: 108 }) })
+    )
+  })
+
+  it('stores null when BPM is 0, so a wrong value can be cleared', async () => {
+    vi.mocked(prisma.song.create).mockResolvedValue({ id: 'song-1' } as never)
+    await expect(createSong(null, buildFormData({ bpm: '0' }))).rejects.toThrow('REDIRECT:/songs')
+    expect(prisma.song.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ bpm: null }) })
+    )
+  })
+
+  it('returns a validation error and never touches the database when BPM is out of range', async () => {
+    const result = await createSong(null, buildFormData({ bpm: '12' }))
+
+    expect(result).toEqual({ error: expect.stringContaining('BPM must be between 30 and 300') })
     expect(prisma.song.create).not.toHaveBeenCalled()
   })
 
@@ -235,6 +261,13 @@ describe('updateSong', () => {
     })
   })
 
+  it('rejects an out-of-range BPM on edit without writing', async () => {
+    const result = await updateSong(null, buildFormData({ id: 'song-1', bpm: '301' }))
+
+    expect(result).toEqual({ error: expect.stringContaining('BPM must be between 30 and 300') })
+    expect(prisma.song.update).not.toHaveBeenCalled()
+  })
+
   it('moves a song to SHELVED', async () => {
     const fd = buildFormData({ id: 'song-1', status: 'SHELVED' })
 
@@ -314,5 +347,88 @@ describe('toggleSongsGenreFilter', () => {
     await toggleSongsGenreFilter('g-1')
 
     expect(revalidatePath).toHaveBeenCalledWith('/songs')
+  })
+})
+
+describe('lyrics provenance', () => {
+  beforeEach(() => {
+    vi.mocked(prisma.song.update).mockResolvedValue({} as never)
+    vi.mocked(prisma.song.create).mockResolvedValue({ id: 'song-1' } as never)
+  })
+
+  it('marks lyrics typed into a new song as MANUAL', async () => {
+    await expect(createSong(null, buildFormData({ lyrics: '<p>Hello</p>' }))).rejects.toThrow('REDIRECT:/songs')
+
+    expect(prisma.song.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ lyricsSource: 'MANUAL', lyricsSourceUrl: null, lyricsImportedAt: null }),
+    })
+  })
+
+  it('flips imported lyrics to MANUAL when a band member edits them', async () => {
+    vi.mocked(prisma.song.findUnique).mockResolvedValue({ chartFileUrl: null, lyrics: '<p>Old</p>' } as never)
+
+    await expect(updateSong(null, buildFormData({ id: 'song-1', lyrics: '<p>Corrected</p>' }))).rejects.toThrow(
+      'REDIRECT:/songs'
+    )
+
+    expect(prisma.song.update).toHaveBeenCalledWith({
+      where: { id: 'song-1' },
+      data: expect.objectContaining({ lyricsSource: 'MANUAL', lyricsSourceUrl: null, lyricsImportedAt: null }),
+    })
+  })
+
+  it('leaves the provenance fields alone when lyrics are unchanged', async () => {
+    vi.mocked(prisma.song.findUnique).mockResolvedValue({ chartFileUrl: null, lyrics: '<p>Same</p>' } as never)
+
+    await expect(updateSong(null, buildFormData({ id: 'song-1', title: 'Renamed', lyrics: '<p>Same</p>' }))).rejects.toThrow(
+      'REDIRECT:/songs'
+    )
+
+    const { data } = vi.mocked(prisma.song.update).mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(data).not.toHaveProperty('lyricsSource')
+  })
+
+  it('does not treat the editor re-serializing blank lines as an edit', async () => {
+    vi.mocked(prisma.song.findUnique).mockResolvedValue({ chartFileUrl: null, lyrics: '<p>A</p><p><br></p><p>B</p>' } as never)
+
+    await expect(
+      updateSong(null, buildFormData({ id: 'song-1', lyrics: '<p>A</p><p></p><p>B</p>' }))
+    ).rejects.toThrow('REDIRECT:/songs')
+
+    const { data } = vi.mocked(prisma.song.update).mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(data).not.toHaveProperty('lyricsSource')
+  })
+
+  it('clears the source when lyrics are emptied', async () => {
+    vi.mocked(prisma.song.findUnique).mockResolvedValue({ chartFileUrl: null, lyrics: '<p>Old</p>' } as never)
+
+    await expect(updateSong(null, buildFormData({ id: 'song-1', lyrics: '' }))).rejects.toThrow('REDIRECT:/songs')
+
+    expect(prisma.song.update).toHaveBeenCalledWith({
+      where: { id: 'song-1' },
+      data: expect.objectContaining({ lyricsSource: null }),
+    })
+  })
+})
+
+describe('findLyrics', () => {
+  it('revalidates the song page after a successful import', async () => {
+    vi.mocked(importLyricsForSong).mockResolvedValue('imported')
+
+    expect(await findLyrics('song-1')).toEqual({ outcome: 'imported' })
+    expect(revalidatePath).toHaveBeenCalledWith('/songs/song-1')
+  })
+
+  it('reports no-match without revalidating', async () => {
+    vi.mocked(importLyricsForSong).mockResolvedValue('no-match')
+
+    expect(await findLyrics('song-1')).toEqual({ outcome: 'no-match' })
+    expect(revalidatePath).not.toHaveBeenCalled()
+  })
+
+  it('turns a provider failure into an error outcome instead of throwing', async () => {
+    vi.mocked(importLyricsForSong).mockRejectedValue(new Error('boom'))
+
+    expect(await findLyrics('song-1')).toEqual({ outcome: 'error' })
   })
 })

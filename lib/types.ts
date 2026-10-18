@@ -1,5 +1,6 @@
 export type SongStatus = 'READY' | 'IN_PROGRESS' | 'WISH' | 'SHELVED'
-export type SetSection = 'SOUNDCHECK' | 'MAIN' | 'ENCORE'
+export type LyricsSource = 'MANUAL' | 'IMPORTED'
+export type SetSection ='SOUNDCHECK' | 'MAIN' | 'ENCORE'
 
 export const SONG_STATUS_LABELS: Record<SongStatus, string> = {
   READY: 'Ready',
@@ -63,7 +64,7 @@ export type SetlistWithItems = {
   createdAt: Date
   updatedAt: Date
   items: SetlistItem[]
-  gig: { id: string; date: Date; venue: Venue } | null
+  gig: { id: string; date: Date; cancelledAt: Date | null; venue: Venue } | null
 }
 
 export type Song = {
@@ -79,6 +80,9 @@ export type Song = {
   lyricsUrl: string | null
   chartsUrl: string | null
   lyrics: string | null
+  lyricsSource: LyricsSource | null
+  lyricsSourceUrl: string | null
+  lyricsImportedAt: Date | null
   chartFileUrl: string | null
   chartFileType: string | null
   chartFileName: string | null
@@ -117,6 +121,8 @@ export type GigSummary = {
   paidAt: Date | null
   tips: string | null
   otherRevenue: string | null
+  cancelledAt: Date | null
+  cancellationFee: string | null
   venue: { name: string }
   setlist: { name: string }
   setlistCreator: { name: string } | null
@@ -151,7 +157,9 @@ export type PerformanceSong = {
   song: {
     title: string
     key: string | null
+    bpm: number | null
     lyrics: string | null
+    lyricsSource?: LyricsSource | null
     chartFileUrl: string | null
     chartFileType: string | null
   }
@@ -175,6 +183,8 @@ export type GigWithDetails = {
   paidAt: Date | null
   tips: string | null
   otherRevenue: string | null
+  cancelledAt: Date | null
+  cancellationFee: string | null
   venueId: string
   setlistId: string
   setlistCreatorId: string | null

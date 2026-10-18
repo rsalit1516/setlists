@@ -5,6 +5,7 @@ import type { TouchEvent as ReactTouchEvent } from 'react'
 import Link from 'next/link'
 import type { GigPerformanceData, PerformanceSong } from '@/lib/types'
 import { PerformanceSongList } from '@/components/gigs/performance-song-list'
+import { MetronomeControl } from '@/components/gigs/metronome-control'
 
 const CHART_CACHE = 'performance-chart-files'
 
@@ -114,6 +115,7 @@ export function PerformanceView({ gig }: { gig: GigPerformanceData }) {
   useEffect(() => {
     if (phase !== 'ready') return
     function handleKey(e: KeyboardEvent) {
+      if (e.target instanceof Element && e.target.closest('[data-no-nav]')) return
       if (sidebarOpen) {
         if (e.key === 'Escape') setSidebarOpen(false)
         return
@@ -178,7 +180,7 @@ export function PerformanceView({ gig }: { gig: GigPerformanceData }) {
 
   return (
     <div
-      className="fixed inset-0 flex flex-col overscroll-none bg-black text-white"
+      className="fixed inset-0 z-20 flex flex-col overscroll-none bg-black text-white"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -207,6 +209,7 @@ export function PerformanceView({ gig }: { gig: GigPerformanceData }) {
         </span>
         <h1 className="min-w-0 flex-1 truncate text-center text-sm font-semibold">{current.song.title}</h1>
         {current.song.key && <span className="shrink-0 text-white/60">{current.song.key}</span>}
+        {current.song.bpm && <MetronomeControl key={current.id} bpm={current.song.bpm} />}
       </div>
 
       {/* Tab bar */}
@@ -241,6 +244,11 @@ export function PerformanceView({ gig }: { gig: GigPerformanceData }) {
           {view === 'lyrics' ? (
             hasLyrics ? (
               <div className="h-full overflow-y-auto px-6 py-8">
+                {current.song.lyricsSource === 'IMPORTED' && (
+                  <p className="mx-auto mb-4 max-w-2xl text-sm text-amber-300">
+                    Imported automatically — not yet reviewed by the band.
+                  </p>
+                )}
                 <div
                   className="rich-text-content mx-auto max-w-2xl text-2xl leading-relaxed sm:text-3xl"
                   dangerouslySetInnerHTML={{ __html: current.song.lyrics! }}

@@ -48,6 +48,8 @@ function makeGig(overrides: Partial<GigWithDetails> = {}): GigWithDetails {
     paidAt: null,
     tips: null,
     otherRevenue: null,
+    cancelledAt: null,
+    cancellationFee: null,
     venueId: 'v-1',
     setlistId: 'sl-1',
     setlistCreatorId: null,
@@ -92,9 +94,9 @@ describe('GigForm — setlist picker', () => {
     fireEvent.click(screen.getByLabelText('Copy an existing setlist'))
     await user.click(screen.getByRole('combobox', { name: 'Setlist' }))
 
-    expect(screen.getByRole('option', { name: 'Friday Night — 12 songs' })).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: 'Friday Night — 12 songs' })).toBeInTheDocument()
     expect(
-      screen.getByRole('option', { name: 'Greatest Hits — 8 songs · The Jazz Club, May 1, 2026' })
+      await screen.findByRole('option', { name: 'Greatest Hits — 8 songs · The Jazz Club, May 1, 2026' })
     ).toBeInTheDocument()
   })
 
@@ -142,6 +144,8 @@ describe('GigForm — setlist picker', () => {
       paidAt: null,
       tips: null,
       otherRevenue: null,
+      cancelledAt: null,
+      cancellationFee: null,
       venueId: 'v-1',
       setlistId: 'sl-1',
       setlistCreatorId: null,
@@ -183,6 +187,8 @@ describe('GigForm — financials fields', () => {
       paidAt: new Date('2026-08-16T12:00:00'),
       tips: '40',
       otherRevenue: '15',
+      cancelledAt: null,
+      cancellationFee: null,
       venueId: 'v-1',
       setlistId: 'sl-1',
       setlistCreatorId: null,
@@ -215,6 +221,8 @@ describe('GigForm — financials fields', () => {
       paidAt: null,
       tips: null,
       otherRevenue: null,
+      cancelledAt: null,
+      cancellationFee: null,
       venueId: 'v-1',
       setlistId: 'sl-1',
       setlistCreatorId: null,
@@ -383,7 +391,7 @@ describe('GigForm — setlist creator', () => {
 
     await user.click(screen.getByRole('combobox', { name: 'Setlist created by' }))
 
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
       'None',
       'Andrew Guerrero',
       'Jeff Zbar',
@@ -408,11 +416,37 @@ describe('GigForm — setlist creator', () => {
     expect(creatorInput().value).toBe('m-9')
 
     await user.click(screen.getByRole('combobox', { name: 'Setlist created by' }))
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
       'None',
       'Andrew Guerrero',
       'Former Member',
       'Jeff Zbar',
     ])
+  })
+})
+
+describe('GigForm — cancellation', () => {
+  it('starts un-cancelled with the date and fee fields hidden', () => {
+    render(<GigForm venues={mockVenues} action={noopAction} />)
+
+    expect(screen.getByLabelText('Cancelled')).not.toBeChecked()
+    expect(screen.getByLabelText('Cancelled on').closest('.hidden')).not.toBeNull()
+  })
+
+  it('reveals the cancellation date and fee when toggled on', () => {
+    render(<GigForm venues={mockVenues} action={noopAction} />)
+
+    fireEvent.click(screen.getByLabelText('Cancelled'))
+
+    expect(screen.getByLabelText('Cancelled on').closest('.hidden')).toBeNull()
+  })
+
+  it('pre-fills a cancelled gig from its saved date and fee', () => {
+    const gig = makeGig({ cancelledAt: new Date('2026-10-16T12:00:00Z'), cancellationFee: '150.00' })
+    render(<GigForm venues={mockVenues} gig={gig} action={noopAction} />)
+
+    expect(screen.getByLabelText('Cancelled')).toBeChecked()
+    expect(screen.getByLabelText('Cancelled on')).toHaveValue('2026-10-16')
+    expect(screen.getByLabelText('Cancellation fee ($)')).toHaveValue(150)
   })
 })

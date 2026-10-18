@@ -92,6 +92,13 @@ export default async function SetlistPage({
           </div>
         </div>
 
+        {setlist.gig?.cancelledAt && (
+          <div className="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            This gig was cancelled on {formatDate(setlist.gig.cancelledAt)}. Mark songs as played
+            in Revision mode if any were performed.
+          </div>
+        )}
+
         {revision && (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
             <span>Revision mode — mark each song as played or skipped.</span>

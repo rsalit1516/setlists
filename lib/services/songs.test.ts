@@ -25,6 +25,9 @@ const baseSong = {
   lyricsUrl: null,
   chartsUrl: null,
   lyrics: null,
+  lyricsSource: null,
+  lyricsSourceUrl: null,
+  lyricsImportedAt: null,
   chartFileUrl: null,
   chartFileType: null,
   chartFileName: null,
@@ -51,7 +54,7 @@ describe("getSongs", () => {
   });
 
   it("includes genres when includeGenres is true", async () => {
-    vi.mocked(prisma.song.findMany).mockResolvedValue([{ ...baseSong, genres: [genreDead] }]);
+    vi.mocked(prisma.song.findMany).mockResolvedValue([{ ...baseSong, genres: [genreDead] }] as never);
     const result = await getSongs(undefined, undefined, true);
     expect(result).toEqual([{ ...baseSong, genres: [genreDead] }]);
     expect(prisma.song.findMany).toHaveBeenCalledWith({
@@ -78,7 +81,7 @@ describe("getSongs", () => {
   });
 
   it("filters by genre ids when provided, matching any of them", async () => {
-    vi.mocked(prisma.song.findMany).mockResolvedValue([{ ...baseSong, genres: [genreDead] }]);
+    vi.mocked(prisma.song.findMany).mockResolvedValue([{ ...baseSong, genres: [genreDead] }] as never);
     const result = await getSongs(undefined, ["genre-1", "genre-2"], true);
     expect(result).toEqual([{ ...baseSong, genres: [genreDead] }]);
     expect(prisma.song.findMany).toHaveBeenCalledWith({
