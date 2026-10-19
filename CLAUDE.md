@@ -155,6 +155,7 @@ This app must work on **desktop, tablet, and phone**. Always design mobile-first
 - **What to test**: service functions (unit), Server Actions (unit with mocked Prisma), and key interactive Client Components.
 - **What not to test**: plain layout/display Server Components that are just data → JSX — they have no logic to test.
 - **Mandatory coverage**: every new or changed function in `lib/services/*.ts` or `actions.ts` ships with corresponding test coverage in the same change (new tests for new logic, updated assertions for changed logic). Don't leave this for a follow-up — if a schema or behavior change touches a file with an existing `*.test.ts`, that test file is part of the change.
+- **Tenant isolation**: `lib/tenant-isolation.integration.test.ts` runs the real services/actions against a local Postgres with two bands (skipped unless `TENANT_TEST_DATABASE_URL` is set; localhost only; runs in CI's `isolation` job). When you add a band-owned table, service or action, extend it — see `docs/tenant-isolation-tests.md`.
 - Mock the Prisma singleton with `vi.mock('@/lib/db', () => ({ default: { song: { findMany: vi.fn(), ... } } }))`.
 - Run tests with `npm test`; run a single file with `npx vitest run <path>`.
 

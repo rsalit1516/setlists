@@ -25,6 +25,20 @@ const genres = [
 const bandId = '01900000-0000-7000-8000-000000000001'
 const otherBandId = '01900000-0000-7000-8000-0000000000a2'
 
+// Logins for when sign-in lands (#140): one admin per band, plus a user in both bands to
+// exercise the band switcher.
+const users = [
+  { id: '01900000-0000-7000-8000-0000000000b1', email: 'ruminators.admin@example.com', name: 'Ruminators Admin' },
+  { id: '01900000-0000-7000-8000-0000000000b2', email: 'pilots.admin@example.com', name: 'Test Pilots Admin' },
+  { id: '01900000-0000-7000-8000-0000000000b3', email: 'both.bands@example.com', name: 'Casey Both' },
+]
+const memberships = [
+  { id: '01900000-0000-7000-8000-0000000000c1', userId: users[0].id, bandId, role: 'ADMIN' as const },
+  { id: '01900000-0000-7000-8000-0000000000c2', userId: users[1].id, bandId: otherBandId, role: 'ADMIN' as const },
+  { id: '01900000-0000-7000-8000-0000000000c3', userId: users[2].id, bandId, role: 'MEMBER' as const },
+  { id: '01900000-0000-7000-8000-0000000000c4', userId: users[2].id, bandId: otherBandId, role: 'MEMBER' as const },
+]
+
 const musicians = [
   { id: 'seed-musician-drums', name: 'Dana Drummer', bandId },
   { id: 'seed-musician-bass', name: 'Sam Bassman', bandId },
@@ -82,6 +96,12 @@ async function main() {
   ]
   for (const b of bands) {
     await prisma.band.upsert({ where: { id: b.id }, update: b, create: b })
+  }
+  for (const u of users) {
+    await prisma.user.upsert({ where: { id: u.id }, update: u, create: u })
+  }
+  for (const m of memberships) {
+    await prisma.bandMember.upsert({ where: { id: m.id }, update: m, create: m })
   }
 
   for (const g of genres) {
@@ -161,7 +181,40 @@ async function main() {
   }
   await prisma.gig.upsert({ where: { id: otherGig.id }, update: otherGig, create: otherGig })
 
-  console.log(`Seeded ${songs.length} songs, ${musicians.length} musicians, 1 venue, 1 gig on ${new URL(connectionString!).host}.`)
+  // A played, unpaid past gig and an expense that exist only for the second band, so the stats and
+  // finance pages visibly differ between the two bands.
+  await prisma.setlist.upsert({
+    where: { id: 'seed-setlist-other-past' },
+    update: {},
+    create: { id: 'seed-setlist-other-past', name: 'Hangar Night (past)', bandId: otherBandId },
+  })
+  const pastItem = { id: 'seed-item-other-1', order: 0, section: 'MAIN' as const, setNumber: 1, wasPlayed: true, songId: 'seed-song-02', setlistId: 'seed-setlist-other-past' }
+  await prisma.setlistItem.upsert({ where: { id: pastItem.id }, update: pastItem, create: pastItem })
+  const pastDate = new Date(gigDate.getTime() - 44 * 24 * 60 * 60 * 1000)
+  const otherPastGig = {
+    id: 'seed-gig-other-past',
+    date: pastDate,
+    notes: 'Second band, past and unpaid.',
+    amountContracted: 300,
+    bandId: otherBandId,
+    venueId: otherVenue.id,
+    setlistId: 'seed-setlist-other-past',
+  }
+  await prisma.gig.upsert({ where: { id: otherPastGig.id }, update: otherPastGig, create: otherPastGig })
+  await prisma.expense.upsert({
+    where: { id: 'seed-expense-other-1' },
+    update: {},
+    create: { id: 'seed-expense-other-1', description: 'Van rental', amount: 75, gigId: otherPastGig.id },
+  })
+  await prisma.gigMusician.upsert({
+    where: { id: 'seed-gigmusician-other-1' },
+    update: {},
+    create: { id: 'seed-gigmusician-other-1', gigId: otherPastGig.id, musicianId: otherMusician.id },
+  })
+
+  console.log(
+    `Seeded ${songs.length} songs, ${bands.length} bands, ${users.length} users, ${musicians.length + 1} musicians, 3 gigs on ${new URL(connectionString!).host}.`
+  )
 }
 
 main()
