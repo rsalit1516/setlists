@@ -3,6 +3,8 @@
 import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { getBandContext } from '@/lib/band'
+import { assertOwned, isOwned } from '@/lib/ownership'
 import type { SetSection } from '@/lib/types'
 
 export type SetlistActionState = { error: string } | null
@@ -19,6 +21,9 @@ export async function addItem(formData: FormData): Promise<void> {
   const section = formData.get('section') as SetSection
   const setNumber = parseInt(formData.get('setNumber') as string) || 1
 
+  const { bandId } = await getBandContext()
+  await assertOwned('setlist', bandId, setlistId)
+
   const lastItem = await prisma.setlistItem.findFirst({
     where: { setlistId, section, setNumber },
     orderBy: { order: 'desc' },
@@ -33,12 +38,16 @@ export async function addItem(formData: FormData): Promise<void> {
 }
 
 export async function removeItem(itemId: string): Promise<void> {
+  const { bandId } = await getBandContext()
+  await assertOwned('setlistItem', bandId, itemId)
   const item = await prisma.setlistItem.update({ where: { id: itemId }, data: { isActive: false } })
   revalidatePath(`/setlists/${item.setlistId}`)
 }
 
 export async function moveItem(itemId: string, direction: 'up' | 'down'): Promise<void> {
   type Row = { id: string; setlistId: string; section: string; setNumber: number; order: number }
+  const { bandId } = await getBandContext()
+  await assertOwned('setlistItem', bandId, itemId)
   const item = (await prisma.setlistItem.findUnique({ where: { id: itemId } })) as Row | null
   if (!item) return
 
@@ -62,6 +71,9 @@ export async function moveItem(itemId: string, direction: 'up' | 'down'): Promis
 }
 
 export async function reorderItems(setlistId: string, orderedItemIds: string[]): Promise<void> {
+  const { bandId } = await getBandContext()
+  await assertOwned('setlist', bandId, setlistId)
+  await assertOwned('setlistItem', bandId, ...orderedItemIds)
   await prisma.$transaction(
     orderedItemIds.map((id, index) =>
       prisma.setlistItem.update({ where: { id }, data: { order: index } })
@@ -90,6 +102,10 @@ export async function moveItemToSection(
     throw new Error('moveItemToSection: itemId must be included in destinationOrderedIds')
   }
 
+  const { bandId } = await getBandContext()
+  await assertOwned('setlist', bandId, setlistId)
+  await assertOwned('setlistItem', bandId, ...destinationOrderedIds, ...sourceOrderedIds)
+
   const destinationUpdates = destinationOrderedIds.map((id, index) =>
     prisma.setlistItem.update({
       where: { id },
@@ -112,6 +128,8 @@ export async function togglePlayed(
   current: boolean | null
 ): Promise<void> {
   const next = current === true ? false : current === false ? null : true
+  const { bandId } = await getBandContext()
+  await assertOwned('setlistItem', bandId, itemId)
   const item = await prisma.setlistItem.update({
     where: { id: itemId },
     data: { wasPlayed: next } as Record<string, unknown>,
@@ -130,6 +148,9 @@ export async function markSectionPlayed(
   setlistId: string,
   scope: MarkPlayedScope
 ): Promise<void> {
+  const { bandId } = await getBandContext()
+  await assertOwned('setlist', bandId, setlistId)
+
   const sectionFilter =
     scope === 'all'
       ? { in: ['MAIN', 'ENCORE'] as SetSection[] }
@@ -155,6 +176,9 @@ export async function renameSetlist(
   const id = formData.get('id') as string
   const name = (formData.get('name') as string).trim()
   if (!name) return { error: 'Name is required.' }
+
+  const { bandId } = await getBandContext()
+  if (!(await isOwned('setlist', bandId, id))) return { error: 'Setlist not found.' }
 
   try {
     await prisma.setlist.update({ where: { id }, data: { name } })

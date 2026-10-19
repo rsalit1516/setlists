@@ -136,6 +136,7 @@ This app must work on **desktop, tablet, and phone**. Always design mobile-first
 
 - Put mutations in `actions.ts` files co-located with their route: `app/songs/actions.ts`.
 - Mark each function individually with `'use server'` **or** put `'use server'` at the top of the file.
+- **Ids from FormData or arguments are untrusted.** Before touching an existing row, get the band with `getBandContext()` and prove ownership with `lib/ownership.ts`: `assertOwned(entity, bandId, ...ids)` throws `NotFoundError` (use in actions that return `void`); `isOwned` / `areOwned` return a boolean (use in actions that return `{ error }` state, e.g. `return { error: 'Gig not found.' }`). Check foreign keys in the payload too (venue, setlist, musician ids). Creates stamp `bandId` from `getBandContext()`. Child rows (expense, gigMusician, setlistItem) inherit ownership through their parent. Songs and genres are global until #133 and are not checked.
 - After mutating, call `revalidatePath('/songs')` (or the relevant path) so the page re-renders fresh data.
 - For redirect-after-create flows, call `revalidatePath` then `redirect` — **nothing runs after `redirect`**.
 - Use `useActionState` in Client Components to show pending/error states.

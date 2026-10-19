@@ -1,7 +1,8 @@
 'use server'
 
 import prisma from '@/lib/db'
-import { DEFAULT_BAND_ID } from '@/lib/band'
+import { getBandContext } from '@/lib/band'
+import { assertOwned, isOwned } from '@/lib/ownership'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -22,8 +23,9 @@ export async function createVenue(
   const data = parseVenueFormData(formData)
   if (!data.name) return { error: 'Name is required.' }
 
+  const { bandId } = await getBandContext()
   try {
-    await prisma.venue.create({ data: { ...data, bandId: DEFAULT_BAND_ID } })
+    await prisma.venue.create({ data: { ...data, bandId } })
   } catch {
     return { error: 'Failed to create venue.' }
   }
@@ -40,6 +42,9 @@ export async function updateVenue(
   const data = parseVenueFormData(formData)
   if (!data.name) return { error: 'Name is required.' }
 
+  const { bandId } = await getBandContext()
+  if (!(await isOwned('venue', bandId, id))) return { error: 'Venue not found.' }
+
   try {
     await prisma.venue.update({ where: { id }, data })
   } catch {
@@ -51,6 +56,8 @@ export async function updateVenue(
 }
 
 export async function deleteVenue(id: string): Promise<void> {
+  const { bandId } = await getBandContext()
+  await assertOwned('venue', bandId, id)
   await prisma.venue.update({ where: { id }, data: { isActive: false } })
   revalidatePath('/venues')
 }

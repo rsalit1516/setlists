@@ -19,11 +19,24 @@ vi.mock('next/navigation', () => ({
   }),
 }))
 
+vi.mock('@/lib/ownership', async () => ({
+  ...(await vi.importActual<typeof import('@/lib/ownership')>('@/lib/ownership')),
+  isOwned: vi.fn(),
+  areOwned: vi.fn(),
+  assertOwned: vi.fn(),
+}))
+
 import prisma from '@/lib/db'
+import { isOwned, areOwned, assertOwned, NotFoundError } from '@/lib/ownership'
 import { revalidatePath } from 'next/cache'
 import { createMusician, updateMusician, deleteMusician } from './actions'
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.mocked(isOwned).mockResolvedValue(true)
+  vi.mocked(areOwned).mockResolvedValue(true)
+  vi.mocked(assertOwned).mockResolvedValue(undefined)
+})
 
 function buildFormData(overrides: Record<string, string> = {}): FormData {
   const fields: Record<string, string> = {
@@ -103,5 +116,28 @@ describe('deleteMusician', () => {
       data: { isActive: false },
     })
     expect(revalidatePath).toHaveBeenCalledWith('/musicians')
+  })
+})
+
+describe('band ownership', () => {
+  const BAND = '01900000-0000-7000-8000-000000000001'
+
+  it("updateMusician returns \"not found\" for another band's musician without writing", async () => {
+    vi.mocked(isOwned).mockResolvedValue(false)
+
+    const result = await updateMusician(null, buildFormData({ id: 'foreign-m' }))
+
+    expect(result).toEqual({ error: 'Musician not found.' })
+    expect(isOwned).toHaveBeenCalledWith('musician', BAND, 'foreign-m')
+    expect(prisma.musician.update).not.toHaveBeenCalled()
+  })
+
+  it("deleteMusician rejects another band's musician without writing", async () => {
+    vi.mocked(assertOwned).mockRejectedValue(new NotFoundError('musician'))
+
+    await expect(deleteMusician('foreign-m')).rejects.toBeInstanceOf(NotFoundError)
+
+    expect(assertOwned).toHaveBeenCalledWith('musician', BAND, 'foreign-m')
+    expect(prisma.musician.update).not.toHaveBeenCalled()
   })
 })
