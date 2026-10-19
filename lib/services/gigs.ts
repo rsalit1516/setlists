@@ -37,9 +37,9 @@ export function deriveMusicianPayoutStatus(
   return 'some'
 }
 
-export async function getGigs(): Promise<GigSummary[]> {
+export async function getGigs(bandId: string): Promise<GigSummary[]> {
   const rows = await prisma.gig.findMany({
-    where: { isActive: true },
+    where: { bandId, isActive: true },
     orderBy: { date: 'desc' },
     include: {
       venue: { select: { name: true } },
@@ -61,16 +61,16 @@ export async function getGigs(): Promise<GigSummary[]> {
 // Cheap existence check — lets the Month calendar view show the same "No gigs
 // yet." empty state as Compact/Quarter without fetching the full gig history
 // just to find out the app has zero gigs (as opposed to zero gigs *this month*).
-export async function hasAnyGigs(): Promise<boolean> {
-  const count = await prisma.gig.count({ where: { isActive: true } })
+export async function hasAnyGigs(bandId: string): Promise<boolean> {
+  const count = await prisma.gig.count({ where: { bandId, isActive: true } })
   return count > 0
 }
 
 // Half-open range [start, end) — used by the Month calendar view so it only
 // queries the visible month instead of the full gig history.
-export async function getGigsInRange(start: Date, end: Date): Promise<GigSummary[]> {
+export async function getGigsInRange(bandId: string, start: Date, end: Date): Promise<GigSummary[]> {
   const rows = await prisma.gig.findMany({
-    where: { isActive: true, date: { gte: start, lt: end } },
+    where: { bandId, isActive: true, date: { gte: start, lt: end } },
     orderBy: { date: 'asc' },
     include: {
       venue: { select: { name: true } },
@@ -121,9 +121,9 @@ export function groupGigsByMonth(gigs: GigSummary[], today: Date = new Date()): 
   return Array.from(groups.values())
 }
 
-export async function getGigForPerformance(id: string): Promise<GigPerformanceData | null> {
+export async function getGigForPerformance(bandId: string, id: string): Promise<GigPerformanceData | null> {
   return prisma.gig.findFirst({
-    where: { id, isActive: true },
+    where: { id, bandId, isActive: true },
     select: {
       id: true,
       date: true,
@@ -159,9 +159,9 @@ export async function getGigForPerformance(id: string): Promise<GigPerformanceDa
   })
 }
 
-export async function getGig(id: string): Promise<GigWithDetails | null> {
+export async function getGig(bandId: string, id: string): Promise<GigWithDetails | null> {
   const row = await prisma.gig.findFirst({
-    where: { id, isActive: true },
+    where: { id, bandId, isActive: true },
     include: {
       venue: true,
       setlistCreator: true,

@@ -1,3 +1,4 @@
+import { getBandContext } from '@/lib/band'
 import { getFinanceReport } from '@/lib/services/finance'
 import {
   Table,
@@ -49,7 +50,8 @@ function YearStatCard({ summary }: { summary: FinanceYearSummary }) {
 const MONEY_HEADS = ['Contracted', 'Paid by venue', 'Tips', 'Other revenue', 'Expenses', 'Musician payouts', 'Net']
 
 export default async function FinancePage() {
-  const report = await getFinanceReport()
+  const { bandId } = await getBandContext()
+  const report = await getFinanceReport(bandId)
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">

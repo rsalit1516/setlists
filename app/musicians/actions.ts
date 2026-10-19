@@ -1,6 +1,8 @@
 'use server'
 
 import prisma from '@/lib/db'
+import { getBandContext } from '@/lib/band'
+import { assertOwned, isOwned } from '@/lib/ownership'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -19,8 +21,9 @@ export async function createMusician(
   const data = parseMusicianFormData(formData)
   if (!data.name) return { error: 'Name is required.' }
 
+  const { bandId } = await getBandContext()
   try {
-    await prisma.musician.create({ data })
+    await prisma.musician.create({ data: { ...data, bandId } })
   } catch {
     return { error: 'Failed to create musician.' }
   }
@@ -37,6 +40,9 @@ export async function updateMusician(
   const data = parseMusicianFormData(formData)
   if (!data.name) return { error: 'Name is required.' }
 
+  const { bandId } = await getBandContext()
+  if (!(await isOwned('musician', bandId, id))) return { error: 'Musician not found.' }
+
   try {
     await prisma.musician.update({ where: { id }, data })
   } catch {
@@ -48,6 +54,8 @@ export async function updateMusician(
 }
 
 export async function deleteMusician(id: string): Promise<void> {
+  const { bandId } = await getBandContext()
+  await assertOwned('musician', bandId, id)
   await prisma.musician.update({ where: { id }, data: { isActive: false } })
   revalidatePath('/musicians')
 }

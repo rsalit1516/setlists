@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { getBandContext } from '@/lib/band'
 import {
   getGig,
   calculateTotalExpenses,
@@ -108,7 +109,12 @@ export default async function GigPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [gig, roster, setlists] = await Promise.all([getGig(id), getMusicians(), getSetlists()])
+  const { bandId } = await getBandContext()
+  const [gig, roster, setlists] = await Promise.all([
+    getGig(bandId, id),
+    getMusicians(bandId),
+    getSetlists(bandId),
+  ])
   if (!gig) notFound()
 
   const copySources = setlists.filter((sl) => sl.id !== gig.setlist.id && sl._count.items > 0)

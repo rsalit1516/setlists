@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { cookies } from 'next/headers'
+import { getBandContext } from '@/lib/band'
 import { getGigs, getGigsInRange, hasAnyGigs, groupGigsByMonth } from '@/lib/services/gigs'
 import { resolveGigsView, GIGS_VIEW_COOKIE } from '@/lib/gigs-view'
 import { parseMonthParam, getMonthRange, buildMonthGrid } from '@/lib/gigs-month'
@@ -18,6 +19,7 @@ export default async function GigsPage({
   const { view: viewParam, month: monthParam, quarter: quarterParam } = await searchParams
   const cookieStore = await cookies()
   const view = resolveGigsView(viewParam, cookieStore.get(GIGS_VIEW_COOKIE)?.value)
+  const { bandId } = await getBandContext()
 
   let content: React.ReactNode
   if (view === 'month') {
@@ -29,7 +31,7 @@ export default async function GigsPage({
     // Fetched together: monthGigs is scoped to the visible month (the AC), while
     // anyGigs is a cheap count — not a full-history fetch — just to tell "no gigs
     // booked this month" apart from "this app has zero gigs, ever" for the empty state.
-    const [monthGigs, anyGigs] = await Promise.all([getGigsInRange(start, end), hasAnyGigs()])
+    const [monthGigs, anyGigs] = await Promise.all([getGigsInRange(bandId, start, end), hasAnyGigs(bandId)])
     content = anyGigs ? (
       <MonthCalendar monthDate={monthDate} days={buildMonthGrid(monthDate, monthGigs)} />
     ) : (
@@ -45,7 +47,7 @@ export default async function GigsPage({
     // then built from its own slice rather than the full quarterGigs list —
     // buildMonthGrid does a linear scan per day cell, so handing it the whole
     // quarter would triple that scan for no benefit.
-    const [quarterGigs, anyGigs] = await Promise.all([getGigsInRange(start, end), hasAnyGigs()])
+    const [quarterGigs, anyGigs] = await Promise.all([getGigsInRange(bandId, start, end), hasAnyGigs(bandId)])
     const months = getQuarterMonths(anchorMonth).map((monthDate) => {
       const monthRange = getMonthRange(monthDate)
       const monthGigs = quarterGigs.filter((g) => g.date >= monthRange.start && g.date < monthRange.end)
@@ -57,7 +59,7 @@ export default async function GigsPage({
       <p className="text-muted-foreground">No gigs yet.</p>
     )
   } else {
-    const gigs = await getGigs()
+    const gigs = await getGigs(bandId)
     content =
       gigs.length === 0 ? (
         <p className="text-muted-foreground">No gigs yet.</p>

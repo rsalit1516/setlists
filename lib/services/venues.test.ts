@@ -5,7 +5,7 @@ vi.mock('@/lib/db', () => ({
   default: {
     venue: {
       findMany: vi.fn(),
-      findUnique: vi.fn(),
+      findFirst: vi.fn(),
     },
   },
 }))
@@ -17,6 +17,7 @@ const mockVenue = {
   name: 'The Fillmore',
   address: '1805 Geary Blvd, San Francisco, CA',
   notes: null,
+  bandId: 'band-1',
   isActive: true,
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -25,29 +26,33 @@ const mockVenue = {
 beforeEach(() => vi.clearAllMocks())
 
 describe('getVenues', () => {
-  it('returns venues ordered by name', async () => {
+  it("returns the band's active venues ordered by name", async () => {
     vi.mocked(prisma.venue.findMany).mockResolvedValue([mockVenue])
-    const result = await getVenues()
+    const result = await getVenues('band-1')
     expect(result).toEqual([mockVenue])
-    expect(prisma.venue.findMany).toHaveBeenCalledWith({ where: { isActive: true }, orderBy: { name: 'asc' } })
+    expect(prisma.venue.findMany).toHaveBeenCalledWith({
+      where: { bandId: 'band-1', isActive: true },
+      orderBy: { name: 'asc' },
+    })
   })
 
   it('returns empty array when no venues exist', async () => {
     vi.mocked(prisma.venue.findMany).mockResolvedValue([])
-    expect(await getVenues()).toEqual([])
+    expect(await getVenues('band-1')).toEqual([])
   })
 })
 
 describe('getVenue', () => {
-  it('returns the venue when found', async () => {
-    vi.mocked(prisma.venue.findUnique).mockResolvedValue(mockVenue)
-    const result = await getVenue('venue-1')
+  it('returns the venue when found in the band', async () => {
+    vi.mocked(prisma.venue.findFirst).mockResolvedValue(mockVenue)
+    const result = await getVenue('band-1', 'venue-1')
     expect(result).toEqual(mockVenue)
-    expect(prisma.venue.findUnique).toHaveBeenCalledWith({ where: { id: 'venue-1' } })
+    expect(prisma.venue.findFirst).toHaveBeenCalledWith({ where: { id: 'venue-1', bandId: 'band-1' } })
   })
 
-  it('returns null when venue does not exist', async () => {
-    vi.mocked(prisma.venue.findUnique).mockResolvedValue(null)
-    expect(await getVenue('nonexistent')).toBeNull()
+  it('returns null when venue does not exist or belongs to another band', async () => {
+    vi.mocked(prisma.venue.findFirst).mockResolvedValue(null)
+    expect(await getVenue('band-2', 'venue-1')).toBeNull()
+    expect(prisma.venue.findFirst).toHaveBeenCalledWith({ where: { id: 'venue-1', bandId: 'band-2' } })
   })
 })

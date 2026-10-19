@@ -25,6 +25,50 @@ enum SetSection {
   ENCORE
 }
 
+enum MemberRole {
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+model Band {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members   BandMember[]
+  venues    Venue[]
+  musicians Musician[]
+  setlists  Setlist[]
+  gigs      Gig[]
+}
+
+model User {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships BandMember[]
+}
+
+model BandMember {
+  id        String     @id @default(uuid(7)) @db.Uuid
+  role      MemberRole @default(MEMBER)
+  createdAt DateTime   @default(now())
+
+  userId String @db.Uuid
+  bandId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  band   Band   @relation(fields: [bandId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bandId])
+  @@index([bandId])
+}
+
 model Song {
   id               String     @id @default(cuid())
   title            String
@@ -71,18 +115,26 @@ model Venue {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  gigs Gig[]
+  bandId String @db.Uuid
+  band   Band   @relation(fields: [bandId], references: [id])
+  gigs   Gig[]
+
+  @@index([bandId])
 }
 
 model Musician {
   id        String   @id @default(cuid())
-  name      String   @unique
+  name      String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  bandId          String        @db.Uuid
+  band            Band          @relation(fields: [bandId], references: [id])
   gigMusicians    GigMusician[]
   setlistsCreated Gig[]         @relation("GigSetlistCreator")
+
+  @@unique([bandId, name])
 }
 
 model Setlist {
@@ -92,8 +144,12 @@ model Setlist {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items SetlistItem[]
-  gig   Gig?
+  bandId String        @db.Uuid
+  band   Band          @relation(fields: [bandId], references: [id])
+  items  SetlistItem[]
+  gig    Gig?
+
+  @@index([bandId])
 }
 
 model SetlistItem {
@@ -128,15 +184,19 @@ model Gig {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
+  bandId           String  @db.Uuid
   venueId          String
   setlistId        String  @unique
   setlistCreatorId String?
 
+  band           Band          @relation(fields: [bandId], references: [id])
   venue          Venue         @relation(fields: [venueId], references: [id])
   setlist        Setlist       @relation(fields: [setlistId], references: [id])
   setlistCreator Musician?     @relation("GigSetlistCreator", fields: [setlistCreatorId], references: [id])
   expenses       Expense[]
   musicians      GigMusician[]
+
+  @@index([bandId, date])
 }
 
 model Expense {

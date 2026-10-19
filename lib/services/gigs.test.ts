@@ -68,7 +68,7 @@ beforeEach(() => vi.clearAllMocks())
 describe('getGigs', () => {
   it('returns gigs ordered by date desc', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([mockGigSummary] as never)
-    const result = await getGigs()
+    const result = await getGigs('band-1')
     expect(result).toHaveLength(1)
     expect(prisma.gig.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ orderBy: { date: 'desc' } })
@@ -77,12 +77,12 @@ describe('getGigs', () => {
 
   it('returns empty array when no gigs exist', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([])
-    expect(await getGigs()).toEqual([])
+    expect(await getGigs('band-1')).toEqual([])
   })
 
   it('converts tips and otherRevenue to strings', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([mockGigSummary] as never)
-    const [result] = await getGigs()
+    const [result] = await getGigs('band-1')
     expect(result.tips).toBe('50.00')
     expect(result.otherRevenue).toBeNull()
   })
@@ -91,21 +91,21 @@ describe('getGigs', () => {
 describe('setlist creator', () => {
   it('getGigs includes only the setlist creator name', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([mockGigSummary] as never)
-    await getGigs()
+    await getGigs('band-1')
     const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as object
     expect(call).toMatchObject({ include: { setlistCreator: { select: { name: true } } } })
   })
 
   it('getGigsInRange includes only the setlist creator name', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([mockGigSummary] as never)
-    await getGigsInRange(new Date('2026-05-01'), new Date('2026-06-01'))
+    await getGigsInRange('band-1', new Date('2026-05-01'), new Date('2026-06-01'))
     const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as object
     expect(call).toMatchObject({ include: { setlistCreator: { select: { name: true } } } })
   })
 
   it('getGig includes the full setlist creator, so the edit form can show a deactivated one', async () => {
     vi.mocked(prisma.gig.findFirst).mockResolvedValue(mockGig as never)
-    await getGig('gig-1')
+    await getGig('band-1', 'gig-1')
     const call = vi.mocked(prisma.gig.findFirst).mock.calls[0][0] as object
     expect(call).toMatchObject({ include: { setlistCreator: true } })
   })
@@ -114,18 +114,18 @@ describe('setlist creator', () => {
 describe('hasAnyGigs', () => {
   it('returns true when at least one active gig exists', async () => {
     vi.mocked(prisma.gig.count).mockResolvedValue(3)
-    expect(await hasAnyGigs()).toBe(true)
+    expect(await hasAnyGigs('band-1')).toBe(true)
   })
 
   it('returns false when there are no active gigs', async () => {
     vi.mocked(prisma.gig.count).mockResolvedValue(0)
-    expect(await hasAnyGigs()).toBe(false)
+    expect(await hasAnyGigs('band-1')).toBe(false)
   })
 
   it('only counts active gigs', async () => {
     vi.mocked(prisma.gig.count).mockResolvedValue(0)
-    await hasAnyGigs()
-    expect(prisma.gig.count).toHaveBeenCalledWith({ where: { isActive: true } })
+    await hasAnyGigs('band-1')
+    expect(prisma.gig.count).toHaveBeenCalledWith({ where: { bandId: 'band-1', isActive: true } })
   })
 })
 
@@ -134,11 +134,11 @@ describe('getGigsInRange', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([mockGigSummary] as never)
     const start = new Date(2026, 7, 1)
     const end = new Date(2026, 8, 1)
-    const result = await getGigsInRange(start, end)
+    const result = await getGigsInRange('band-1', start, end)
     expect(result).toHaveLength(1)
     expect(prisma.gig.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { isActive: true, date: { gte: start, lt: end } },
+        where: { bandId: 'band-1', isActive: true, date: { gte: start, lt: end } },
         orderBy: { date: 'asc' },
       })
     )
@@ -146,12 +146,12 @@ describe('getGigsInRange', () => {
 
   it('returns empty array when no gigs fall in range', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([])
-    expect(await getGigsInRange(new Date(2026, 7, 1), new Date(2026, 8, 1))).toEqual([])
+    expect(await getGigsInRange('band-1', new Date(2026, 7, 1), new Date(2026, 8, 1))).toEqual([])
   })
 
   it('converts tips and otherRevenue to strings', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([mockGigSummary] as never)
-    const [result] = await getGigsInRange(new Date(2026, 7, 1), new Date(2026, 8, 1))
+    const [result] = await getGigsInRange('band-1', new Date(2026, 7, 1), new Date(2026, 8, 1))
     expect(result.tips).toBe('50.00')
     expect(result.otherRevenue).toBeNull()
   })
@@ -160,25 +160,25 @@ describe('getGigsInRange', () => {
 describe('getGig', () => {
   it('returns the gig with details when found', async () => {
     vi.mocked(prisma.gig.findFirst).mockResolvedValue(mockGig as never)
-    const result = await getGig('gig-1')
+    const result = await getGig('band-1', 'gig-1')
     expect(result).not.toBeNull()
     expect(result?.id).toBe('gig-1')
     expect(result?.amountContracted).toBe('800.00')
     expect(prisma.gig.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'gig-1', isActive: true } })
+      expect.objectContaining({ where: { id: 'gig-1', bandId: 'band-1', isActive: true } })
     )
   })
 
   it('only fetches active (non-removed) setlist items', async () => {
     vi.mocked(prisma.gig.findFirst).mockResolvedValue(mockGig as never)
-    await getGig('gig-1')
+    await getGig('band-1', 'gig-1')
     const call = vi.mocked(prisma.gig.findFirst).mock.calls[0][0] as object
     expect(call).toMatchObject({ include: { setlist: { include: { items: { where: { isActive: true } } } } } })
   })
 
   it('nests the roster musician on each active GigMusician', async () => {
     vi.mocked(prisma.gig.findFirst).mockResolvedValue(mockGig as never)
-    await getGig('gig-1')
+    await getGig('band-1', 'gig-1')
     const call = vi.mocked(prisma.gig.findFirst).mock.calls[0][0] as object
     expect(call).toMatchObject({ include: { musicians: {
       where: { isActive: true },
@@ -189,7 +189,7 @@ describe('getGig', () => {
 
   it('converts tips and otherRevenue to strings', async () => {
     vi.mocked(prisma.gig.findFirst).mockResolvedValue(mockGig as never)
-    const result = await getGig('gig-1')
+    const result = await getGig('band-1', 'gig-1')
     expect(result?.tips).toBe('50.00')
     expect(result?.otherRevenue).toBeNull()
     expect(result?.paidAt).toBeNull()
@@ -197,7 +197,7 @@ describe('getGig', () => {
 
   it('converts each musician amountPaid to a string and passes the roster musician through', async () => {
     vi.mocked(prisma.gig.findFirst).mockResolvedValue(mockGig as never)
-    const result = await getGig('gig-1')
+    const result = await getGig('band-1', 'gig-1')
     expect(result?.musicians[0].amountPaid).toBe('200.00')
     expect(result?.musicians[0].musician).toEqual({ id: 'musician-1', name: 'Drummer' })
     expect(result?.musicians[0]).not.toHaveProperty('share')
@@ -205,7 +205,7 @@ describe('getGig', () => {
 
   it('returns null when gig does not exist', async () => {
     vi.mocked(prisma.gig.findFirst).mockResolvedValue(null)
-    expect(await getGig('nonexistent')).toBeNull()
+    expect(await getGig('band-1', 'nonexistent')).toBeNull()
   })
 })
 
@@ -235,7 +235,7 @@ describe('getGigForPerformance', () => {
 
   it('sanitizes each song\'s lyrics into safe HTML, converting legacy plain text', async () => {
     vi.mocked(prisma.gig.findFirst).mockResolvedValue(mockPerformanceGig as never)
-    const result = await getGigForPerformance('gig-1')
+    const result = await getGigForPerformance('band-1', 'gig-1')
     expect(result?.items[0].song.lyrics).toBe('<p>Line one</p><p>Line two</p>')
   })
 
@@ -251,20 +251,20 @@ describe('getGigForPerformance', () => {
         ],
       },
     } as never)
-    const result = await getGigForPerformance('gig-1')
+    const result = await getGigForPerformance('band-1', 'gig-1')
     expect(result?.items[0].song.lyrics).toBe('<p>Hi </p>')
   })
 
   it('returns null when gig does not exist', async () => {
     vi.mocked(prisma.gig.findFirst).mockResolvedValue(null)
-    expect(await getGigForPerformance('nonexistent')).toBeNull()
+    expect(await getGigForPerformance('band-1', 'nonexistent')).toBeNull()
   })
 
   it('excludes soft-deleted gigs', async () => {
     vi.mocked(prisma.gig.findFirst).mockResolvedValue(null)
-    await getGigForPerformance('gig-1')
+    await getGigForPerformance('band-1', 'gig-1')
     expect(prisma.gig.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'gig-1', isActive: true } })
+      expect.objectContaining({ where: { id: 'gig-1', bandId: 'band-1', isActive: true } })
     )
   })
 })
@@ -373,27 +373,45 @@ describe('cancellation fields', () => {
 
   it('getGigs converts cancellationFee to a string and passes cancelledAt through', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([{ ...mockGigSummary, ...cancelled }] as never)
-    const [result] = await getGigs()
+    const [result] = await getGigs('band-1')
     expect(result.cancellationFee).toBe('150.00')
     expect(result.cancelledAt).toEqual(new Date('2026-10-16'))
   })
 
   it('getGigsInRange converts cancellationFee to a string', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([{ ...mockGigSummary, ...cancelled }] as never)
-    const [result] = await getGigsInRange(new Date(2026, 9, 1), new Date(2026, 10, 1))
+    const [result] = await getGigsInRange('band-1', new Date(2026, 9, 1), new Date(2026, 10, 1))
     expect(result.cancellationFee).toBe('150.00')
   })
 
   it('getGig converts cancellationFee to a string', async () => {
     vi.mocked(prisma.gig.findFirst).mockResolvedValue(cancelled as never)
-    const result = await getGig('gig-1')
+    const result = await getGig('band-1', 'gig-1')
     expect(result?.cancellationFee).toBe('150.00')
     expect(result?.cancelledAt).toEqual(new Date('2026-10-16'))
   })
 
   it('leaves cancellationFee null for a gig that was never cancelled', async () => {
     vi.mocked(prisma.gig.findFirst).mockResolvedValue(mockGig as never)
-    const result = await getGig('gig-1')
+    const result = await getGig('band-1', 'gig-1')
     expect(result?.cancellationFee).toBeNull()
+  })
+})
+
+describe('band scoping', () => {
+  it('getGigs only queries the given band', async () => {
+    vi.mocked(prisma.gig.findMany).mockResolvedValue([] as never)
+    await getGigs('band-2')
+    expect(prisma.gig.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { bandId: 'band-2', isActive: true } })
+    )
+  })
+
+  it('getGig cannot return another band\'s gig', async () => {
+    vi.mocked(prisma.gig.findFirst).mockResolvedValue(null)
+    expect(await getGig('band-2', 'gig-1')).toBeNull()
+    expect(prisma.gig.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'gig-1', bandId: 'band-2', isActive: true } })
+    )
   })
 })

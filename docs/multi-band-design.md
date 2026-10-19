@@ -14,23 +14,27 @@ Status: **draft for discussion** (2026-10-19). Nothing here is implemented.
 
 ### New models
 
-| Model | Purpose |
-|---|---|
-| `Band` | The tenant. `id`, `name`, timestamps. |
-| `User` | A login identity (email, name). Exact shape depends on the auth provider (see Auth). |
+| Model        | Purpose                                                                                                                        |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `Band`       | The tenant. `id`, `name`, timestamps.                                                                                          |
+| `User`       | A login identity (email, name). Exact shape depends on the auth provider (see Auth).                                           |
 | `BandMember` | `userId`, `bandId`, `role`. `@@unique([userId, bandId])`. Roles: `ADMIN` (sees finances, manages members), `MEMBER`, `VIEWER`. |
-| `BandSong` | Join between `Band` and `Song`: that band's view of a song (see below). |
+| `BandSong`   | Join between `Band` and `Song`: that band's view of a song (see below).                                                        |
 
 ### Changed models
 
-| Model | Change |
-|---|---|
-| `Venue`, `Setlist`, `Gig`, `Musician` | Add required `bandId`. `Musician.name` is currently globally `@unique`; becomes `@@unique([bandId, name])`. |
-| `Musician` | Add optional `userId` so a roster entry can be linked to a login. A user in two bands has two `Musician` rows. |
-| `SetlistItem` | `songId` is replaced by `bandSongId` pointing to `BandSong`, so a setlist can only reference songs in its own band's catalog. |
-| `Song` | Becomes the **generic** record. Keeps title, artist, genres, default key / bpm / durationSeconds, lyrics, lyricsUrl/chartsUrl, chart file fields, lyrics-import fields. Loses `status`, `singer`, `keyboardRequired` (move to `BandSong`). |
-| `Genre` | Stays global. Genres classify the shared catalog. |
-| `Expense`, `GigMusician` | Unchanged. They inherit the tenant through `Gig`. |
+| Model                                 | Change                                                                                                                                                                                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Venue`, `Setlist`, `Gig`, `Musician` | Add required `bandId`. `Musician.name` is currently globally `@unique`; becomes `@@unique([bandId, name])`.                                                                                                                                |
+| `Musician`                            | Add optional `userId` so a roster entry can be linked to a login. A user in two bands has two `Musician` rows.                                                                                                                             |
+| `SetlistItem`                         | `songId` is replaced by `bandSongId` pointing to `BandSong`, so a setlist can only reference songs in its own band's catalog.                                                                                                              |
+| `Song`                                | Becomes the **generic** record. Keeps title, artist, genres, default key / bpm / durationSeconds, lyrics, lyricsUrl/chartsUrl, chart file fields, lyrics-import fields. Loses `status`, `singer`, `keyboardRequired` (move to `BandSong`). |
+| `Genre`                               | Stays global. Genres classify the shared catalog.                                                                                                                                                                                          |
+| `Expense`, `GigMusician`              | Unchanged. They inherit the tenant through `Gig`.                                                                                                                                                                                          |
+
+### Key types
+
+New tables (`Band`, `User`, `BandMember`, and everything added later) use UUIDv7 primary keys (`@db.Uuid`); `bandId` columns on existing tables are `uuid` too. Existing tables keep text `cuid` ids until #152 converts them. Consequence: a new table that references an existing one (e.g. `BandSong.songId` → `Song.id`) uses a text column until that conversion lands, then is altered with the rest.
 
 ### `BandSong`
 
@@ -79,14 +83,14 @@ All of this is plain SQL inside Prisma migrations, since production has real dat
 
 Roughly 75 Prisma call sites across 15 non-test files:
 
-| Area | Sites | Work |
-|---|---|---|
-| `app/gigs/actions.ts` | 24 | Every mutation takes ids from FormData, so each needs an ownership check |
-| `app/setlists/actions.ts` | 13 | Same, plus `bandSongId` for items |
-| `app/songs/actions.ts` | 7 | Rework: create-or-attach to catalog, edit generic vs edit override |
-| `app/venues`, `genres`, `musicians` actions | 9 | Scope by band (genres unscoped) |
-| `lib/services/*.ts` | ~28 | Take `bandId`; songs/setlists/gigs/stats/finance/lyrics-import are the heavy ones |
-| Tests | 11 service test files + `musicians/actions.test.ts` | Assertions updated; new tenant-isolation tests |
+| Area                                        | Sites                                               | Work                                                                              |
+| ------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `app/gigs/actions.ts`                       | 24                                                  | Every mutation takes ids from FormData, so each needs an ownership check          |
+| `app/setlists/actions.ts`                   | 13                                                  | Same, plus `bandSongId` for items                                                 |
+| `app/songs/actions.ts`                      | 7                                                   | Rework: create-or-attach to catalog, edit generic vs edit override                |
+| `app/venues`, `genres`, `musicians` actions | 9                                                   | Scope by band (genres unscoped)                                                   |
+| `lib/services/*.ts`                         | ~28                                                 | Take `bandId`; songs/setlists/gigs/stats/finance/lyrics-import are the heavy ones |
+| Tests                                       | 11 service test files + `musicians/actions.test.ts` | Assertions updated; new tenant-isolation tests                                    |
 
 ### Scoping pattern (recommended)
 

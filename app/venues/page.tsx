@@ -1,11 +1,13 @@
 import Link from 'next/link'
+import { getBandContext } from '@/lib/band'
 import { getVenues } from '@/lib/services/venues'
 import { buttonVariants } from '@/components/ui/button'
 import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
 import { deleteVenue } from './actions'
 
 export default async function VenuesPage() {
-  const venues = await getVenues()
+  const { bandId } = await getBandContext()
+  const venues = await getVenues(bandId)
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">

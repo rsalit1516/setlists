@@ -20,10 +20,15 @@ const genres = [
   { id: 'seed-genre-funk', name: 'Funk' },
 ]
 
+// The first band is the one the add_band_tenancy migration creates; the second exists only so
+// tenant-isolation bugs show up on the dev site.
+const bandId = '01900000-0000-7000-8000-000000000001'
+const otherBandId = '01900000-0000-7000-8000-0000000000a2'
+
 const musicians = [
-  { id: 'seed-musician-drums', name: 'Dana Drummer' },
-  { id: 'seed-musician-bass', name: 'Sam Bassman' },
-  { id: 'seed-musician-keys', name: 'Kit Keys' },
+  { id: 'seed-musician-drums', name: 'Dana Drummer', bandId },
+  { id: 'seed-musician-bass', name: 'Sam Bassman', bandId },
+  { id: 'seed-musician-keys', name: 'Kit Keys', bandId },
 ]
 
 const lyrics = (...lines: string[]) => lines.map((l) => `<p>${l}</p>`).join('')
@@ -71,6 +76,14 @@ const setlistItems: [string, 'SOUNDCHECK' | 'MAIN' | 'ENCORE', number][] = [
 ]
 
 async function main() {
+  const bands = [
+    { id: bandId, name: 'The Ruminators' },
+    { id: otherBandId, name: 'The Test Pilots' },
+  ]
+  for (const b of bands) {
+    await prisma.band.upsert({ where: { id: b.id }, update: b, create: b })
+  }
+
   for (const g of genres) {
     await prisma.genre.upsert({ where: { id: g.id }, update: g, create: g })
   }
@@ -85,13 +98,13 @@ async function main() {
     })
   }
 
-  const venue = { id: 'seed-venue-1', name: 'The Test Tavern', address: '1 Fixture Lane', notes: 'Fake venue for the dev database' }
+  const venue = { id: 'seed-venue-1', name: 'The Test Tavern', address: '1 Fixture Lane', notes: 'Fake venue for the dev database', bandId }
   await prisma.venue.upsert({ where: { id: venue.id }, update: venue, create: venue })
 
   await prisma.setlist.upsert({
     where: { id: 'seed-setlist-1' },
     update: {},
-    create: { id: 'seed-setlist-1', name: 'Test Tavern Night' },
+    create: { id: 'seed-setlist-1', name: 'Test Tavern Night', bandId },
   })
   for (const [index, [songId, section, setNumber]] of setlistItems.entries()) {
     const item = { id: `seed-item-${index + 1}`, order: index, section, setNumber, songId, setlistId: 'seed-setlist-1' }
@@ -109,6 +122,7 @@ async function main() {
     notes: 'Seeded gig — safe to edit or delete.',
     amountContracted: 800,
     tips: 60,
+    bandId,
     venueId: venue.id,
     setlistId: 'seed-setlist-1',
     setlistCreatorId: 'seed-musician-keys',
@@ -124,6 +138,28 @@ async function main() {
     const gm = { id: `seed-gigmusician-${index + 1}`, gigId: gig.id, musicianId: m.id }
     await prisma.gigMusician.upsert({ where: { id: gm.id }, update: {}, create: gm })
   }
+
+  const otherMusician = { id: 'seed-musician-other', name: 'Pat Pilot', bandId: otherBandId }
+  await prisma.musician.upsert({ where: { id: otherMusician.id }, update: otherMusician, create: otherMusician })
+  const otherVenue = { id: 'seed-venue-other', name: 'The Hangar', address: '2 Fixture Lane', notes: 'Belongs to the second band', bandId: otherBandId }
+  await prisma.venue.upsert({ where: { id: otherVenue.id }, update: otherVenue, create: otherVenue })
+  await prisma.setlist.upsert({
+    where: { id: 'seed-setlist-other' },
+    update: {},
+    create: { id: 'seed-setlist-other', name: 'Hangar Night', bandId: otherBandId },
+  })
+  const otherGig = {
+    id: 'seed-gig-other',
+    date: new Date(gigDate.getTime() + 7 * 24 * 60 * 60 * 1000),
+    startTime: '20:00',
+    endTime: '23:00',
+    notes: 'Second band — should never show for The Ruminators.',
+    amountContracted: 500,
+    bandId: otherBandId,
+    venueId: otherVenue.id,
+    setlistId: 'seed-setlist-other',
+  }
+  await prisma.gig.upsert({ where: { id: otherGig.id }, update: otherGig, create: otherGig })
 
   console.log(`Seeded ${songs.length} songs, ${musicians.length} musicians, 1 venue, 1 gig on ${new URL(connectionString!).host}.`)
 }

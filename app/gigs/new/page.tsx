@@ -1,3 +1,4 @@
+import { getBandContext } from '@/lib/band'
 import { getVenues } from '@/lib/services/venues'
 import { getSetlists } from '@/lib/services/setlists'
 import { getMusicians } from '@/lib/services/musicians'
@@ -10,7 +11,12 @@ export default async function NewGigPage({
   searchParams: Promise<{ setlistId?: string }>
 }) {
   const { setlistId } = await searchParams
-  const [venues, setlists, musicians] = await Promise.all([getVenues(), getSetlists(), getMusicians()])
+  const { bandId } = await getBandContext()
+  const [venues, setlists, musicians] = await Promise.all([
+    getVenues(bandId),
+    getSetlists(bandId),
+    getMusicians(bandId),
+  ])
 
   return (
     <div className="mx-auto max-w-lg px-4 py-6">

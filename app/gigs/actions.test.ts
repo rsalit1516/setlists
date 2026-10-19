@@ -9,6 +9,8 @@ vi.mock('@/lib/db', () => ({
       findFirst: vi.fn(),
     },
     expense: {
+      create: vi.fn(),
+      update: vi.fn(),
       updateMany: vi.fn(),
     },
     venue: {
@@ -17,6 +19,7 @@ vi.mock('@/lib/db', () => ({
     setlist: {
       create: vi.fn(),
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       updateMany: vi.fn(),
     },
     setlistItem: {
@@ -50,7 +53,15 @@ vi.mock('next/navigation', () => ({
   }),
 }))
 
+vi.mock('@/lib/ownership', async () => ({
+  ...(await vi.importActual<typeof import('@/lib/ownership')>('@/lib/ownership')),
+  isOwned: vi.fn(),
+  areOwned: vi.fn(),
+  assertOwned: vi.fn(),
+}))
+
 import prisma from '@/lib/db'
+import { isOwned, areOwned, assertOwned, NotFoundError } from '@/lib/ownership'
 import { revalidatePath } from 'next/cache'
 import {
   createGig,
@@ -61,9 +72,17 @@ import {
   syncGigMusicians,
   updateMusicianPayment,
   markAllMusiciansPaid,
+  addExpense,
+  removeExpense,
+  removeMusician,
 } from './actions'
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.mocked(isOwned).mockResolvedValue(true)
+  vi.mocked(areOwned).mockResolvedValue(true)
+  vi.mocked(assertOwned).mockResolvedValue(undefined)
+})
 
 function buildFormData(overrides: Record<string, string> = {}, musicianIds: string[] = []): FormData {
   const fields: Record<string, string> = {
@@ -249,6 +268,7 @@ describe('createGig', () => {
     expect(prisma.setlist.create).toHaveBeenCalledWith({
       data: {
         name: 'The Jazz Club - 08-15-26',
+        bandId: '01900000-0000-7000-8000-000000000001',
         items: {
           create: [
             { songId: 's-1', section: 'MAIN', setNumber: 1, order: 0 },
@@ -268,8 +288,20 @@ describe('createGig', () => {
 
     await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
 
-    expect(prisma.setlist.create).toHaveBeenCalledWith({ data: { name: 'The Jazz Club - 08-15-26' } })
+    expect(prisma.setlist.create).toHaveBeenCalledWith({
+      data: { name: 'The Jazz Club - 08-15-26', bandId: '01900000-0000-7000-8000-000000000001' },
+    })
     expect(prisma.setlist.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('stamps the new gig with the band', async () => {
+    const fd = buildFormData({ createSetlist: 'true' })
+
+    await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
+
+    expect(prisma.gig.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ bandId: '01900000-0000-7000-8000-000000000001' }),
+    })
   })
 
   it('returns a validation error and creates nothing when neither setlist option is chosen', async () => {
@@ -672,8 +704,8 @@ describe('copySetlistToGig', () => {
   ]
 
   beforeEach(() => {
-    vi.mocked(prisma.gig.findUnique).mockResolvedValue({ setlistId: 'target-sl', isActive: true } as never)
-    vi.mocked(prisma.setlist.findUnique).mockResolvedValue({ isActive: true, items: sourceItems } as never)
+    vi.mocked(prisma.gig.findFirst).mockResolvedValue({ setlistId: 'target-sl', isActive: true } as never)
+    vi.mocked(prisma.setlist.findFirst).mockResolvedValue({ isActive: true, items: sourceItems } as never)
     vi.mocked(prisma.setlistItem.updateMany).mockResolvedValue({ count: 3 } as never)
     vi.mocked(prisma.setlistItem.createMany).mockResolvedValue({ count: 2 } as never)
   })
@@ -704,7 +736,7 @@ describe('copySetlistToGig', () => {
   it('only reads active source items and never copies wasPlayed', async () => {
     await copySetlistToGig('gig-1', 'source-sl')
 
-    expect(vi.mocked(prisma.setlist.findUnique).mock.calls[0][0]).toMatchObject({
+    expect(vi.mocked(prisma.setlist.findFirst).mock.calls[0][0]).toMatchObject({
       select: { items: { where: { isActive: true } } },
     })
     const rows = vi.mocked(prisma.setlistItem.createMany).mock.calls[0][0]?.data as Record<string, unknown>[]
@@ -719,26 +751,26 @@ describe('copySetlistToGig', () => {
   })
 
   it('rejects an empty source setlist', async () => {
-    vi.mocked(prisma.setlist.findUnique).mockResolvedValue({ isActive: true, items: [] } as never)
+    vi.mocked(prisma.setlist.findFirst).mockResolvedValue({ isActive: true, items: [] } as never)
 
     expect(await copySetlistToGig('gig-1', 'source-sl')).toEqual({ error: expect.any(String) })
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 
   it('rejects an inactive or missing source setlist', async () => {
-    vi.mocked(prisma.setlist.findUnique).mockResolvedValue({ isActive: false, items: sourceItems } as never)
+    vi.mocked(prisma.setlist.findFirst).mockResolvedValue({ isActive: false, items: sourceItems } as never)
     expect(await copySetlistToGig('gig-1', 'source-sl')).toEqual({ error: expect.any(String) })
 
-    vi.mocked(prisma.setlist.findUnique).mockResolvedValue(null as never)
+    vi.mocked(prisma.setlist.findFirst).mockResolvedValue(null as never)
     expect(await copySetlistToGig('gig-1', 'source-sl')).toEqual({ error: expect.any(String) })
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 
   it('rejects a missing or inactive gig', async () => {
-    vi.mocked(prisma.gig.findUnique).mockResolvedValue(null as never)
+    vi.mocked(prisma.gig.findFirst).mockResolvedValue(null as never)
     expect(await copySetlistToGig('gig-1', 'source-sl')).toEqual({ error: 'Gig not found.' })
 
-    vi.mocked(prisma.gig.findUnique).mockResolvedValue({ setlistId: 'target-sl', isActive: false } as never)
+    vi.mocked(prisma.gig.findFirst).mockResolvedValue({ setlistId: 'target-sl', isActive: false } as never)
     expect(await copySetlistToGig('gig-1', 'source-sl')).toEqual({ error: 'Gig not found.' })
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
@@ -748,5 +780,141 @@ describe('copySetlistToGig', () => {
 
     await expect(copySetlistToGig('gig-1', 'source-sl')).rejects.toThrow('db down')
     expect(revalidatePath).not.toHaveBeenCalled()
+  })
+})
+
+describe('band ownership', () => {
+  const BAND = '01900000-0000-7000-8000-000000000001'
+
+  describe('createGig', () => {
+    beforeEach(() => {
+      vi.mocked(prisma.gig.create).mockResolvedValue({ id: 'new-gig-1' } as never)
+      vi.mocked(prisma.setlist.create).mockResolvedValue({ id: 'new-setlist-1' } as never)
+      vi.mocked(prisma.venue.findUnique).mockResolvedValue({ name: 'The Jazz Club' } as never)
+    })
+
+    it("rejects a venue from another band and creates nothing", async () => {
+      vi.mocked(isOwned).mockImplementation(async (entity) => entity !== 'venue')
+      const result = await createGig(null, buildFormData({ createSetlist: 'true' }))
+      expect(result).toEqual({ error: 'Venue not found.' })
+      expect(isOwned).toHaveBeenCalledWith('venue', BAND, 'venue-1')
+      expect(prisma.setlist.create).not.toHaveBeenCalled()
+      expect(prisma.gig.create).not.toHaveBeenCalled()
+    })
+
+    it('rejects a source setlist from another band', async () => {
+      vi.mocked(isOwned).mockImplementation(async (entity) => entity !== 'setlist')
+      const result = await createGig(null, buildFormData({ setlistId: 'foreign-sl' }))
+      expect(result).toEqual({ error: 'Setlist not found.' })
+      expect(prisma.gig.create).not.toHaveBeenCalled()
+    })
+
+    it('rejects a setlist creator from another band', async () => {
+      vi.mocked(isOwned).mockImplementation(async (entity) => entity !== 'musician')
+      const result = await createGig(null, buildFormData({ createSetlist: 'true', setlistCreatorId: 'foreign-m' }))
+      expect(result).toEqual({ error: 'Musician not found.' })
+      expect(prisma.gig.create).not.toHaveBeenCalled()
+    })
+
+    it('rejects musicians from another band', async () => {
+      vi.mocked(areOwned).mockResolvedValue(false)
+      const result = await createGig(null, buildFormData({ createSetlist: 'true' }, ['m-1', 'foreign-m']))
+      expect(result).toEqual({ error: 'Musician not found.' })
+      expect(areOwned).toHaveBeenCalledWith('musician', BAND, ['m-1', 'foreign-m'])
+      expect(prisma.gig.create).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('updateGig', () => {
+    it("rejects another band's gig without writing", async () => {
+      vi.mocked(isOwned).mockImplementation(async (entity) => entity !== 'gig')
+      const result = await updateGig(null, buildFormData())
+      expect(result).toEqual({ error: 'Gig not found.' })
+      expect(isOwned).toHaveBeenCalledWith('gig', BAND, 'gig-1')
+      expect(prisma.gig.update).not.toHaveBeenCalled()
+    })
+
+    it("rejects moving a gig to another band's venue", async () => {
+      vi.mocked(isOwned).mockImplementation(async (entity) => entity !== 'venue')
+      const result = await updateGig(null, buildFormData())
+      expect(result).toEqual({ error: 'Venue not found.' })
+      expect(prisma.gig.update).not.toHaveBeenCalled()
+    })
+  })
+
+  it("deleteGig rejects another band's gig before touching any row", async () => {
+    vi.mocked(assertOwned).mockRejectedValue(new NotFoundError('gig'))
+    await expect(deleteGig('gig-1')).rejects.toBeInstanceOf(NotFoundError)
+    expect(assertOwned).toHaveBeenCalledWith('gig', BAND, 'gig-1')
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  describe('copySetlistToGig', () => {
+    it('looks both setlists up within the band, so a foreign id is "not found"', async () => {
+      vi.mocked(prisma.gig.findFirst).mockResolvedValue(null)
+      expect(await copySetlistToGig('foreign-gig', 'source-sl')).toEqual({ error: 'Gig not found.' })
+      expect(prisma.gig.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'foreign-gig', bandId: BAND } }))
+
+      vi.mocked(prisma.gig.findFirst).mockResolvedValue({ setlistId: 'target-sl', isActive: true } as never)
+      vi.mocked(prisma.setlist.findFirst).mockResolvedValue(null)
+      expect(await copySetlistToGig('gig-1', 'foreign-sl')).toEqual({ error: 'Source setlist not found.' })
+      expect(prisma.setlist.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'foreign-sl', bandId: BAND } })
+      )
+      expect(prisma.$transaction).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('void actions throw NotFoundError and write nothing for foreign ids', () => {
+    beforeEach(() => {
+      vi.mocked(assertOwned).mockRejectedValue(new NotFoundError('gig'))
+    })
+
+    it('addExpense', async () => {
+      const fd = new FormData()
+      fd.set('gigId', 'foreign-gig')
+      fd.set('description', 'Parking')
+      fd.set('amount', '20')
+      await expect(addExpense(fd)).rejects.toBeInstanceOf(NotFoundError)
+      expect(assertOwned).toHaveBeenCalledWith('gig', BAND, 'foreign-gig')
+      expect(prisma.expense.create).not.toHaveBeenCalled()
+    })
+
+    it('removeExpense', async () => {
+      await expect(removeExpense('foreign-expense')).rejects.toBeInstanceOf(NotFoundError)
+      expect(assertOwned).toHaveBeenCalledWith('expense', BAND, 'foreign-expense')
+      expect(prisma.expense.update).not.toHaveBeenCalled()
+    })
+
+    it('bulkAddMusicians', async () => {
+      const fd = new FormData()
+      fd.set('gigId', 'foreign-gig')
+      fd.append('musicianIds', 'm-1')
+      await expect(bulkAddMusicians(fd)).rejects.toBeInstanceOf(NotFoundError)
+      expect(prisma.gigMusician.upsert).not.toHaveBeenCalled()
+    })
+
+    it('syncGigMusicians', async () => {
+      const fd = new FormData()
+      fd.set('gigId', 'foreign-gig')
+      fd.append('musicianIds', 'm-1')
+      await expect(syncGigMusicians(fd)).rejects.toBeInstanceOf(NotFoundError)
+      expect(prisma.gigMusician.upsert).not.toHaveBeenCalled()
+      expect(prisma.gigMusician.updateMany).not.toHaveBeenCalled()
+    })
+
+    it('removeMusician', async () => {
+      await expect(removeMusician('foreign-gm')).rejects.toBeInstanceOf(NotFoundError)
+      expect(assertOwned).toHaveBeenCalledWith('gigMusician', BAND, 'foreign-gm')
+      expect(prisma.gigMusician.update).not.toHaveBeenCalled()
+    })
+
+    it('updateMusicianPayment', async () => {
+      const fd = new FormData()
+      fd.set('gigMusicianId', 'foreign-gm')
+      fd.set('amountPaid', '100')
+      await expect(updateMusicianPayment(fd)).rejects.toBeInstanceOf(NotFoundError)
+      expect(prisma.gigMusician.update).not.toHaveBeenCalled()
+    })
   })
 })

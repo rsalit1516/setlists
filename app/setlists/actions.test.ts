@@ -3,8 +3,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@/lib/db', () => ({
   default: {
     setlistItem: {
+      create: vi.fn(),
+      findFirst: vi.fn(),
+      findUnique: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
+    },
+    setlist: {
+      update: vi.fn(),
     },
     $transaction: vi.fn((ops: unknown[]) => Promise.resolve(ops)),
   },
@@ -12,11 +18,33 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
-import prisma from '@/lib/db'
-import { revalidatePath } from 'next/cache'
-import { reorderItems, markSectionPlayed, moveItemToSection } from './actions'
+vi.mock('@/lib/ownership', async () => ({
+  ...(await vi.importActual<typeof import('@/lib/ownership')>('@/lib/ownership')),
+  isOwned: vi.fn(),
+  areOwned: vi.fn(),
+  assertOwned: vi.fn(),
+}))
 
-beforeEach(() => vi.clearAllMocks())
+import prisma from '@/lib/db'
+import { isOwned, areOwned, assertOwned, NotFoundError } from '@/lib/ownership'
+import { revalidatePath } from 'next/cache'
+import {
+  reorderItems,
+  markSectionPlayed,
+  moveItemToSection,
+  addItem,
+  removeItem,
+  moveItem,
+  togglePlayed,
+  renameSetlist,
+} from './actions'
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.mocked(isOwned).mockResolvedValue(true)
+  vi.mocked(areOwned).mockResolvedValue(true)
+  vi.mocked(assertOwned).mockResolvedValue(undefined)
+})
 
 describe('reorderItems', () => {
   it('writes sequential order values matching the given id order', async () => {
@@ -160,5 +188,75 @@ describe('markSectionPlayed', () => {
     const call = vi.mocked(prisma.setlistItem.updateMany).mock.calls[0][0]
     expect(call.data).toEqual({ wasPlayed: true })
     expect(call.where).not.toHaveProperty('wasPlayed')
+  })
+})
+
+describe('band ownership', () => {
+  const BAND = '01900000-0000-7000-8000-000000000001'
+
+  beforeEach(() => {
+    vi.mocked(assertOwned).mockRejectedValue(new NotFoundError('setlist'))
+  })
+
+  it('addItem rejects another band\'s setlist before reading or writing items', async () => {
+    const fd = new FormData()
+    fd.set('setlistId', 'foreign-sl')
+    fd.set('songId', 'song-1')
+    fd.set('section', 'MAIN')
+    await expect(addItem(fd)).rejects.toBeInstanceOf(NotFoundError)
+    expect(assertOwned).toHaveBeenCalledWith('setlist', BAND, 'foreign-sl')
+    expect(prisma.setlistItem.findFirst).not.toHaveBeenCalled()
+    expect(prisma.setlistItem.create).not.toHaveBeenCalled()
+  })
+
+  it('removeItem rejects another band\'s item', async () => {
+    await expect(removeItem('foreign-item')).rejects.toBeInstanceOf(NotFoundError)
+    expect(assertOwned).toHaveBeenCalledWith('setlistItem', BAND, 'foreign-item')
+    expect(prisma.setlistItem.update).not.toHaveBeenCalled()
+  })
+
+  it('moveItem rejects another band\'s item', async () => {
+    await expect(moveItem('foreign-item', 'up')).rejects.toBeInstanceOf(NotFoundError)
+    expect(prisma.setlistItem.findUnique).not.toHaveBeenCalled()
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('togglePlayed rejects another band\'s item', async () => {
+    await expect(togglePlayed('foreign-item', null)).rejects.toBeInstanceOf(NotFoundError)
+    expect(prisma.setlistItem.update).not.toHaveBeenCalled()
+  })
+
+  it('reorderItems rejects when any item or the setlist is foreign', async () => {
+    await expect(reorderItems('foreign-sl', ['a', 'b'])).rejects.toBeInstanceOf(NotFoundError)
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('reorderItems checks every item id against the band', async () => {
+    vi.mocked(assertOwned).mockResolvedValue(undefined)
+    await reorderItems('sl-1', ['a', 'b'])
+    expect(assertOwned).toHaveBeenCalledWith('setlist', BAND, 'sl-1')
+    expect(assertOwned).toHaveBeenCalledWith('setlistItem', BAND, 'a', 'b')
+  })
+
+  it('moveItemToSection rejects when any dragged item is foreign', async () => {
+    await expect(
+      moveItemToSection('sl-1', 'a', { section: 'MAIN', setNumber: 1 }, ['a', 'b'], ['c'])
+    ).rejects.toBeInstanceOf(NotFoundError)
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('markSectionPlayed rejects another band\'s setlist', async () => {
+    await expect(markSectionPlayed('foreign-sl', 'all')).rejects.toBeInstanceOf(NotFoundError)
+    expect(prisma.setlistItem.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('renameSetlist returns "not found" for another band\'s setlist without writing', async () => {
+    vi.mocked(isOwned).mockResolvedValue(false)
+    const fd = new FormData()
+    fd.set('id', 'foreign-sl')
+    fd.set('name', 'Hijacked')
+    expect(await renameSetlist(null, fd)).toEqual({ error: 'Setlist not found.' })
+    expect(isOwned).toHaveBeenCalledWith('setlist', BAND, 'foreign-sl')
+    expect(prisma.setlist.update).not.toHaveBeenCalled()
   })
 })

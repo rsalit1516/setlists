@@ -126,6 +126,7 @@ This app must work on **desktop, tablet, and phone**. Always design mobile-first
     const { revision } = await searchParams
   ```
 - Use `<Suspense>` with a skeleton fallback around slow data; add a `loading.tsx` in the route folder for full-page loading states.
+- **Every band-owned query is scoped by band.** Pages, route handlers and actions call `getBandContext()` (`lib/band.ts`) to get the `bandId`, then pass it as the **first argument** to service functions (`getGigs(bandId)`, `getGig(bandId, id)`). Services filter on it; lookups by id use `findFirst({ where: { id, bandId } })` so another band's id returns `null` instead of data. Songs and genres are still global until #133.
 - For parallel independent queries, initiate them without `await`, then `Promise.all`:
   ```ts
   const [songs, venues] = await Promise.all([getSongs(), getVenues()])
@@ -135,6 +136,7 @@ This app must work on **desktop, tablet, and phone**. Always design mobile-first
 
 - Put mutations in `actions.ts` files co-located with their route: `app/songs/actions.ts`.
 - Mark each function individually with `'use server'` **or** put `'use server'` at the top of the file.
+- **Ids from FormData or arguments are untrusted.** Before touching an existing row, get the band with `getBandContext()` and prove ownership with `lib/ownership.ts`: `assertOwned(entity, bandId, ...ids)` throws `NotFoundError` (use in actions that return `void`); `isOwned` / `areOwned` return a boolean (use in actions that return `{ error }` state, e.g. `return { error: 'Gig not found.' }`). Check foreign keys in the payload too (venue, setlist, musician ids). Creates stamp `bandId` from `getBandContext()`. Child rows (expense, gigMusician, setlistItem) inherit ownership through their parent. Songs and genres are global until #133 and are not checked.
 - After mutating, call `revalidatePath('/songs')` (or the relevant path) so the page re-renders fresh data.
 - For redirect-after-create flows, call `revalidatePath` then `redirect` — **nothing runs after `redirect`**.
 - Use `useActionState` in Client Components to show pending/error states.
@@ -161,6 +163,7 @@ This app must work on **desktop, tablet, and phone**. Always design mobile-first
 - Schema lives in `prisma/schema.prisma`. Always run `npx prisma migrate dev` after schema changes.
 - The Prisma client is a singleton in `lib/db.ts` — import `db` from there, never create a new `PrismaClient` elsewhere.
 - Generate types after schema changes: `npx prisma generate`.
+- **Primary keys: UUIDv7 for every new table.** Use `id String @id @default(uuid(7)) @db.Uuid`, and `@db.Uuid` on every foreign-key column that references a UUID table (Postgres can't join a `uuid` column to a `text` one). Prisma generates v7 client-side, so no Postgres extension is needed. Migration SQL that inserts fixed rows uses UUID literals. Pre-existing tables (Song, Genre, Venue, Musician, Setlist, SetlistItem, Gig, Expense, GigMusician) still use `cuid()` text ids until #152 converts them; a new column that points at one of them stays `String` (text). Don't add new `cuid()` keys.
 - **Prisma enum imports don't resolve via `@prisma/client`** due to a TypeScript path resolution quirk with this adapter setup. Define enum types locally as string unions (e.g. `type SongStatus = 'READY' | 'IN_PROGRESS' | 'WISH'`) and cast FormData values to them. They match at runtime. All such types are already defined in `lib/types.ts`.
 - **`Decimal` fields** (`amountContracted`, `amountPaid`, `amount`, `share`) are not JSON-serializable. Service functions convert them to `string | null` via a `toStr()` helper before returning. The corresponding types in `lib/types.ts` use `string | null`.
 
