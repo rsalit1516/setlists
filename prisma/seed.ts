@@ -22,8 +22,8 @@ const genres = [
 
 // The first band is the one the add_band_tenancy migration creates; the second exists only so
 // tenant-isolation bugs show up on the dev site.
-const bandId = 'band-the-ruminators'
-const otherBandId = 'seed-band-2'
+const bandId = '01900000-0000-7000-8000-000000000001'
+const otherBandId = '01900000-0000-7000-8000-0000000000a2'
 
 const musicians = [
   { id: 'seed-musician-drums', name: 'Dana Drummer', bandId },

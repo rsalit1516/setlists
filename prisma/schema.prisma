@@ -32,7 +32,7 @@ enum MemberRole {
 }
 
 model Band {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid(7)) @db.Uuid
   name      String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -46,7 +46,7 @@ model Band {
 }
 
 model User {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid(7)) @db.Uuid
   email     String   @unique
   name      String?
   createdAt DateTime @default(now())
@@ -56,12 +56,12 @@ model User {
 }
 
 model BandMember {
-  id        String     @id @default(cuid())
+  id        String     @id @default(uuid(7)) @db.Uuid
   role      MemberRole @default(MEMBER)
   createdAt DateTime   @default(now())
 
-  userId String
-  bandId String
+  userId String @db.Uuid
+  bandId String @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   band   Band   @relation(fields: [bandId], references: [id], onDelete: Cascade)
 
@@ -115,7 +115,7 @@ model Venue {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  bandId String
+  bandId String @db.Uuid
   band   Band   @relation(fields: [bandId], references: [id])
   gigs   Gig[]
 
@@ -129,7 +129,7 @@ model Musician {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  bandId          String
+  bandId          String        @db.Uuid
   band            Band          @relation(fields: [bandId], references: [id])
   gigMusicians    GigMusician[]
   setlistsCreated Gig[]         @relation("GigSetlistCreator")
@@ -144,7 +144,7 @@ model Setlist {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  bandId String
+  bandId String        @db.Uuid
   band   Band          @relation(fields: [bandId], references: [id])
   items  SetlistItem[]
   gig    Gig?
@@ -184,7 +184,7 @@ model Gig {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  bandId           String
+  bandId           String  @db.Uuid
   venueId          String
   setlistId        String  @unique
   setlistCreatorId String?
