@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import prisma from '@/lib/db'
 import { getGig, calculateTotalExpenses, calculateGigNet } from '@/lib/services/gigs'
-import { DEFAULT_BAND_ID, getBandContext } from '@/lib/band'
+import { getBandContext } from '@/lib/band'
+import { areOwned, assertOwned, isOwned } from '@/lib/ownership'
 import type { SetSection } from '@/lib/types'
 
 export type GigActionState = { error: string } | null
@@ -41,6 +42,16 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
     return { error: 'Please check "Create setlist" or link an existing one.' }
   }
 
+  const { bandId } = await getBandContext()
+  if (!(await isOwned('venue', bandId, venueId))) return { error: 'Venue not found.' }
+  if (existingSetlistId && !(await isOwned('setlist', bandId, existingSetlistId))) {
+    return { error: 'Setlist not found.' }
+  }
+  if (setlistCreatorId && !(await isOwned('musician', bandId, setlistCreatorId))) {
+    return { error: 'Musician not found.' }
+  }
+  if (!(await areOwned('musician', bandId, musicianIds))) return { error: 'Musician not found.' }
+
   const venue = await prisma.venue.findUnique({ where: { id: venueId }, select: { name: true } })
   const mm = String(date.getMonth() + 1).padStart(2, '0')
   const dd = String(date.getDate()).padStart(2, '0')
@@ -63,7 +74,7 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
     const setlist = await prisma.setlist.create({
       data: {
         name,
-        bandId: DEFAULT_BAND_ID,
+        bandId,
         items: {
           create: (source?.items ?? []).map((item) => ({
             songId: item.songId,
@@ -76,13 +87,13 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
     })
     setlistId = setlist.id
   } else {
-    const setlist = await prisma.setlist.create({ data: { name, bandId: DEFAULT_BAND_ID } })
+    const setlist = await prisma.setlist.create({ data: { name, bandId } })
     setlistId = setlist.id
   }
 
   const gig = await prisma.gig.create({
     data: {
-      bandId: DEFAULT_BAND_ID,
+      bandId,
       date,
       startTime,
       endTime,
@@ -135,6 +146,13 @@ export async function updateGig(_state: GigActionState, formData: FormData): Pro
   const date = new Date(dateStr + 'T12:00:00')
   if (isNaN(date.getTime())) return { error: 'Invalid date.' }
 
+  const { bandId } = await getBandContext()
+  if (!(await isOwned('gig', bandId, id))) return { error: 'Gig not found.' }
+  if (!(await isOwned('venue', bandId, venueId))) return { error: 'Venue not found.' }
+  if (setlistCreatorId && !(await isOwned('musician', bandId, setlistCreatorId))) {
+    return { error: 'Musician not found.' }
+  }
+
   await prisma.gig.update({
     where: { id },
     data: {
@@ -160,6 +178,8 @@ export async function updateGig(_state: GigActionState, formData: FormData): Pro
 }
 
 export async function deleteGig(id: string): Promise<void> {
+  const { bandId } = await getBandContext()
+  await assertOwned('gig', bandId, id)
   // The setlist goes too: it's strictly 1:1 with its gig (#41), so leaving it
   // active would surface a dead gig in New Gig's copy-from picker (#93).
   await prisma.$transaction([
@@ -173,15 +193,16 @@ export async function deleteGig(id: string): Promise<void> {
 }
 
 export async function copySetlistToGig(gigId: string, sourceSetlistId: string): Promise<GigActionState> {
-  const gig = await prisma.gig.findUnique({
-    where: { id: gigId },
+  const { bandId } = await getBandContext()
+  const gig = await prisma.gig.findFirst({
+    where: { id: gigId, bandId },
     select: { setlistId: true, isActive: true },
   })
   if (!gig || !gig.isActive) return { error: 'Gig not found.' }
   if (gig.setlistId === sourceSetlistId) return { error: 'Cannot copy a setlist onto itself.' }
 
-  const source = await prisma.setlist.findUnique({
-    where: { id: sourceSetlistId },
+  const source = await prisma.setlist.findFirst({
+    where: { id: sourceSetlistId, bandId },
     select: {
       isActive: true,
       items: {
@@ -222,11 +243,15 @@ export async function addExpense(formData: FormData): Promise<void> {
 
   if (!gigId || !description || !amount) return
 
+  const { bandId } = await getBandContext()
+  await assertOwned('gig', bandId, gigId)
   await prisma.expense.create({ data: { gigId, description, amount: parseFloat(amount) } })
   revalidatePath(`/gigs/${gigId}`)
 }
 
 export async function removeExpense(expenseId: string): Promise<void> {
+  const { bandId } = await getBandContext()
+  await assertOwned('expense', bandId, expenseId)
   const expense = await prisma.expense.update({ where: { id: expenseId }, data: { isActive: false } })
   revalidatePath(`/gigs/${expense.gigId}`)
 }
@@ -236,6 +261,10 @@ export async function bulkAddMusicians(formData: FormData): Promise<void> {
   const musicianIds = formData.getAll('musicianIds').map(String)
 
   if (!gigId || musicianIds.length === 0) return
+
+  const { bandId } = await getBandContext()
+  await assertOwned('gig', bandId, gigId)
+  await assertOwned('musician', bandId, ...musicianIds)
 
   // A musician previously removed from this gig leaves behind an inactive
   // GigMusician row, which the @@unique([gigId, musicianId]) constraint
@@ -252,8 +281,10 @@ export async function bulkAddMusicians(formData: FormData): Promise<void> {
   revalidatePath(`/gigs/${gigId}`)
 }
 
-export async function removeMusician(musicianId: string): Promise<void> {
-  const musician = await prisma.gigMusician.update({ where: { id: musicianId }, data: { isActive: false } })
+export async function removeMusician(gigMusicianId: string): Promise<void> {
+  const { bandId } = await getBandContext()
+  await assertOwned('gigMusician', bandId, gigMusicianId)
+  const musician = await prisma.gigMusician.update({ where: { id: gigMusicianId }, data: { isActive: false } })
   revalidatePath(`/gigs/${musician.gigId}`)
 }
 
@@ -265,6 +296,10 @@ export async function syncGigMusicians(formData: FormData): Promise<void> {
   if (!gigId) return
 
   const selectedIds = new Set(formData.getAll('musicianIds').map(String))
+
+  const { bandId } = await getBandContext()
+  await assertOwned('gig', bandId, gigId)
+  await assertOwned('musician', bandId, ...selectedIds)
 
   const current = await prisma.gigMusician.findMany({
     where: { gigId, isActive: true },
@@ -303,6 +338,8 @@ export async function updateMusicianPayment(formData: FormData): Promise<void> {
 
   if (!gigMusicianId) return
 
+  const { bandId } = await getBandContext()
+  await assertOwned('gigMusician', bandId, gigMusicianId)
   const musician = await prisma.gigMusician.update({
     where: { id: gigMusicianId },
     data: {
