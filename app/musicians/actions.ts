@@ -1,6 +1,7 @@
 'use server'
 
 import prisma from '@/lib/db'
+import { DEFAULT_BAND_ID } from '@/lib/band'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -20,7 +21,7 @@ export async function createMusician(
   if (!data.name) return { error: 'Name is required.' }
 
   try {
-    await prisma.musician.create({ data })
+    await prisma.musician.create({ data: { ...data, bandId: DEFAULT_BAND_ID } })
   } catch {
     return { error: 'Failed to create musician.' }
   }

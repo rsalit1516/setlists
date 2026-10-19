@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import prisma from '@/lib/db'
 import { getGig, calculateTotalExpenses, calculateGigNet } from '@/lib/services/gigs'
+import { DEFAULT_BAND_ID } from '@/lib/band'
 import type { SetSection } from '@/lib/types'
 
 export type GigActionState = { error: string } | null
@@ -62,6 +63,7 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
     const setlist = await prisma.setlist.create({
       data: {
         name,
+        bandId: DEFAULT_BAND_ID,
         items: {
           create: (source?.items ?? []).map((item) => ({
             songId: item.songId,
@@ -74,12 +76,13 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
     })
     setlistId = setlist.id
   } else {
-    const setlist = await prisma.setlist.create({ data: { name } })
+    const setlist = await prisma.setlist.create({ data: { name, bandId: DEFAULT_BAND_ID } })
     setlistId = setlist.id
   }
 
   const gig = await prisma.gig.create({
     data: {
+      bandId: DEFAULT_BAND_ID,
       date,
       startTime,
       endTime,

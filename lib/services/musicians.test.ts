@@ -15,6 +15,7 @@ import prisma from '@/lib/db'
 const mockMusician = {
   id: 'musician-1',
   name: 'Richard Salit',
+  bandId: 'band-1',
   isActive: true,
   createdAt: new Date(),
   updatedAt: new Date(),
