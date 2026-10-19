@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { getBandContext } from '@/lib/band'
 import { getMusician } from '@/lib/services/musicians'
 import { MusicianForm } from '@/components/musicians/musician-form'
 import { updateMusician } from '../../actions'
@@ -10,7 +11,8 @@ export default async function EditMusicianPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const musician = await getMusician(id)
+  const { bandId } = await getBandContext()
+  const musician = await getMusician(bandId, id)
 
   if (!musician) notFound()
 

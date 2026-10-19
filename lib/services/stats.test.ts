@@ -111,13 +111,13 @@ beforeEach(() => vi.clearAllMocks())
 describe('getMostPlayedSongs', () => {
   it('only counts active, played, non-Soundcheck setlist items at active gigs', async () => {
     vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([])
-    await getMostPlayedSongs()
+    await getMostPlayedSongs('band-1')
     type FindManyArgs = {
       where: {
         isActive: unknown
         wasPlayed: unknown
         section: unknown
-        setlist: { gig: { isActive: unknown } }
+        setlist: { bandId: unknown; gig: { isActive: unknown } }
       }
     }
     const call = vi.mocked(prisma.setlistItem.findMany).mock.calls[0][0] as unknown as FindManyArgs
@@ -127,9 +127,17 @@ describe('getMostPlayedSongs', () => {
     expect(call.where.setlist.gig.isActive).toBe(true)
   })
 
+  it("only counts plays from the given band's setlists", async () => {
+    vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([])
+    await getMostPlayedSongs('band-2')
+    expect(prisma.setlistItem.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ setlist: expect.objectContaining({ bandId: 'band-2' }) }) })
+    )
+  })
+
   it('trusts wasPlayed rather than gig cancellation, so a fully cancelled gig contributes nothing', async () => {
     vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([])
-    const result = await getMostPlayedSongs()
+    const result = await getMostPlayedSongs('band-1')
     expect(result).toEqual([])
     const call = vi.mocked(prisma.setlistItem.findMany).mock.calls[0][0] as unknown as {
       where: { setlist: { gig: Record<string, unknown> } }
@@ -148,7 +156,7 @@ describe('getMostPlayedSongs', () => {
       makeSong({ id: 'song-1', title: 'A' }),
       makeSong({ id: 'song-2', title: 'B' }),
     ] as never)
-    const result = await getMostPlayedSongs()
+    const result = await getMostPlayedSongs('band-1')
     expect(result.map((s) => [s.songId, s.playCount])).toEqual([
       ['song-1', 1],
       ['song-2', 1],
@@ -157,7 +165,7 @@ describe('getMostPlayedSongs', () => {
 
   it('skips the song lookup entirely when nothing has been played', async () => {
     vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([])
-    const result = await getMostPlayedSongs()
+    const result = await getMostPlayedSongs('band-1')
     expect(result).toEqual([])
     expect(prisma.song.findMany).not.toHaveBeenCalled()
   })
@@ -172,7 +180,7 @@ describe('getMostPlayedSongs', () => {
       makeSong({ id: 'song-1' }),
       makeSong({ id: 'song-2', title: 'Scarlet Begonias' }),
     ] as never)
-    const result = await getMostPlayedSongs()
+    const result = await getMostPlayedSongs('band-1')
     expect(result.find((s) => s.songId === 'song-1')?.playCount).toBe(2)
     expect(result.find((s) => s.songId === 'song-2')?.playCount).toBe(1)
   })
@@ -183,7 +191,7 @@ describe('getMostPlayedSongs', () => {
     // row is ever returned here, so playCount is 1, not 3.
     vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([makeItem('song-1')] as never)
     vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
-    const result = await getMostPlayedSongs()
+    const result = await getMostPlayedSongs('band-1')
     expect(result.find((s) => s.songId === 'song-1')?.playCount).toBe(1)
   })
 
@@ -198,7 +206,7 @@ describe('getMostPlayedSongs', () => {
       makeSong({ id: 'song-1' }),
       makeSong({ id: 'song-2', title: 'Scarlet Begonias' }),
     ] as never)
-    const result = await getMostPlayedSongs()
+    const result = await getMostPlayedSongs('band-1')
     expect(result.map((s) => s.songId)).toEqual(['song-2', 'song-1'])
   })
 
@@ -211,7 +219,7 @@ describe('getMostPlayedSongs', () => {
       makeSong({ id: 'song-z', title: 'Zzz Song' }),
       makeSong({ id: 'song-a', title: 'Aaa Song' }),
     ] as never)
-    const result = await getMostPlayedSongs()
+    const result = await getMostPlayedSongs('band-1')
     expect(result.map((s) => s.songId)).toEqual(['song-a', 'song-z'])
   })
 
@@ -226,7 +234,7 @@ describe('getMostPlayedSongs', () => {
       makeSong({ id: 'song-2', title: 'B' }),
       makeSong({ id: 'song-3', title: 'C' }),
     ] as never)
-    const result = await getMostPlayedSongs(2)
+    const result = await getMostPlayedSongs('band-1', 2)
     expect(result).toHaveLength(2)
   })
 
@@ -237,7 +245,7 @@ describe('getMostPlayedSongs', () => {
     vi.mocked(prisma.song.findMany).mockResolvedValue(
       Array.from({ length: 15 }, (_, i) => makeSong({ id: `song-${i}`, title: `Song ${i}` })) as never
     )
-    const result = await getMostPlayedSongs()
+    const result = await getMostPlayedSongs('band-1')
     expect(result).toHaveLength(10)
   })
 })
@@ -246,7 +254,7 @@ describe('getReadySongsNeverPlayed', () => {
   it('only fetches active READY songs', async () => {
     vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([])
     vi.mocked(prisma.song.findMany).mockResolvedValue([])
-    await getReadySongsNeverPlayed()
+    await getReadySongsNeverPlayed('band-1')
     type FindManyArgs = { where: { isActive: unknown; status: unknown } }
     const call = vi.mocked(prisma.song.findMany).mock.calls[0][0] as unknown as FindManyArgs
     expect(call.where.isActive).toBe(true)
@@ -259,7 +267,7 @@ describe('getReadySongsNeverPlayed', () => {
       makeSong({ id: 'song-1', title: 'Played Song' }),
       makeSong({ id: 'song-2', title: 'Never Played Song' }),
     ] as never)
-    const result = await getReadySongsNeverPlayed()
+    const result = await getReadySongsNeverPlayed('band-1')
     expect(result.map((s) => s.songId)).toEqual(['song-2'])
   })
 
@@ -269,7 +277,7 @@ describe('getReadySongsNeverPlayed', () => {
       makeSong({ id: 'song-1', title: 'A' }),
       makeSong({ id: 'song-2', title: 'B' }),
     ] as never)
-    const result = await getReadySongsNeverPlayed()
+    const result = await getReadySongsNeverPlayed('band-1')
     expect(result).toHaveLength(2)
   })
 
@@ -281,7 +289,7 @@ describe('getReadySongsNeverPlayed', () => {
     vi.mocked(prisma.song.findMany).mockResolvedValue([
       makeSong({ id: 'song-1', title: 'Soundcheck Only' }),
     ] as never)
-    const result = await getReadySongsNeverPlayed()
+    const result = await getReadySongsNeverPlayed('band-1')
     expect(result.map((s) => s.songId)).toEqual(['song-1'])
   })
 
@@ -294,7 +302,7 @@ describe('getReadySongsNeverPlayed', () => {
       makeSong({ id: 'song-1' }),
       makeSong({ id: 'song-2' }),
     ] as never)
-    const result = await getReadySongsNeverPlayed()
+    const result = await getReadySongsNeverPlayed('band-1')
     expect(result).toEqual([])
   })
 
@@ -304,7 +312,7 @@ describe('getReadySongsNeverPlayed', () => {
       makeSong({ id: 'song-a', title: 'Aaa Song' }),
       makeSong({ id: 'song-z', title: 'Zzz Song' }),
     ] as never)
-    const result = await getReadySongsNeverPlayed()
+    const result = await getReadySongsNeverPlayed('band-1')
     expect(result.map((s) => s.title)).toEqual(['Aaa Song', 'Zzz Song'])
   })
 
@@ -313,7 +321,7 @@ describe('getReadySongsNeverPlayed', () => {
     vi.mocked(prisma.song.findMany).mockResolvedValue([
       makeSong({ id: 'song-1', title: 'Fire on the Mountain', artist: 'Grateful Dead', key: 'F#m' }),
     ] as never)
-    const result = await getReadySongsNeverPlayed()
+    const result = await getReadySongsNeverPlayed('band-1')
     expect(result[0]).toEqual({
       songId: 'song-1',
       title: 'Fire on the Mountain',
@@ -327,9 +335,10 @@ describe('getStaleReadySongs', () => {
   it('only considers active, past gigs, most-recent-first', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([])
     vi.mocked(prisma.song.findMany).mockResolvedValue([])
-    await getStaleReadySongs()
-    type FindManyArgs = { where: { isActive: unknown; date: { lte: unknown } }; orderBy: { date: unknown } }
+    await getStaleReadySongs('band-1')
+    type FindManyArgs = { where: { bandId: unknown; isActive: unknown; date: { lte: unknown } }; orderBy: { date: unknown } }
     const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as unknown as FindManyArgs
+    expect(call.where.bandId).toBe('band-1')
     expect(call.where.isActive).toBe(true)
     expect(call.where.date.lte).toBeInstanceOf(Date)
     expect(call.orderBy.date).toBe('desc')
@@ -338,7 +347,7 @@ describe('getStaleReadySongs', () => {
   it('only considers active, played, non-Soundcheck setlist items when computing last-played', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([])
     vi.mocked(prisma.song.findMany).mockResolvedValue([])
-    await getStaleReadySongs()
+    await getStaleReadySongs('band-1')
     type FindManyArgs = {
       select: {
         setlist: { select: { items: { where: { isActive: unknown; wasPlayed: unknown; section: unknown } } } }
@@ -357,7 +366,7 @@ describe('getStaleReadySongs', () => {
     // as a song that was never played at all.
     vi.mocked(prisma.gig.findMany).mockResolvedValue(makeGigs([], []) as never)
     vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
-    const result = await getStaleReadySongs()
+    const result = await getStaleReadySongs('band-1')
     expect(result[0].gigsSinceLastPlayed).toBeNull()
   })
 
@@ -367,7 +376,7 @@ describe('getStaleReadySongs', () => {
       makeGigs(F, F, F, F, F, ['song-1'], F, F, F, F) as never
     )
     vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
-    const result = await getStaleReadySongs()
+    const result = await getStaleReadySongs('band-1')
     expect(result).toEqual([])
   })
 
@@ -377,7 +386,7 @@ describe('getStaleReadySongs', () => {
       makeGigs(F, F, F, F, F, F, F, F, F, F, ['song-1']) as never
     )
     vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
-    const result = await getStaleReadySongs()
+    const result = await getStaleReadySongs('band-1')
     expect(result).toEqual([
       { songId: 'song-1', title: 'Fire on the Mountain', artist: 'Grateful Dead', key: null, gigsSinceLastPlayed: 10 },
     ])
@@ -386,7 +395,7 @@ describe('getStaleReadySongs', () => {
   it('includes a Ready song that has never been played, with gigsSinceLastPlayed null', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue(makeGigs([], []) as never)
     vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
-    const result = await getStaleReadySongs()
+    const result = await getStaleReadySongs('band-1')
     expect(result[0].gigsSinceLastPlayed).toBeNull()
   })
 
@@ -399,7 +408,7 @@ describe('getStaleReadySongs', () => {
       makeSong({ id: 'song-a', title: 'A Song' }),
       makeSong({ id: 'song-b', title: 'B Song' }),
     ] as never)
-    const result = await getStaleReadySongs()
+    const result = await getStaleReadySongs('band-1')
     expect(result.map((s) => s.songId)).toEqual(['song-b', 'song-a'])
   })
 
@@ -411,7 +420,7 @@ describe('getStaleReadySongs', () => {
       makeSong({ id: 'song-z', title: 'Zzz Song' }),
       makeSong({ id: 'song-a', title: 'Aaa Song' }),
     ] as never)
-    const result = await getStaleReadySongs()
+    const result = await getStaleReadySongs('band-1')
     expect(result.map((s) => s.songId)).toEqual(['song-a', 'song-z'])
   })
 
@@ -421,8 +430,8 @@ describe('getStaleReadySongs', () => {
       makeGigs(F, F, ['song-1'], F, F) as never
     )
     vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
-    expect(await getStaleReadySongs(3)).toEqual([])
-    expect((await getStaleReadySongs(2))[0]?.songId).toBe('song-1')
+    expect(await getStaleReadySongs('band-1', 3)).toEqual([])
+    expect((await getStaleReadySongs('band-1', 2))[0]?.songId).toBe('song-1')
   })
 
   it('skips gigs with no played songs (cancelled / rained out) when counting gigs since last played', async () => {
@@ -432,8 +441,8 @@ describe('getStaleReadySongs', () => {
       makeGigs([], [], [], [], F, [], [], [], [], [], [], F, ['song-1']) as never
     )
     vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
-    expect(await getStaleReadySongs()).toEqual([])
-    expect((await getStaleReadySongs(2))[0]).toMatchObject({ songId: 'song-1', gigsSinceLastPlayed: 2 })
+    expect(await getStaleReadySongs('band-1')).toEqual([])
+    expect((await getStaleReadySongs('band-1', 2))[0]).toMatchObject({ songId: 'song-1', gigsSinceLastPlayed: 2 })
   })
 
   it('keeps the plays from a partially played cancelled gig in the sequence', async () => {
@@ -442,7 +451,7 @@ describe('getStaleReadySongs', () => {
       makeGigs(['song-2'], ['song-1']) as never
     )
     vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
-    expect((await getStaleReadySongs(1))[0]).toMatchObject({ songId: 'song-1', gigsSinceLastPlayed: 1 })
+    expect((await getStaleReadySongs('band-1', 1))[0]).toMatchObject({ songId: 'song-1', gigsSinceLastPlayed: 1 })
   })
 
   it('defaults gigWindow to DEFAULT_STALE_GIG_WINDOW', async () => {
@@ -520,12 +529,13 @@ describe('getStaleInProgressSongs', () => {
 describe('getUnpaidGigs', () => {
   it('only fetches active past gigs with a contracted amount or cancellation fee, oldest-first', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([])
-    await getUnpaidGigs(NOW)
+    await getUnpaidGigs('band-1', NOW)
     type FindManyArgs = {
-      where: { isActive: unknown; date: { lte: unknown }; OR: unknown }
+      where: { bandId: unknown; isActive: unknown; date: { lte: unknown }; OR: unknown }
       orderBy: { date: unknown }
     }
     const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as unknown as FindManyArgs
+    expect(call.where.bandId).toBe('band-1')
     expect(call.where.isActive).toBe(true)
     expect(call.where.date.lte).toBe(NOW)
     expect(call.where.OR).toEqual([{ amountContracted: { not: null } }, { cancellationFee: { not: null } }])
@@ -536,7 +546,7 @@ describe('getUnpaidGigs', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([
       makeGig({ amountContracted: '800.00', amountPaid: null }),
     ] as never)
-    const result = await getUnpaidGigs(NOW)
+    const result = await getUnpaidGigs('band-1', NOW)
     expect(result).toEqual([
       {
         id: 'gig-1',
@@ -555,7 +565,7 @@ describe('getUnpaidGigs', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([
       makeGig({ amountContracted: '800.00', amountPaid: '300.00' }),
     ] as never)
-    const result = await getUnpaidGigs(NOW)
+    const result = await getUnpaidGigs('band-1', NOW)
     expect(result[0].paidStatus).toBe('partial')
     expect(result[0].outstandingBalance).toBe(500)
   })
@@ -564,7 +574,7 @@ describe('getUnpaidGigs', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([
       makeGig({ amountContracted: '800.00', amountPaid: '800.00' }),
     ] as never)
-    const result = await getUnpaidGigs(NOW)
+    const result = await getUnpaidGigs('band-1', NOW)
     expect(result).toEqual([])
   })
 
@@ -572,7 +582,7 @@ describe('getUnpaidGigs', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([
       makeGig({ amountContracted: '800.00', amountPaid: '900.00' }),
     ] as never)
-    const result = await getUnpaidGigs(NOW)
+    const result = await getUnpaidGigs('band-1', NOW)
     expect(result).toEqual([])
   })
 
@@ -580,7 +590,7 @@ describe('getUnpaidGigs', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([
       makeGig({ amountContracted: '800.00', amountPaid: '0.00' }),
     ] as never)
-    const result = await getUnpaidGigs(NOW)
+    const result = await getUnpaidGigs('band-1', NOW)
     expect(result[0].paidStatus).toBe('unpaid')
   })
 
@@ -589,7 +599,7 @@ describe('getUnpaidGigs', () => {
       makeGig({ id: 'gig-old', date: new Date('2026-01-01T12:00:00') }),
       makeGig({ id: 'gig-new', date: new Date('2026-06-01T12:00:00') }),
     ] as never)
-    const result = await getUnpaidGigs(NOW)
+    const result = await getUnpaidGigs('band-1', NOW)
     expect(result.map((g) => g.id)).toEqual(['gig-old', 'gig-new'])
   })
 
@@ -597,7 +607,7 @@ describe('getUnpaidGigs', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([
       makeGig({ amountContracted: '800.00', cancelledAt: new Date('2026-05-15T12:00:00'), cancellationFee: '400.00' }),
     ] as never)
-    const result = await getUnpaidGigs(NOW)
+    const result = await getUnpaidGigs('band-1', NOW)
     expect(result).toHaveLength(1)
     expect(result[0].expectedAmount).toBe('400.00')
     expect(result[0].isCancelled).toBe(true)
@@ -609,19 +619,19 @@ describe('getUnpaidGigs', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([
       makeGig({ cancelledAt: new Date('2026-05-15T12:00:00'), cancellationFee: '400.00', amountPaid: '400.00' }),
     ] as never)
-    expect(await getUnpaidGigs(NOW)).toEqual([])
+    expect(await getUnpaidGigs('band-1', NOW)).toEqual([])
   })
 
   it('never lists a cancelled gig with no fee, even if it has a contracted amount', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([
       makeGig({ amountContracted: '800.00', cancelledAt: new Date('2026-05-15T12:00:00'), cancellationFee: null }),
     ] as never)
-    expect(await getUnpaidGigs(NOW)).toEqual([])
+    expect(await getUnpaidGigs('band-1', NOW)).toEqual([])
   })
 
   it('returns an empty list when nothing is owed', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([])
-    const result = await getUnpaidGigs(NOW)
+    const result = await getUnpaidGigs('band-1', NOW)
     expect(result).toEqual([])
   })
 })
@@ -629,12 +639,13 @@ describe('getUnpaidGigs', () => {
 describe('getScheduleGaps', () => {
   it('only fetches active gigs from today through the lookahead window, ascending', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([])
-    await getScheduleGaps(1, 14, NOW)
+    await getScheduleGaps('band-1', 1, 14, NOW)
     type FindManyArgs = {
-      where: { isActive: unknown; date: { gte: unknown; lte: unknown } }
+      where: { bandId: unknown; isActive: unknown; date: { gte: unknown; lte: unknown } }
       orderBy: { date: unknown }
     }
     const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as unknown as FindManyArgs
+    expect(call.where.bandId).toBe('band-1')
     expect(call.where.isActive).toBe(true)
     expect(call.where.date.gte).toBe(NOW)
     expect(call.where.date.lte).toEqual(new Date('2026-09-05T12:00:00'))
@@ -643,7 +654,7 @@ describe('getScheduleGaps', () => {
 
   it('excludes cancelled gigs so they cannot hide an open stretch of calendar', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([])
-    await getScheduleGaps(1, 14, NOW)
+    await getScheduleGaps('band-1', 1, 14, NOW)
     type FindManyArgs = { where: { cancelledAt: unknown } }
     const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as unknown as FindManyArgs
     expect(call.where.cancelledAt).toBeNull()
@@ -654,7 +665,7 @@ describe('getScheduleGaps', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([
       makeUpcomingGig({ id: 'gig-2', date: daysFromNow(30), venue: { name: 'Venue B' } }),
     ] as never)
-    const result = await getScheduleGaps(2, 14, NOW)
+    const result = await getScheduleGaps('band-1', 2, 14, NOW)
     expect(result[0]).toEqual({
       from: { type: 'today' },
       to: { type: 'gig', gigId: 'gig-2', venueName: 'Venue B', date: daysFromNow(30) },
@@ -664,7 +675,7 @@ describe('getScheduleGaps', () => {
 
   it('flags an open-ended gap from today when nothing is scheduled at all', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([])
-    const result = await getScheduleGaps(1, 14, NOW)
+    const result = await getScheduleGaps('band-1', 1, 14, NOW)
     expect(result).toEqual([{ from: { type: 'today' }, to: { type: 'open' }, days: 31 }])
   })
 
@@ -672,7 +683,7 @@ describe('getScheduleGaps', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([
       makeUpcomingGig({ id: 'gig-1', date: daysFromNow(5), venue: { name: 'The Jazz Club' } }),
     ] as never)
-    const result = await getScheduleGaps(1, 14, NOW)
+    const result = await getScheduleGaps('band-1', 1, 14, NOW)
     expect(result).toEqual([
       {
         from: { type: 'gig', gigId: 'gig-1', venueName: 'The Jazz Club', date: daysFromNow(5) },
@@ -687,7 +698,7 @@ describe('getScheduleGaps', () => {
       makeUpcomingGig({ id: 'gig-1', date: daysFromNow(2), venue: { name: 'Venue A' } }),
       makeUpcomingGig({ id: 'gig-2', date: daysFromNow(20), venue: { name: 'Venue B' } }),
     ] as never)
-    const result = await getScheduleGaps(1, 14, NOW)
+    const result = await getScheduleGaps('band-1', 1, 14, NOW)
     expect(result).toEqual([
       {
         from: { type: 'gig', gigId: 'gig-1', venueName: 'Venue A', date: daysFromNow(2) },
@@ -701,7 +712,7 @@ describe('getScheduleGaps', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([
       makeUpcomingGig({ id: 'gig-1', date: daysFromNow(20), venue: { name: 'Venue A' } }),
     ] as never)
-    const result = await getScheduleGaps(1, 14, NOW)
+    const result = await getScheduleGaps('band-1', 1, 14, NOW)
     expect(result[0]).toEqual({
       from: { type: 'today' },
       to: { type: 'gig', gigId: 'gig-1', venueName: 'Venue A', date: daysFromNow(20) },
@@ -714,7 +725,7 @@ describe('getScheduleGaps', () => {
       makeUpcomingGig({ id: 'gig-1', date: daysFromNow(5) }),
       makeUpcomingGig({ id: 'gig-2', date: daysFromNow(19) }),
     ] as never)
-    const result = await getScheduleGaps(1, 14, NOW)
+    const result = await getScheduleGaps('band-1', 1, 14, NOW)
     expect(result).toEqual([])
   })
 
@@ -723,7 +734,7 @@ describe('getScheduleGaps', () => {
       makeUpcomingGig({ id: 'gig-1', date: daysFromNow(5) }),
       makeUpcomingGig({ id: 'gig-2', date: daysFromNow(20) }),
     ] as never)
-    const result = await getScheduleGaps(1, 14, NOW)
+    const result = await getScheduleGaps('band-1', 1, 14, NOW)
     expect(result).toHaveLength(1)
     expect(result[0].days).toBe(15)
   })
@@ -734,7 +745,7 @@ describe('getScheduleGaps', () => {
       makeUpcomingGig({ id: 'gig-2', date: daysFromNow(15) }),
       makeUpcomingGig({ id: 'gig-3', date: daysFromNow(25) }),
     ] as never)
-    const result = await getScheduleGaps(1, 14, NOW)
+    const result = await getScheduleGaps('band-1', 1, 14, NOW)
     expect(result).toEqual([])
   })
 
@@ -743,7 +754,7 @@ describe('getScheduleGaps', () => {
       makeUpcomingGig({ id: 'gig-1', date: daysFromNow(20), venue: { name: 'Venue A' } }),
     ] as never)
     // lookaheadMonths=2 -> windowEnd = 61 days out; today->gig=20 (flagged), gig->end=41 (flagged)
-    const result = await getScheduleGaps(2, 14, NOW)
+    const result = await getScheduleGaps('band-1', 2, 14, NOW)
     expect(result).toHaveLength(2)
     expect(result[0].from).toEqual({ type: 'today' })
     expect(result[0].to).toMatchObject({ type: 'gig', gigId: 'gig-1' })

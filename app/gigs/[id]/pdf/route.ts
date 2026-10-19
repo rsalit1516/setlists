@@ -1,4 +1,5 @@
 import { renderToBuffer } from '@react-pdf/renderer'
+import { getBandContext } from '@/lib/band'
 import { getGig } from '@/lib/services/gigs'
 import { buildPrintLayout } from '@/lib/setlist-print'
 import { GigSetlistPdf } from '@/lib/pdf/gig-setlist-pdf'
@@ -16,7 +17,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params
-  const gig = await getGig(id)
+  const { bandId } = await getBandContext()
+  const gig = await getGig(bandId, id)
   if (!gig) {
     return new Response('Not found', { status: 404 })
   }

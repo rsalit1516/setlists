@@ -1,10 +1,10 @@
 import prisma from '@/lib/db'
 import type { Venue } from '@/lib/types'
 
-export async function getVenues(): Promise<Venue[]> {
-  return prisma.venue.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }) as Promise<Venue[]>
+export async function getVenues(bandId: string): Promise<Venue[]> {
+  return prisma.venue.findMany({ where: { bandId, isActive: true }, orderBy: { name: 'asc' } }) as Promise<Venue[]>
 }
 
-export async function getVenue(id: string): Promise<Venue | null> {
-  return prisma.venue.findUnique({ where: { id } }) as Promise<Venue | null>
+export async function getVenue(bandId: string, id: string): Promise<Venue | null> {
+  return prisma.venue.findFirst({ where: { id, bandId } }) as Promise<Venue | null>
 }

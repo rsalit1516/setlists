@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { getBandContext } from "@/lib/band";
 import {
   getMostPlayedSongs,
   getReadySongsNeverPlayed,
@@ -67,6 +68,7 @@ export default async function StatsPage({
     cookieStore.get(GAP_LOOKAHEAD_COOKIE)?.value,
   );
 
+  const { bandId } = await getBandContext();
   const [
     mostPlayed,
     neverPlayed,
@@ -75,12 +77,12 @@ export default async function StatsPage({
     unpaidGigs,
     scheduleGaps,
   ] = await Promise.all([
-    getMostPlayedSongs(),
-    getReadySongsNeverPlayed(),
-    getStaleReadySongs(gigWindow),
+    getMostPlayedSongs(bandId),
+    getReadySongsNeverPlayed(bandId),
+    getStaleReadySongs(bandId, gigWindow),
     getStaleInProgressSongs(),
-    getUnpaidGigs(),
-    getScheduleGaps(gapLookaheadMonths, gapDays),
+    getUnpaidGigs(bandId),
+    getScheduleGaps(bandId, gapLookaheadMonths, gapDays),
   ]);
 
   const unpaidBalanceTotal = unpaidGigs.reduce(

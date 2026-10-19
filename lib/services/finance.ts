@@ -57,11 +57,11 @@ function addGigToSummary(summary: FinanceYearSummary, row: FinanceGigRow): Finan
 }
 
 // `now` is injectable so tests don't depend on the real clock; callers omit it.
-export async function getFinanceReport(now: Date = new Date()): Promise<FinanceReport> {
+export async function getFinanceReport(bandId: string, now: Date = new Date()): Promise<FinanceReport> {
   const currentYear = now.getFullYear()
 
   const rows: GigFinanceRow[] = await prisma.gig.findMany({
-    where: { isActive: true },
+    where: { bandId, isActive: true },
     orderBy: { date: 'desc' },
     include: {
       venue: { select: { name: true } },

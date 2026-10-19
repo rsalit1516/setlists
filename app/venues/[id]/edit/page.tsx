@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { getBandContext } from '@/lib/band'
 import { getVenue } from '@/lib/services/venues'
 import { VenueForm } from '@/components/venues/venue-form'
 import { updateVenue } from '../../actions'
@@ -10,7 +11,8 @@ export default async function EditVenuePage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const venue = await getVenue(id)
+  const { bandId } = await getBandContext()
+  const venue = await getVenue(bandId, id)
 
   if (!venue) notFound()
 
