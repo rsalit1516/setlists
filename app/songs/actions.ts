@@ -51,12 +51,13 @@ function lyricsChanged(previous: string | null, next: string | null): boolean {
 function lyricsProvenance(
   current: { lyrics: string | null } | null,
   lyrics: string | null
-): { lyricsSource: 'MANUAL' | null; lyricsSourceUrl: null; lyricsImportedAt: null } | null {
+): { lyricsSource: 'MANUAL' | null; lyricsSourceUrl: null; lyricsImportedAt: null; lyricsUpdatedAt: Date } | null {
   if (!lyricsChanged(current?.lyrics ?? null, lyrics)) return null
   return {
     lyricsSource: lyrics ? 'MANUAL' : null,
     lyricsSourceUrl: null,
     lyricsImportedAt: null,
+    lyricsUpdatedAt: new Date(),
   }
 }
 

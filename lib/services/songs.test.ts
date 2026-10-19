@@ -28,12 +28,14 @@ const baseSong = {
   lyricsSource: null,
   lyricsSourceUrl: null,
   lyricsImportedAt: null,
+  lyricsUpdatedAt: null,
   chartFileUrl: null,
   chartFileType: null,
   chartFileName: null,
   isActive: true,
   createdAt: new Date(),
   updatedAt: new Date(),
+  ownerBandId: null,
 };
 
 const genreDead = { id: "genre-1", name: "Dead", isActive: true, createdAt: new Date(), updatedAt: new Date() };

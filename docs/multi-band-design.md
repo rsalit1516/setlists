@@ -36,33 +36,38 @@ Status: **draft for discussion** (2026-10-19). Nothing here is implemented.
 
 New tables (`Band`, `User`, `BandMember`, and everything added later) use UUIDv7 primary keys (`@db.Uuid`); `bandId` columns on existing tables are `uuid` too. Existing tables keep text `cuid` ids until #152 converts them. Consequence: a new table that references an existing one (e.g. `BandSong.songId` → `Song.id`) uses a text column until that conversion lands, then is altered with the rest.
 
-### `BandSong`
+### Song ownership: master vs private
+
+`Song.ownerBandId` decides who may see and edit a song. **Null = master catalog**, visible to every band and editable only by a platform admin. **Set = private to that band**, never shown to others, editable by that band. The foreign key is `ON DELETE RESTRICT`, so deleting a band can never turn its private songs into master ones.
+
+**Existing songs became master** (decision, 2026-10-21): the migration leaves `ownerBandId` null for every song that existed, so The Ruminators' lyrics, imported lyrics and chart files are visible to any band that joins. This is deliberate: they are the owner's content. Anything a *future* band enters stays private to it unless that band agrees otherwise.
+
+Until platform admins exist (#145), `getBandContext()` carries an interim `isPlatformAdmin` flag, stubbed `true` like the ADMIN role today, so the current band can still edit master songs. The rule for editing a `Song` is: `song.ownerBandId === bandId`, or `ownerBandId === null && isPlatformAdmin`. Everyone else edits only their `BandSong`.
+
+### `BandSong` (built in #133)
 
 ```
 model BandSong {
-  id               String     @id @default(cuid())
-  bandId           String
-  songId           String
-  // band-owned fields (no generic equivalent)
-  status           SongStatus @default(WISH)
+  id               String     @id @default(uuid(7)) @db.Uuid
+  bandId           String     @db.Uuid
+  songId           String                          // text until #152
+  status           SongStatus @default(WISH)       // band-owned: no generic equivalent
   singer           String?
   keyboardRequired Boolean    @default(false)
-  isActive         Boolean    @default(true)
-  // nullable overrides; null = inherit from Song
-  keyOverride      String?
-  bpmOverride      Int?
-  durationOverride Int?
-  lyricsOverride   String?
-  chartFileOverrideUrl/Type/Name  String?
-  lyricsBasedOn    DateTime?   // Song.updatedAt (lyrics) when the override was forked
-
+  isActive         Boolean    @default(true)       // the band dropped it from its catalog
   @@unique([bandId, songId])
 }
 ```
 
+`Song.isActive` is the separate, global "retired by an admin" flag; lists must filter on both.
+
+Planned for #137/#138 (not built yet, because overrides only matter once master songs exist): nullable `keyOverride`, `bpmOverride`, `durationOverride`, `lyricsOverride`, chart-file overrides, and `lyricsBasedOn`, the generic `lyricsUpdatedAt` at the moment the override was forked. A band's chart change must never delete the generic chart blob that other bands use.
+
 Resolution lives in one function (e.g. `resolveSong(bandSong, song)` in `lib/services/songs.ts`): `bandSong.keyOverride ?? song.key`, and so on. No screen reimplements it.
 
-"Generic lyrics changed since you forked" is derived by comparing `lyricsBasedOn` with the generic lyrics' last-modified time. This needs a dedicated `Song.lyricsUpdatedAt`, because `updatedAt` also moves on unrelated edits.
+"Generic lyrics changed since you forked" is derived by comparing `lyricsBasedOn` with `Song.lyricsUpdatedAt`. That column exists since #133 and is maintained wherever lyrics change (song save and both importers), because `updatedAt` also moves on unrelated edits.
+
+`SetlistItem` points at `BandSong`, not `Song`. This makes a later switch from a band's private copy to a master version a one-column repoint (`BandSong.songId`) that leaves setlists, play history and stats untouched. `SetlistItem.bandSongId` is nullable in #133 (the running app still writes `songId`) and becomes required in #134.
 
 ### Keeping the UI churn small
 
