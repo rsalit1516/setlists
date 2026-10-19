@@ -44,7 +44,7 @@ describe('createMusician', () => {
     await expect(createMusician(null, fd)).rejects.toThrow('REDIRECT:/musicians')
 
     expect(prisma.musician.create).toHaveBeenCalledWith({
-      data: { name: 'Richard Salit', bandId: 'band-the-ruminators' },
+      data: { name: 'Richard Salit', bandId: '01900000-0000-7000-8000-000000000001' },
     })
     expect(revalidatePath).toHaveBeenCalledWith('/musicians')
   })

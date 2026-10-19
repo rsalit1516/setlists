@@ -249,7 +249,7 @@ describe('createGig', () => {
     expect(prisma.setlist.create).toHaveBeenCalledWith({
       data: {
         name: 'The Jazz Club - 08-15-26',
-        bandId: 'band-the-ruminators',
+        bandId: '01900000-0000-7000-8000-000000000001',
         items: {
           create: [
             { songId: 's-1', section: 'MAIN', setNumber: 1, order: 0 },
@@ -270,7 +270,7 @@ describe('createGig', () => {
     await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
 
     expect(prisma.setlist.create).toHaveBeenCalledWith({
-      data: { name: 'The Jazz Club - 08-15-26', bandId: 'band-the-ruminators' },
+      data: { name: 'The Jazz Club - 08-15-26', bandId: '01900000-0000-7000-8000-000000000001' },
     })
     expect(prisma.setlist.findUnique).not.toHaveBeenCalled()
   })
@@ -281,7 +281,7 @@ describe('createGig', () => {
     await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
 
     expect(prisma.gig.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ bandId: 'band-the-ruminators' }),
+      data: expect.objectContaining({ bandId: '01900000-0000-7000-8000-000000000001' }),
     })
   })
 

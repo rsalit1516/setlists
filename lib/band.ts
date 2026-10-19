@@ -3,7 +3,7 @@ import type { MemberRole } from '@/lib/types'
 // Interim: until sign-in exists (#140) every request belongs to the one band created by the
 // add_band_tenancy migration. Create actions still read this directly; #131 moves them to
 // getBandContext().
-export const DEFAULT_BAND_ID = 'band-the-ruminators'
+export const DEFAULT_BAND_ID = '01900000-0000-7000-8000-000000000001'
 
 export type BandContext = {
   userId: string | null

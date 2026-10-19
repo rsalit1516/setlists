@@ -32,6 +32,10 @@ Status: **draft for discussion** (2026-10-19). Nothing here is implemented.
 | `Genre` | Stays global. Genres classify the shared catalog. |
 | `Expense`, `GigMusician` | Unchanged. They inherit the tenant through `Gig`. |
 
+### Key types
+
+New tables (`Band`, `User`, `BandMember`, and everything added later) use UUIDv7 primary keys (`@db.Uuid`); `bandId` columns on existing tables are `uuid` too. Existing tables keep text `cuid` ids until #152 converts them. Consequence: a new table that references an existing one (e.g. `BandSong.songId` → `Song.id`) uses a text column until that conversion lands, then is altered with the rest.
+
 ### `BandSong`
 
 ```

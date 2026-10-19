@@ -41,7 +41,7 @@ describe('createVenue', () => {
     await expect(createVenue(null, buildFormData({ name: '  The Fillmore  ' }))).rejects.toThrow('REDIRECT:/venues')
 
     expect(prisma.venue.create).toHaveBeenCalledWith({
-      data: { name: 'The Fillmore', address: '1805 Geary Blvd', notes: null, bandId: 'band-the-ruminators' },
+      data: { name: 'The Fillmore', address: '1805 Geary Blvd', notes: null, bandId: '01900000-0000-7000-8000-000000000001' },
     })
     expect(revalidatePath).toHaveBeenCalledWith('/venues')
   })
