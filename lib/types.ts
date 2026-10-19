@@ -85,12 +85,14 @@ export type Song = {
   lyricsSource: LyricsSource | null
   lyricsSourceUrl: string | null
   lyricsImportedAt: Date | null
+  lyricsUpdatedAt: Date | null
   chartFileUrl: string | null
   chartFileType: string | null
   chartFileName: string | null
   isActive: boolean
   createdAt: Date
   updatedAt: Date
+  ownerBandId: string | null
   genres: Genre[]
 }
 

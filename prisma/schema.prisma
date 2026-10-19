@@ -38,11 +38,13 @@ model Band {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members   BandMember[]
-  venues    Venue[]
-  musicians Musician[]
-  setlists  Setlist[]
-  gigs      Gig[]
+  members    BandMember[]
+  venues     Venue[]
+  musicians  Musician[]
+  setlists   Setlist[]
+  gigs       Gig[]
+  bandSongs  BandSong[]
+  ownedSongs Song[]     @relation("SongOwner")
 }
 
 model User {
@@ -85,6 +87,7 @@ model Song {
   lyricsSource     LyricsSource?
   lyricsSourceUrl  String?
   lyricsImportedAt DateTime?
+  lyricsUpdatedAt  DateTime?
   chartFileUrl    String?
   chartFileType    String?
   chartFileName    String?
@@ -92,8 +95,37 @@ model Song {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
+  // null = master catalog (visible to every band); set = private to that band.
+  ownerBandId String? @db.Uuid
+  ownerBand   Band?   @relation("SongOwner", fields: [ownerBandId], references: [id], onDelete: Restrict)
+
   setlistItems SetlistItem[]
+  bandSongs    BandSong[]
   genres       Genre[]
+
+  @@index([ownerBandId])
+}
+
+// One band's view of a song: the band-owned fields (status, singer, keyboard) plus the link a
+// setlist item will point at (#134). Per-band overrides of key/BPM/lyrics join this table in #137/#138.
+model BandSong {
+  id               String     @id @default(uuid(7)) @db.Uuid
+  status           SongStatus @default(WISH)
+  singer           String?
+  keyboardRequired Boolean    @default(false)
+  isActive         Boolean    @default(true)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  bandId String @db.Uuid
+  songId String
+  band   Band   @relation(fields: [bandId], references: [id])
+  song   Song   @relation(fields: [songId], references: [id])
+
+  setlistItems SetlistItem[]
+
+  @@unique([bandId, songId])
+  @@index([songId])
 }
 
 model Genre {
@@ -162,9 +194,14 @@ model SetlistItem {
   isActive    Boolean    @default(true)
   songId      String
   setlistId   String
+  // Nullable until #134 switches the app to write it; then it becomes required and songId goes.
+  bandSongId  String?    @db.Uuid
 
-  song    Song    @relation(fields: [songId], references: [id])
-  setlist Setlist @relation(fields: [setlistId], references: [id])
+  song     Song      @relation(fields: [songId], references: [id])
+  setlist  Setlist   @relation(fields: [setlistId], references: [id])
+  bandSong BandSong? @relation(fields: [bandSongId], references: [id])
+
+  @@index([bandSongId])
 }
 
 model Gig {

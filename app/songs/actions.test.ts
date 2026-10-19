@@ -360,7 +360,7 @@ describe('lyrics provenance', () => {
     await expect(createSong(null, buildFormData({ lyrics: '<p>Hello</p>' }))).rejects.toThrow('REDIRECT:/songs')
 
     expect(prisma.song.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ lyricsSource: 'MANUAL', lyricsSourceUrl: null, lyricsImportedAt: null }),
+      data: expect.objectContaining({ lyricsSource: 'MANUAL', lyricsSourceUrl: null, lyricsImportedAt: null, lyricsUpdatedAt: expect.any(Date) }),
     })
   })
 
@@ -373,7 +373,7 @@ describe('lyrics provenance', () => {
 
     expect(prisma.song.update).toHaveBeenCalledWith({
       where: { id: 'song-1' },
-      data: expect.objectContaining({ lyricsSource: 'MANUAL', lyricsSourceUrl: null, lyricsImportedAt: null }),
+      data: expect.objectContaining({ lyricsSource: 'MANUAL', lyricsSourceUrl: null, lyricsImportedAt: null, lyricsUpdatedAt: expect.any(Date) }),
     })
   })
 
@@ -386,6 +386,7 @@ describe('lyrics provenance', () => {
 
     const { data } = vi.mocked(prisma.song.update).mock.calls[0][0] as { data: Record<string, unknown> }
     expect(data).not.toHaveProperty('lyricsSource')
+    expect(data).not.toHaveProperty('lyricsUpdatedAt')
   })
 
   it('does not treat the editor re-serializing blank lines as an edit', async () => {
@@ -397,6 +398,7 @@ describe('lyrics provenance', () => {
 
     const { data } = vi.mocked(prisma.song.update).mock.calls[0][0] as { data: Record<string, unknown> }
     expect(data).not.toHaveProperty('lyricsSource')
+    expect(data).not.toHaveProperty('lyricsUpdatedAt')
   })
 
   it('clears the source when lyrics are emptied', async () => {

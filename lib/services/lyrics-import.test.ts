@@ -155,6 +155,7 @@ describe('importMissingLyrics', () => {
         lyricsSource: 'IMPORTED',
         lyricsSourceUrl: 'https://lrclib.net/api/get/1',
         lyricsImportedAt: expect.any(Date),
+        lyricsUpdatedAt: expect.any(Date),
       },
     })
     expect(summary).toMatchObject({ imported: 1, noMatch: 1, errors: 0 })

@@ -118,6 +118,48 @@ async function main() {
     })
   }
 
+  // Upserted by (bandId, songId) because on an already-migrated dev database the migration created
+  // these rows with random ids.
+  const bandSongIds = new Map<string, string>()
+  async function attachSong(
+    forBandId: string,
+    songId: string,
+    fields: { status: SeedSong['status']; singer: string | null; keyboardRequired: boolean }
+  ) {
+    const row = await prisma.bandSong.upsert({
+      where: { bandId_songId: { bandId: forBandId, songId } },
+      update: fields,
+      create: { bandId: forBandId, songId, ...fields },
+    })
+    bandSongIds.set(`${forBandId}|${songId}`, row.id)
+  }
+  // Every seed song is in the master catalog (ownerBandId null) and in The Ruminators' catalog.
+  for (const s of songs) {
+    await attachSong(bandId, s.id, { status: s.status, singer: s.singer, keyboardRequired: s.keyboardRequired ?? false })
+  }
+  // The Test Pilots share a few master songs under their own status, plus one song only they have.
+  const pilotsSongs: [string, SeedSong['status'], string | null][] = [
+    ['seed-song-01', 'READY', null],
+    ['seed-song-02', 'IN_PROGRESS', 'Pat Pilot'],
+    ['seed-song-05', 'WISH', null],
+    ['seed-song-12', 'READY', 'Pat Pilot'],
+  ]
+  for (const [songId, status, singer] of pilotsSongs) {
+    await attachSong(otherBandId, songId, { status, singer, keyboardRequired: false })
+  }
+  const privateSong = {
+    id: 'seed-song-private-pilots',
+    title: 'Pilots Original (private)',
+    artist: 'The Test Pilots',
+    key: 'D',
+    bpm: 100,
+    durationSeconds: 215,
+    lyrics: lyrics('Only the Test Pilots can see this one'),
+    ownerBandId: otherBandId,
+  }
+  await prisma.song.upsert({ where: { id: privateSong.id }, update: privateSong, create: privateSong })
+  await attachSong(otherBandId, privateSong.id, { status: 'READY', singer: 'Pat Pilot', keyboardRequired: false })
+
   const venue = { id: 'seed-venue-1', name: 'The Test Tavern', address: '1 Fixture Lane', notes: 'Fake venue for the dev database', bandId }
   await prisma.venue.upsert({ where: { id: venue.id }, update: venue, create: venue })
 
@@ -127,7 +169,15 @@ async function main() {
     create: { id: 'seed-setlist-1', name: 'Test Tavern Night', bandId },
   })
   for (const [index, [songId, section, setNumber]] of setlistItems.entries()) {
-    const item = { id: `seed-item-${index + 1}`, order: index, section, setNumber, songId, setlistId: 'seed-setlist-1' }
+    const item = {
+      id: `seed-item-${index + 1}`,
+      order: index,
+      section,
+      setNumber,
+      songId,
+      bandSongId: bandSongIds.get(`${bandId}|${songId}`),
+      setlistId: 'seed-setlist-1',
+    }
     await prisma.setlistItem.upsert({ where: { id: item.id }, update: item, create: item })
   }
 
@@ -188,7 +238,7 @@ async function main() {
     update: {},
     create: { id: 'seed-setlist-other-past', name: 'Hangar Night (past)', bandId: otherBandId },
   })
-  const pastItem = { id: 'seed-item-other-1', order: 0, section: 'MAIN' as const, setNumber: 1, wasPlayed: true, songId: 'seed-song-02', setlistId: 'seed-setlist-other-past' }
+  const pastItem = { id: 'seed-item-other-1', order: 0, section: 'MAIN' as const, setNumber: 1, wasPlayed: true, songId: 'seed-song-02', bandSongId: bandSongIds.get(`${otherBandId}|seed-song-02`), setlistId: 'seed-setlist-other-past' }
   await prisma.setlistItem.upsert({ where: { id: pastItem.id }, update: pastItem, create: pastItem })
   const pastDate = new Date(gigDate.getTime() - 44 * 24 * 60 * 60 * 1000)
   const otherPastGig = {
@@ -213,7 +263,7 @@ async function main() {
   })
 
   console.log(
-    `Seeded ${songs.length} songs, ${bands.length} bands, ${users.length} users, ${musicians.length + 1} musicians, 3 gigs on ${new URL(connectionString!).host}.`
+    `Seeded ${songs.length + 1} songs, ${bands.length} bands, ${users.length} users, ${musicians.length + 1} musicians, 3 gigs on ${new URL(connectionString!).host}.`
   )
 }
 

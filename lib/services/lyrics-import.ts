@@ -137,6 +137,7 @@ export async function importMissingLyrics(
               lyricsSource: 'IMPORTED',
               lyricsSourceUrl: found.sourceUrl,
               lyricsImportedAt: new Date(),
+              lyricsUpdatedAt: new Date(),
             },
           })
         }
@@ -175,6 +176,7 @@ export async function importLyricsForSong(
       lyricsSource: 'IMPORTED',
       lyricsSourceUrl: found.sourceUrl,
       lyricsImportedAt: new Date(),
+      lyricsUpdatedAt: new Date(),
     },
   })
   return count ? 'imported' : 'no-match'
