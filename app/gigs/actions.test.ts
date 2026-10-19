@@ -249,6 +249,7 @@ describe('createGig', () => {
     expect(prisma.setlist.create).toHaveBeenCalledWith({
       data: {
         name: 'The Jazz Club - 08-15-26',
+        bandId: 'band-the-ruminators',
         items: {
           create: [
             { songId: 's-1', section: 'MAIN', setNumber: 1, order: 0 },
@@ -268,8 +269,20 @@ describe('createGig', () => {
 
     await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
 
-    expect(prisma.setlist.create).toHaveBeenCalledWith({ data: { name: 'The Jazz Club - 08-15-26' } })
+    expect(prisma.setlist.create).toHaveBeenCalledWith({
+      data: { name: 'The Jazz Club - 08-15-26', bandId: 'band-the-ruminators' },
+    })
     expect(prisma.setlist.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('stamps the new gig with the band', async () => {
+    const fd = buildFormData({ createSetlist: 'true' })
+
+    await expect(createGig(null, fd)).rejects.toThrow('REDIRECT:/gigs/new-gig-1')
+
+    expect(prisma.gig.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ bandId: 'band-the-ruminators' }),
+    })
   })
 
   it('returns a validation error and creates nothing when neither setlist option is chosen', async () => {
