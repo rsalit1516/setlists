@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { getBandContext } from '@/lib/band'
 import { getSong } from '@/lib/services/songs'
 import { getGenres } from '@/lib/services/genres'
 import { SongForm } from '@/components/songs/song-form'
@@ -12,7 +13,8 @@ export default async function EditSongPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [song, genres] = await Promise.all([getSong(id), getGenres()])
+  const { bandId } = await getBandContext()
+  const [song, genres] = await Promise.all([getSong(bandId, id), getGenres()])
 
   if (!song) notFound()
 

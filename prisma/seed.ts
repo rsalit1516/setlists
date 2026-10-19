@@ -133,6 +133,11 @@ async function main() {
     })
     bandSongIds.set(`${forBandId}|${songId}`, row.id)
   }
+  function bandSongIdFor(forBandId: string, songId: string): string {
+    const id = bandSongIds.get(`${forBandId}|${songId}`)
+    if (!id) throw new Error(`No BandSong for ${songId} in band ${forBandId}`)
+    return id
+  }
   // Every seed song is in the master catalog (ownerBandId null) and in The Ruminators' catalog.
   for (const s of songs) {
     await attachSong(bandId, s.id, { status: s.status, singer: s.singer, keyboardRequired: s.keyboardRequired ?? false })
@@ -175,7 +180,7 @@ async function main() {
       section,
       setNumber,
       songId,
-      bandSongId: bandSongIds.get(`${bandId}|${songId}`),
+      bandSongId: bandSongIdFor(bandId, songId),
       setlistId: 'seed-setlist-1',
     }
     await prisma.setlistItem.upsert({ where: { id: item.id }, update: item, create: item })
@@ -238,7 +243,7 @@ async function main() {
     update: {},
     create: { id: 'seed-setlist-other-past', name: 'Hangar Night (past)', bandId: otherBandId },
   })
-  const pastItem = { id: 'seed-item-other-1', order: 0, section: 'MAIN' as const, setNumber: 1, wasPlayed: true, songId: 'seed-song-02', bandSongId: bandSongIds.get(`${otherBandId}|seed-song-02`), setlistId: 'seed-setlist-other-past' }
+  const pastItem = { id: 'seed-item-other-1', order: 0, section: 'MAIN' as const, setNumber: 1, wasPlayed: true, songId: 'seed-song-02', bandSongId: bandSongIdFor(otherBandId, 'seed-song-02'), setlistId: 'seed-setlist-other-past' }
   await prisma.setlistItem.upsert({ where: { id: pastItem.id }, update: pastItem, create: pastItem })
   const pastDate = new Date(gigDate.getTime() - 44 * 24 * 60 * 60 * 1000)
   const otherPastGig = {

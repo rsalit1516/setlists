@@ -19,7 +19,7 @@ vi.mock('@/lib/db', () => ({
     setlistItem: {
       findMany: vi.fn(),
     },
-    song: {
+    bandSong: {
       findMany: vi.fn(),
     },
     gig: {
@@ -30,7 +30,8 @@ vi.mock('@/lib/db', () => ({
 
 import prisma from '@/lib/db'
 
-type MockSetlistItem = { songId: string }
+// Setlist items carry the BandSong id; the tests keep calling it a "song id" for readability.
+type MockSetlistItem = { bandSongId: string }
 type MockSong = {
   id: string
   title: string
@@ -41,7 +42,7 @@ type MockSong = {
 type MockGigRow = { setlist: { items: MockSetlistItem[] } }
 
 function makeItem(songId = 'song-1'): MockSetlistItem {
-  return { songId }
+  return { bandSongId: songId }
 }
 
 function makeSong(overrides: Partial<MockSong> = {}): MockSong {
@@ -55,6 +56,26 @@ function makeSong(overrides: Partial<MockSong> = {}): MockSong {
   }
 }
 
+// What getSongs reads: the band's BandSong rows, each with its generic Song nested.
+function mockCatalog(songs: MockSong[]) {
+  const rows = songs.map((s) => ({
+    id: s.id,
+    status: 'READY',
+    singer: null,
+    keyboardRequired: false,
+    isActive: true,
+    updatedAt: s.updatedAt,
+    song: { title: s.title, artist: s.artist, key: s.key ?? null, isActive: true, updatedAt: s.updatedAt },
+  }))
+  vi.mocked(prisma.bandSong.findMany).mockResolvedValue(rows as never)
+}
+
+// What getMostPlayedSongs reads: BandSong ids with just the title/artist of their Song.
+function mockPlayed(songs: MockSong[]) {
+  const rows = songs.map((s) => ({ id: s.id, song: { title: s.title, artist: s.artist } }))
+  vi.mocked(prisma.bandSong.findMany).mockResolvedValue(rows as never)
+}
+
 // One row per gig, most-recent-first, matching the real orderBy: { date: 'desc' }.
 // `playedSongIds` is that gig's played songIds; pass [] for a gig with no matches.
 // Filler for "a gig that was actually performed" in position-based tests —
@@ -62,7 +83,7 @@ function makeSong(overrides: Partial<MockSong> = {}): MockSong {
 const F = ['filler']
 
 function makeGigs(...playedSongIds: string[][]): MockGigRow[] {
-  return playedSongIds.map((songIds) => ({ setlist: { items: songIds.map((songId) => ({ songId })) } }))
+  return playedSongIds.map((songIds) => ({ setlist: { items: songIds.map((bandSongId) => ({ bandSongId })) } }))
 }
 
 const NOW = new Date('2026-08-05T12:00:00')
@@ -152,7 +173,7 @@ describe('getMostPlayedSongs', () => {
       makeItem('song-1'),
       makeItem('song-2'),
     ] as never)
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockPlayed([
       makeSong({ id: 'song-1', title: 'A' }),
       makeSong({ id: 'song-2', title: 'B' }),
     ] as never)
@@ -167,7 +188,7 @@ describe('getMostPlayedSongs', () => {
     vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([])
     const result = await getMostPlayedSongs('band-1')
     expect(result).toEqual([])
-    expect(prisma.song.findMany).not.toHaveBeenCalled()
+    expect(prisma.bandSong.findMany).not.toHaveBeenCalled()
   })
 
   it('counts one play per matching setlist item, per song', async () => {
@@ -176,7 +197,7 @@ describe('getMostPlayedSongs', () => {
       makeItem('song-1'),
       makeItem('song-2'),
     ] as never)
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockPlayed([
       makeSong({ id: 'song-1' }),
       makeSong({ id: 'song-2', title: 'Scarlet Begonias' }),
     ] as never)
@@ -190,7 +211,7 @@ describe('getMostPlayedSongs', () => {
     // query's `section: { not: 'SOUNDCHECK' }` filter means only the Main
     // row is ever returned here, so playCount is 1, not 3.
     vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([makeItem('song-1')] as never)
-    vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
+    mockPlayed([makeSong({ id: 'song-1' })] as never)
     const result = await getMostPlayedSongs('band-1')
     expect(result.find((s) => s.songId === 'song-1')?.playCount).toBe(1)
   })
@@ -202,7 +223,7 @@ describe('getMostPlayedSongs', () => {
       makeItem('song-2'),
       makeItem('song-2'),
     ] as never)
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockPlayed([
       makeSong({ id: 'song-1' }),
       makeSong({ id: 'song-2', title: 'Scarlet Begonias' }),
     ] as never)
@@ -215,7 +236,7 @@ describe('getMostPlayedSongs', () => {
       makeItem('song-z'),
       makeItem('song-a'),
     ] as never)
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockPlayed([
       makeSong({ id: 'song-z', title: 'Zzz Song' }),
       makeSong({ id: 'song-a', title: 'Aaa Song' }),
     ] as never)
@@ -229,7 +250,7 @@ describe('getMostPlayedSongs', () => {
       makeItem('song-2'),
       makeItem('song-3'),
     ] as never)
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockPlayed([
       makeSong({ id: 'song-1', title: 'A' }),
       makeSong({ id: 'song-2', title: 'B' }),
       makeSong({ id: 'song-3', title: 'C' }),
@@ -242,7 +263,7 @@ describe('getMostPlayedSongs', () => {
     vi.mocked(prisma.setlistItem.findMany).mockResolvedValue(
       Array.from({ length: 15 }, (_, i) => makeItem(`song-${i}`)) as never
     )
-    vi.mocked(prisma.song.findMany).mockResolvedValue(
+    mockPlayed(
       Array.from({ length: 15 }, (_, i) => makeSong({ id: `song-${i}`, title: `Song ${i}` })) as never
     )
     const result = await getMostPlayedSongs('band-1')
@@ -251,19 +272,20 @@ describe('getMostPlayedSongs', () => {
 })
 
 describe('getReadySongsNeverPlayed', () => {
-  it('only fetches active READY songs', async () => {
+  it("only fetches the band's active READY songs", async () => {
     vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([])
-    vi.mocked(prisma.song.findMany).mockResolvedValue([])
+    mockCatalog([])
     await getReadySongsNeverPlayed('band-1')
-    type FindManyArgs = { where: { isActive: unknown; status: unknown } }
-    const call = vi.mocked(prisma.song.findMany).mock.calls[0][0] as unknown as FindManyArgs
+    type FindManyArgs = { where: { bandId: unknown; isActive: unknown; status: unknown } }
+    const call = vi.mocked(prisma.bandSong.findMany).mock.calls[0][0] as unknown as FindManyArgs
+    expect(call.where.bandId).toBe('band-1')
     expect(call.where.isActive).toBe(true)
     expect(call.where.status).toBe('READY')
   })
 
   it('excludes songs that were played at an active gig', async () => {
     vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([makeItem('song-1')] as never)
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockCatalog([
       makeSong({ id: 'song-1', title: 'Played Song' }),
       makeSong({ id: 'song-2', title: 'Never Played Song' }),
     ] as never)
@@ -273,7 +295,7 @@ describe('getReadySongsNeverPlayed', () => {
 
   it('returns all active READY songs when none have been played', async () => {
     vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([])
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockCatalog([
       makeSong({ id: 'song-1', title: 'A' }),
       makeSong({ id: 'song-2', title: 'B' }),
     ] as never)
@@ -286,7 +308,7 @@ describe('getReadySongsNeverPlayed', () => {
     // 'SOUNDCHECK' }` filter means it never shows up in the play-count rows —
     // it should surface here as never played, not be excluded.
     vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([])
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockCatalog([
       makeSong({ id: 'song-1', title: 'Soundcheck Only' }),
     ] as never)
     const result = await getReadySongsNeverPlayed('band-1')
@@ -298,7 +320,7 @@ describe('getReadySongsNeverPlayed', () => {
       makeItem('song-1'),
       makeItem('song-2'),
     ] as never)
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockCatalog([
       makeSong({ id: 'song-1' }),
       makeSong({ id: 'song-2' }),
     ] as never)
@@ -308,7 +330,7 @@ describe('getReadySongsNeverPlayed', () => {
 
   it('preserves the alphabetical order returned by getSongs', async () => {
     vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([])
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockCatalog([
       makeSong({ id: 'song-a', title: 'Aaa Song' }),
       makeSong({ id: 'song-z', title: 'Zzz Song' }),
     ] as never)
@@ -318,7 +340,7 @@ describe('getReadySongsNeverPlayed', () => {
 
   it('includes title, artist, and key for each song', async () => {
     vi.mocked(prisma.setlistItem.findMany).mockResolvedValue([])
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockCatalog([
       makeSong({ id: 'song-1', title: 'Fire on the Mountain', artist: 'Grateful Dead', key: 'F#m' }),
     ] as never)
     const result = await getReadySongsNeverPlayed('band-1')
@@ -334,7 +356,7 @@ describe('getReadySongsNeverPlayed', () => {
 describe('getStaleReadySongs', () => {
   it('only considers active, past gigs, most-recent-first', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([])
-    vi.mocked(prisma.song.findMany).mockResolvedValue([])
+    mockCatalog([])
     await getStaleReadySongs('band-1')
     type FindManyArgs = { where: { bandId: unknown; isActive: unknown; date: { lte: unknown } }; orderBy: { date: unknown } }
     const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as unknown as FindManyArgs
@@ -346,7 +368,7 @@ describe('getStaleReadySongs', () => {
 
   it('only considers active, played, non-Soundcheck setlist items when computing last-played', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([])
-    vi.mocked(prisma.song.findMany).mockResolvedValue([])
+    mockCatalog([])
     await getStaleReadySongs('band-1')
     type FindManyArgs = {
       select: {
@@ -365,7 +387,7 @@ describe('getStaleReadySongs', () => {
     // soundcheck-only play never appears in a gig's items here — same shape
     // as a song that was never played at all.
     vi.mocked(prisma.gig.findMany).mockResolvedValue(makeGigs([], []) as never)
-    vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
+    mockCatalog([makeSong({ id: 'song-1' })] as never)
     const result = await getStaleReadySongs('band-1')
     expect(result[0].gigsSinceLastPlayed).toBeNull()
   })
@@ -375,7 +397,7 @@ describe('getStaleReadySongs', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue(
       makeGigs(F, F, F, F, F, ['song-1'], F, F, F, F) as never
     )
-    vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
+    mockCatalog([makeSong({ id: 'song-1' })] as never)
     const result = await getStaleReadySongs('band-1')
     expect(result).toEqual([])
   })
@@ -385,7 +407,7 @@ describe('getStaleReadySongs', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue(
       makeGigs(F, F, F, F, F, F, F, F, F, F, ['song-1']) as never
     )
-    vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
+    mockCatalog([makeSong({ id: 'song-1' })] as never)
     const result = await getStaleReadySongs('band-1')
     expect(result).toEqual([
       { songId: 'song-1', title: 'Fire on the Mountain', artist: 'Grateful Dead', key: null, gigsSinceLastPlayed: 10 },
@@ -394,7 +416,7 @@ describe('getStaleReadySongs', () => {
 
   it('includes a Ready song that has never been played, with gigsSinceLastPlayed null', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue(makeGigs([], []) as never)
-    vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
+    mockCatalog([makeSong({ id: 'song-1' })] as never)
     const result = await getStaleReadySongs('band-1')
     expect(result[0].gigsSinceLastPlayed).toBeNull()
   })
@@ -404,7 +426,7 @@ describe('getStaleReadySongs', () => {
       // index 0..14; song-a last played at index 12, song-b at index 15 (never, i.e. absent)
       makeGigs(...Array.from({ length: 13 }, (_, i) => (i === 12 ? ['song-a'] : F))) as never
     )
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockCatalog([
       makeSong({ id: 'song-a', title: 'A Song' }),
       makeSong({ id: 'song-b', title: 'B Song' }),
     ] as never)
@@ -416,7 +438,7 @@ describe('getStaleReadySongs', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue(
       makeGigs(...Array.from({ length: 13 }, (_, i) => (i === 12 ? ['song-z', 'song-a'] : F))) as never
     )
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockCatalog([
       makeSong({ id: 'song-z', title: 'Zzz Song' }),
       makeSong({ id: 'song-a', title: 'Aaa Song' }),
     ] as never)
@@ -429,7 +451,7 @@ describe('getStaleReadySongs', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue(
       makeGigs(F, F, ['song-1'], F, F) as never
     )
-    vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
+    mockCatalog([makeSong({ id: 'song-1' })] as never)
     expect(await getStaleReadySongs('band-1', 3)).toEqual([])
     expect((await getStaleReadySongs('band-1', 2))[0]?.songId).toBe('song-1')
   })
@@ -440,7 +462,7 @@ describe('getStaleReadySongs', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue(
       makeGigs([], [], [], [], F, [], [], [], [], [], [], F, ['song-1']) as never
     )
-    vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
+    mockCatalog([makeSong({ id: 'song-1' })] as never)
     expect(await getStaleReadySongs('band-1')).toEqual([])
     expect((await getStaleReadySongs('band-1', 2))[0]).toMatchObject({ songId: 'song-1', gigsSinceLastPlayed: 2 })
   })
@@ -450,7 +472,7 @@ describe('getStaleReadySongs', () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue(
       makeGigs(['song-2'], ['song-1']) as never
     )
-    vi.mocked(prisma.song.findMany).mockResolvedValue([makeSong({ id: 'song-1' })] as never)
+    mockCatalog([makeSong({ id: 'song-1' })] as never)
     expect((await getStaleReadySongs('band-1', 1))[0]).toMatchObject({ songId: 'song-1', gigsSinceLastPlayed: 1 })
   })
 
@@ -460,56 +482,57 @@ describe('getStaleReadySongs', () => {
 })
 
 describe('getStaleInProgressSongs', () => {
-  it('only fetches active IN_PROGRESS songs', async () => {
-    vi.mocked(prisma.song.findMany).mockResolvedValue([])
-    await getStaleInProgressSongs(DEFAULT_STALE_DAYS_THRESHOLD, NOW)
-    type FindManyArgs = { where: { isActive: unknown; status: unknown } }
-    const call = vi.mocked(prisma.song.findMany).mock.calls[0][0] as unknown as FindManyArgs
+  it("only fetches the band's active IN_PROGRESS songs", async () => {
+    mockCatalog([])
+    await getStaleInProgressSongs('band-1', DEFAULT_STALE_DAYS_THRESHOLD, NOW)
+    type FindManyArgs = { where: { bandId: unknown; isActive: unknown; status: unknown } }
+    const call = vi.mocked(prisma.bandSong.findMany).mock.calls[0][0] as unknown as FindManyArgs
+    expect(call.where.bandId).toBe('band-1')
     expect(call.where.isActive).toBe(true)
     expect(call.where.status).toBe('IN_PROGRESS')
   })
 
   it('excludes a song updated within the threshold', async () => {
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockCatalog([
       makeSong({ id: 'song-1', updatedAt: daysAgo(30) }),
     ] as never)
-    const result = await getStaleInProgressSongs(60, NOW)
+    const result = await getStaleInProgressSongs('band-1', 60, NOW)
     expect(result).toEqual([])
   })
 
   it('includes a song updated exactly at the threshold boundary', async () => {
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockCatalog([
       makeSong({ id: 'song-1', updatedAt: daysAgo(60) }),
     ] as never)
-    const result = await getStaleInProgressSongs(60, NOW)
+    const result = await getStaleInProgressSongs('band-1', 60, NOW)
     expect(result).toHaveLength(1)
     expect(result[0].daysSinceUpdate).toBe(60)
   })
 
   it('includes a song updated well before the threshold', async () => {
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockCatalog([
       makeSong({ id: 'song-1', updatedAt: daysAgo(120) }),
     ] as never)
-    const result = await getStaleInProgressSongs(60, NOW)
+    const result = await getStaleInProgressSongs('band-1', 60, NOW)
     expect(result[0].daysSinceUpdate).toBe(120)
   })
 
   it('sorts oldest-first', async () => {
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockCatalog([
       makeSong({ id: 'song-recent', title: 'Recent', updatedAt: daysAgo(70) }),
       makeSong({ id: 'song-ancient', title: 'Ancient', updatedAt: daysAgo(300) }),
       makeSong({ id: 'song-mid', title: 'Mid', updatedAt: daysAgo(150) }),
     ] as never)
-    const result = await getStaleInProgressSongs(60, NOW)
+    const result = await getStaleInProgressSongs('band-1', 60, NOW)
     expect(result.map((s) => s.songId)).toEqual(['song-ancient', 'song-mid', 'song-recent'])
   })
 
   it('respects a custom daysThreshold', async () => {
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockCatalog([
       makeSong({ id: 'song-1', updatedAt: daysAgo(10) }),
     ] as never)
-    expect(await getStaleInProgressSongs(30, NOW)).toEqual([])
-    const result = await getStaleInProgressSongs(5, NOW)
+    expect(await getStaleInProgressSongs('band-1', 30, NOW)).toEqual([])
+    const result = await getStaleInProgressSongs('band-1', 5, NOW)
     expect(result).toHaveLength(1)
   })
 
@@ -518,10 +541,10 @@ describe('getStaleInProgressSongs', () => {
   })
 
   it('returns an empty list when there are no stale songs', async () => {
-    vi.mocked(prisma.song.findMany).mockResolvedValue([
+    mockCatalog([
       makeSong({ id: 'song-1', updatedAt: daysAgo(1) }),
     ] as never)
-    const result = await getStaleInProgressSongs(60, NOW)
+    const result = await getStaleInProgressSongs('band-1', 60, NOW)
     expect(result).toEqual([])
   })
 })

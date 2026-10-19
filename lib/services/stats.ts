@@ -52,35 +52,36 @@ async function getPlayCountsBySongId(bandId: string): Promise<Map<string, number
       section: { not: 'SOUNDCHECK' },
       setlist: { bandId, gig: { isActive: true } },
     },
-    select: { songId: true },
+    select: { bandSongId: true },
   })
 
   const counts = new Map<string, number>()
   for (const row of rows) {
-    counts.set(row.songId, (counts.get(row.songId) ?? 0) + 1)
+    counts.set(row.bandSongId, (counts.get(row.bandSongId) ?? 0) + 1)
   }
   return counts
 }
 
 // Song is not filtered by isActive here — a play count is a historical fact
-// even for a since-deactivated song.
+// even for a since-deactivated song. `songId` in the result is the BandSong id,
+// matching the ids getSongs returns.
 export async function getMostPlayedSongs(bandId: string, limit = 10): Promise<MostPlayedSong[]> {
   const counts = await getPlayCountsBySongId(bandId)
   if (counts.size === 0) return []
 
-  const songs = await prisma.song.findMany({
-    where: { id: { in: Array.from(counts.keys()) } },
-    select: { id: true, title: true, artist: true },
+  const bandSongs = await prisma.bandSong.findMany({
+    where: { bandId, id: { in: Array.from(counts.keys()) } },
+    select: { id: true, song: { select: { title: true, artist: true } } },
   })
 
-  return songs
-    .map((s) => ({ songId: s.id, title: s.title, artist: s.artist, playCount: counts.get(s.id)! }))
+  return bandSongs
+    .map((s) => ({ songId: s.id, title: s.song.title, artist: s.song.artist, playCount: counts.get(s.id)! }))
     .sort((a, b) => b.playCount - a.playCount || a.title.localeCompare(b.title))
     .slice(0, limit)
 }
 
 export async function getReadySongsNeverPlayed(bandId: string): Promise<ReadySongNeverPlayed[]> {
-  const [counts, readySongs] = await Promise.all([getPlayCountsBySongId(bandId), getSongs('READY')])
+  const [counts, readySongs] = await Promise.all([getPlayCountsBySongId(bandId), getSongs(bandId, 'READY')])
 
   // getSongs orders by title asc already — filtering preserves that order.
   return readySongs
@@ -105,7 +106,7 @@ async function getGigsSinceLastPlayedBySongId(bandId: string): Promise<Map<strin
         select: {
           items: {
             where: { isActive: true, wasPlayed: true, section: { not: 'SOUNDCHECK' } },
-            select: { songId: true },
+            select: { bandSongId: true },
           },
         },
       },
@@ -120,8 +121,8 @@ async function getGigsSinceLastPlayedBySongId(bandId: string): Promise<Map<strin
   const gigsSinceLastPlayed = new Map<string, number>()
   performedGigs.forEach((gig, gigIndex) => {
     for (const item of gig.setlist.items) {
-      if (!gigsSinceLastPlayed.has(item.songId)) {
-        gigsSinceLastPlayed.set(item.songId, gigIndex)
+      if (!gigsSinceLastPlayed.has(item.bandSongId)) {
+        gigsSinceLastPlayed.set(item.bandSongId, gigIndex)
       }
     }
   })
@@ -137,7 +138,7 @@ export async function getStaleReadySongs(
 ): Promise<StaleReadySong[]> {
   const [gigsSinceLastPlayed, readySongs] = await Promise.all([
     getGigsSinceLastPlayedBySongId(bandId),
-    getSongs('READY'),
+    getSongs(bandId, 'READY'),
   ])
 
   return readySongs
@@ -163,11 +164,12 @@ export async function getStaleReadySongs(
 // dedicated statusChangedAt field, by design (decided with the user).
 // `now` is injectable so tests don't depend on the real clock; callers omit it.
 export async function getStaleInProgressSongs(
+  bandId: string,
   daysThreshold = DEFAULT_STALE_DAYS_THRESHOLD,
   now: Date = new Date()
 ): Promise<StaleInProgressSong[]> {
   const cutoff = new Date(now.getTime() - daysThreshold * MS_PER_DAY)
-  const songs = await getSongs('IN_PROGRESS')
+  const songs = await getSongs(bandId, 'IN_PROGRESS')
 
   return songs
     .filter((s) => s.updatedAt <= cutoff)

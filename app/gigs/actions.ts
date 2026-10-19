@@ -78,6 +78,7 @@ export async function createGig(_state: GigActionState, formData: FormData): Pro
         items: {
           create: (source?.items ?? []).map((item) => ({
             songId: item.songId,
+            bandSongId: item.bandSongId,
             section: item.section as SetSection,
             setNumber: item.setNumber,
             order: item.order,
@@ -207,7 +208,7 @@ export async function copySetlistToGig(gigId: string, sourceSetlistId: string): 
       isActive: true,
       items: {
         where: { isActive: true },
-        select: { songId: true, section: true, setNumber: true, order: true },
+        select: { songId: true, bandSongId: true, section: true, setNumber: true, order: true },
       },
     },
   })
@@ -225,6 +226,7 @@ export async function copySetlistToGig(gigId: string, sourceSetlistId: string): 
       data: source.items.map((item) => ({
         setlistId: gig.setlistId,
         songId: item.songId,
+        bandSongId: item.bandSongId,
         section: item.section as SetSection,
         setNumber: item.setNumber,
         order: item.order,

@@ -37,7 +37,7 @@ export default async function SetlistPage({
   const { bandId } = await getBandContext()
   const [setlist, songs, allGenres] = await Promise.all([
     getSetlist(bandId, id),
-    getSongs(undefined, undefined, true),
+    getSongs(bandId, undefined, undefined, true),
     getGenres(),
   ])
   if (!setlist) notFound()

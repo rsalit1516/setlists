@@ -1,6 +1,14 @@
 import prisma from '@/lib/db'
 
-export type OwnedEntity = 'gig' | 'setlist' | 'venue' | 'musician' | 'expense' | 'gigMusician' | 'setlistItem'
+export type OwnedEntity =
+  | 'gig'
+  | 'setlist'
+  | 'venue'
+  | 'musician'
+  | 'bandSong'
+  | 'expense'
+  | 'gigMusician'
+  | 'setlistItem'
 
 export class NotFoundError extends Error {
   constructor(entity: OwnedEntity) {
@@ -23,6 +31,8 @@ function countOwned(entity: OwnedEntity, bandId: string, ids: string[]): Promise
       return prisma.venue.count({ where: { id, bandId } })
     case 'musician':
       return prisma.musician.count({ where: { id, bandId } })
+    case 'bandSong':
+      return prisma.bandSong.count({ where: { id, bandId } })
     case 'expense':
       return prisma.expense.count({ where: { id, gig: { bandId } } })
     case 'gigMusician':

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { cookies } from 'next/headers'
+import { getBandContext } from '@/lib/band'
 import { getSongs } from '@/lib/services/songs'
 import { getGenres } from '@/lib/services/genres'
 import { SongStatusBadge } from '@/components/songs/song-status-badge'
@@ -32,7 +33,8 @@ export default async function SongsPage({
   const statusFilter = resolveSongsStatusFilter(statusParam, cookieStore.get(SONGS_STATUS_COOKIE)?.value)
   const status = statusFilter === 'ALL' ? undefined : statusFilter
   const genreFilter = resolveSongsGenreFilter(genresParam, cookieStore.get(SONGS_GENRES_COOKIE)?.value)
-  const [songs, allGenres] = await Promise.all([getSongs(status, genreFilter, true), getGenres()])
+  const { bandId } = await getBandContext()
+  const [songs, allGenres] = await Promise.all([getSongs(bandId, status, genreFilter, true), getGenres()])
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">

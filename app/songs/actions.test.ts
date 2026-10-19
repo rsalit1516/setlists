@@ -5,13 +5,29 @@ vi.mock('@/lib/db', () => ({
     song: {
       create: vi.fn(),
       update: vi.fn(),
-      findUnique: vi.fn(),
       delete: vi.fn(),
+    },
+    bandSong: {
+      findFirst: vi.fn(),
+      update: vi.fn(),
+      deleteMany: vi.fn(),
     },
     genre: {
       findMany: vi.fn(),
     },
+    // Array form only: resolves the already-built operations.
+    $transaction: vi.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
   },
+}))
+
+vi.mock('@/lib/band', async () => ({
+  ...(await vi.importActual<typeof import('@/lib/band')>('@/lib/band')),
+  getBandContext: vi.fn(),
+}))
+
+vi.mock('@/lib/ownership', async () => ({
+  ...(await vi.importActual<typeof import('@/lib/ownership')>('@/lib/ownership')),
+  assertOwned: vi.fn(),
 }))
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
@@ -38,10 +54,33 @@ import prisma from '@/lib/db'
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { importLyricsForSong } from '@/lib/services/lyrics-import'
-import { createSong, updateSong, findLyrics, toggleSongsGenreFilter } from './actions'
+import { getBandContext } from '@/lib/band'
+import { assertOwned, NotFoundError } from '@/lib/ownership'
+import { createSong, updateSong, findLyrics, deleteSong, toggleSongsGenreFilter } from './actions'
 import { SONGS_GENRES_COOKIE } from '@/lib/songs-genre-filter'
 
-beforeEach(() => vi.clearAllMocks())
+function mockBand(overrides: { bandId?: string; isPlatformAdmin?: boolean } = {}) {
+  vi.mocked(getBandContext).mockResolvedValue({
+    userId: null,
+    bandId: 'band-1',
+    role: 'ADMIN',
+    isPlatformAdmin: true,
+    ...overrides,
+  })
+}
+
+// What the actions read to find a song's shared row from a BandSong id.
+function mockBandSong(song: { ownerBandId?: string | null; chartFileUrl?: string | null; lyrics?: string | null } = {}) {
+  vi.mocked(prisma.bandSong.findFirst).mockResolvedValue({
+    songId: 'song-1',
+    song: { ownerBandId: 'band-1', chartFileUrl: null, lyrics: null, ...song },
+  } as never)
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mockBand()
+})
 
 function mockCookieStore(currentValue?: string) {
   const store = {
@@ -189,26 +228,46 @@ describe('createSong', () => {
     })
   })
 
-  it('accepts SHELVED as a valid status', async () => {
+  it("accepts SHELVED as a valid status, stored on the band's own entry", async () => {
     vi.mocked(prisma.song.create).mockResolvedValue({ id: 'song-1' } as never)
     const fd = buildFormData({ status: 'SHELVED' })
 
     await expect(createSong(null, fd)).rejects.toThrow('REDIRECT:/songs')
 
     expect(prisma.song.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ status: 'SHELVED' }),
+      data: expect.objectContaining({
+        bandSongs: { create: expect.objectContaining({ status: 'SHELVED' }) },
+      }),
     })
+  })
+
+  it('creates the song private to the band, with the band-owned fields on its BandSong', async () => {
+    vi.mocked(prisma.song.create).mockResolvedValue({ id: 'song-1' } as never)
+    const fd = buildFormData({ singer: ' Dana ', status: 'READY', keyboardRequired: 'true', key: 'G' })
+
+    await expect(createSong(null, fd)).rejects.toThrow('REDIRECT:/songs')
+
+    const { data } = vi.mocked(prisma.song.create).mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(data).toMatchObject({
+      ownerBandId: 'band-1',
+      key: 'G',
+      bandSongs: { create: { bandId: 'band-1', singer: 'Dana', status: 'READY', keyboardRequired: true } },
+    })
+    expect(data).not.toHaveProperty('singer')
+    expect(data).not.toHaveProperty('status')
+    expect(data).not.toHaveProperty('keyboardRequired')
   })
 })
 
 describe('updateSong', () => {
   beforeEach(() => {
-    vi.mocked(prisma.song.findUnique).mockResolvedValue({ chartFileUrl: null } as never)
+    mockBandSong()
     vi.mocked(prisma.song.update).mockResolvedValue({} as never)
+    vi.mocked(prisma.bandSong.update).mockResolvedValue({} as never)
   })
 
   it('re-sanitizes lyrics on edit, stripping scripts injected since the row was created', async () => {
-    const fd = buildFormData({ id: 'song-1', lyrics: '<p>Safe</p><script>alert(1)</script>' })
+    const fd = buildFormData({ id: 'bs-1', lyrics: '<p>Safe</p><script>alert(1)</script>' })
 
     await expect(updateSong(null, fd)).rejects.toThrow('REDIRECT:/songs')
 
@@ -220,7 +279,7 @@ describe('updateSong', () => {
 
   it('does not discard existing formatted lyrics when unrelated fields are edited', async () => {
     const html = '<p><em>Bridge</em></p><p><mark>hold here</mark></p>'
-    const fd = buildFormData({ id: 'song-1', title: 'Renamed', lyrics: html })
+    const fd = buildFormData({ id: 'bs-1', title: 'Renamed', lyrics: html })
 
     await expect(updateSong(null, fd)).rejects.toThrow('REDIRECT:/songs')
 
@@ -231,7 +290,7 @@ describe('updateSong', () => {
   })
 
   it('returns a validation error and never touches the database when title is blank', async () => {
-    const fd = buildFormData({ id: 'song-1', title: '  ' })
+    const fd = buildFormData({ id: 'bs-1', title: '  ' })
 
     const result = await updateSong(null, fd)
 
@@ -240,7 +299,7 @@ describe('updateSong', () => {
   })
 
   it('replaces the full genre selection, including clearing it when nothing is checked', async () => {
-    const fd = buildFormData({ id: 'song-1' })
+    const fd = buildFormData({ id: 'bs-1' })
 
     await expect(updateSong(null, fd)).rejects.toThrow('REDIRECT:/songs')
 
@@ -251,7 +310,7 @@ describe('updateSong', () => {
   })
 
   it('sets the genre relation to exactly the checked ids', async () => {
-    const fd = buildFormDataWithGenres(['genre-2'], { id: 'song-1' })
+    const fd = buildFormDataWithGenres(['genre-2'], { id: 'bs-1' })
 
     await expect(updateSong(null, fd)).rejects.toThrow('REDIRECT:/songs')
 
@@ -262,21 +321,110 @@ describe('updateSong', () => {
   })
 
   it('rejects an out-of-range BPM on edit without writing', async () => {
-    const result = await updateSong(null, buildFormData({ id: 'song-1', bpm: '301' }))
+    const result = await updateSong(null, buildFormData({ id: 'bs-1', bpm: '301' }))
 
     expect(result).toEqual({ error: expect.stringContaining('BPM must be between 30 and 300') })
     expect(prisma.song.update).not.toHaveBeenCalled()
   })
 
-  it('moves a song to SHELVED', async () => {
-    const fd = buildFormData({ id: 'song-1', status: 'SHELVED' })
+  it("moves a song to SHELVED on the band's own entry only", async () => {
+    const fd = buildFormData({ id: 'bs-1', status: 'SHELVED' })
 
     await expect(updateSong(null, fd)).rejects.toThrow('REDIRECT:/songs')
 
+    expect(prisma.bandSong.update).toHaveBeenCalledWith({
+      where: { id: 'bs-1' },
+      data: { singer: null, status: 'SHELVED', keyboardRequired: false },
+    })
+    const { data } = vi.mocked(prisma.song.update).mock.calls[0][0] as { data: Record<string, unknown> }
+    expect(data).not.toHaveProperty('status')
+  })
+
+  it("looks the BandSong up within the band and says 'not found' for another band's id", async () => {
+    vi.mocked(prisma.bandSong.findFirst).mockResolvedValue(null)
+
+    const result = await updateSong(null, buildFormData({ id: 'foreign-bs' }))
+
+    expect(result).toEqual({ error: 'Song not found.' })
+    expect(prisma.bandSong.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'foreign-bs', bandId: 'band-1' } })
+    )
+    expect(prisma.bandSong.update).not.toHaveBeenCalled()
+    expect(prisma.song.update).not.toHaveBeenCalled()
+  })
+
+  it('updates the shared fields and the band fields in one transaction', async () => {
+    const fd = buildFormData({ id: 'bs-1', title: 'Renamed', singer: 'Dana' })
+
+    await expect(updateSong(null, fd)).rejects.toThrow('REDIRECT:/songs')
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(prisma.$transaction).mock.calls[0][0]).toHaveLength(2)
     expect(prisma.song.update).toHaveBeenCalledWith({
       where: { id: 'song-1' },
-      data: expect.objectContaining({ status: 'SHELVED' }),
+      data: expect.objectContaining({ title: 'Renamed' }),
     })
+    expect(prisma.bandSong.update).toHaveBeenCalledWith({
+      where: { id: 'bs-1' },
+      data: expect.objectContaining({ singer: 'Dana' }),
+    })
+  })
+
+  it('lets a platform admin edit a master song', async () => {
+    mockBandSong({ ownerBandId: null })
+    mockBand({ isPlatformAdmin: true })
+
+    await expect(updateSong(null, buildFormData({ id: 'bs-1', title: 'Fixed typo' }))).rejects.toThrow('REDIRECT:/songs')
+
+    expect(prisma.song.update).toHaveBeenCalledTimes(1)
+  })
+
+  it("leaves a master song's shared fields alone when the band is not a platform admin, but still saves its own status", async () => {
+    mockBandSong({ ownerBandId: null })
+    mockBand({ isPlatformAdmin: false })
+
+    await expect(
+      updateSong(null, buildFormData({ id: 'bs-1', title: 'Hijacked title', status: 'READY' }))
+    ).rejects.toThrow('REDIRECT:/songs')
+
+    expect(prisma.song.update).not.toHaveBeenCalled()
+    expect(vi.mocked(prisma.$transaction).mock.calls[0][0]).toHaveLength(1)
+    expect(prisma.bandSong.update).toHaveBeenCalledWith({
+      where: { id: 'bs-1' },
+      data: expect.objectContaining({ status: 'READY' }),
+    })
+  })
+
+  it("never edits another band's private song, even from a platform admin context", async () => {
+    mockBandSong({ ownerBandId: 'band-2' })
+    mockBand({ isPlatformAdmin: true })
+
+    await expect(updateSong(null, buildFormData({ id: 'bs-1', title: 'Hijacked title' }))).rejects.toThrow(
+      'REDIRECT:/songs'
+    )
+
+    expect(prisma.song.update).not.toHaveBeenCalled()
+  })
+})
+
+describe('deleteSong', () => {
+  it("removes the song from the band's catalog only, leaving the shared song alone", async () => {
+    vi.mocked(prisma.bandSong.update).mockResolvedValue({} as never)
+
+    await deleteSong('bs-1')
+
+    expect(assertOwned).toHaveBeenCalledWith('bandSong', 'band-1', 'bs-1')
+    expect(prisma.bandSong.update).toHaveBeenCalledWith({ where: { id: 'bs-1' }, data: { isActive: false } })
+    expect(prisma.song.update).not.toHaveBeenCalled()
+    expect(revalidatePath).toHaveBeenCalledWith('/songs')
+  })
+
+  it("rejects another band's entry without writing", async () => {
+    vi.mocked(assertOwned).mockRejectedValue(new NotFoundError('bandSong'))
+
+    await expect(deleteSong('foreign-bs')).rejects.toBeInstanceOf(NotFoundError)
+
+    expect(prisma.bandSong.update).not.toHaveBeenCalled()
   })
 })
 
@@ -352,8 +500,10 @@ describe('toggleSongsGenreFilter', () => {
 
 describe('lyrics provenance', () => {
   beforeEach(() => {
+    mockBandSong()
+    vi.mocked(prisma.bandSong.update).mockResolvedValue({} as never)
     vi.mocked(prisma.song.update).mockResolvedValue({} as never)
-    vi.mocked(prisma.song.create).mockResolvedValue({ id: 'song-1' } as never)
+    vi.mocked(prisma.song.create).mockResolvedValue({ id: 'bs-1' } as never)
   })
 
   it('marks lyrics typed into a new song as MANUAL', async () => {
@@ -365,9 +515,9 @@ describe('lyrics provenance', () => {
   })
 
   it('flips imported lyrics to MANUAL when a band member edits them', async () => {
-    vi.mocked(prisma.song.findUnique).mockResolvedValue({ chartFileUrl: null, lyrics: '<p>Old</p>' } as never)
+    mockBandSong({ lyrics: '<p>Old</p>' })
 
-    await expect(updateSong(null, buildFormData({ id: 'song-1', lyrics: '<p>Corrected</p>' }))).rejects.toThrow(
+    await expect(updateSong(null, buildFormData({ id: 'bs-1', lyrics: '<p>Corrected</p>' }))).rejects.toThrow(
       'REDIRECT:/songs'
     )
 
@@ -378,9 +528,9 @@ describe('lyrics provenance', () => {
   })
 
   it('leaves the provenance fields alone when lyrics are unchanged', async () => {
-    vi.mocked(prisma.song.findUnique).mockResolvedValue({ chartFileUrl: null, lyrics: '<p>Same</p>' } as never)
+    mockBandSong({ lyrics: '<p>Same</p>' })
 
-    await expect(updateSong(null, buildFormData({ id: 'song-1', title: 'Renamed', lyrics: '<p>Same</p>' }))).rejects.toThrow(
+    await expect(updateSong(null, buildFormData({ id: 'bs-1', title: 'Renamed', lyrics: '<p>Same</p>' }))).rejects.toThrow(
       'REDIRECT:/songs'
     )
 
@@ -390,10 +540,10 @@ describe('lyrics provenance', () => {
   })
 
   it('does not treat the editor re-serializing blank lines as an edit', async () => {
-    vi.mocked(prisma.song.findUnique).mockResolvedValue({ chartFileUrl: null, lyrics: '<p>A</p><p><br></p><p>B</p>' } as never)
+    mockBandSong({ lyrics: '<p>A</p><p><br></p><p>B</p>' })
 
     await expect(
-      updateSong(null, buildFormData({ id: 'song-1', lyrics: '<p>A</p><p></p><p>B</p>' }))
+      updateSong(null, buildFormData({ id: 'bs-1', lyrics: '<p>A</p><p></p><p>B</p>' }))
     ).rejects.toThrow('REDIRECT:/songs')
 
     const { data } = vi.mocked(prisma.song.update).mock.calls[0][0] as { data: Record<string, unknown> }
@@ -402,9 +552,9 @@ describe('lyrics provenance', () => {
   })
 
   it('clears the source when lyrics are emptied', async () => {
-    vi.mocked(prisma.song.findUnique).mockResolvedValue({ chartFileUrl: null, lyrics: '<p>Old</p>' } as never)
+    mockBandSong({ lyrics: '<p>Old</p>' })
 
-    await expect(updateSong(null, buildFormData({ id: 'song-1', lyrics: '' }))).rejects.toThrow('REDIRECT:/songs')
+    await expect(updateSong(null, buildFormData({ id: 'bs-1', lyrics: '' }))).rejects.toThrow('REDIRECT:/songs')
 
     expect(prisma.song.update).toHaveBeenCalledWith({
       where: { id: 'song-1' },
@@ -414,23 +564,45 @@ describe('lyrics provenance', () => {
 })
 
 describe('findLyrics', () => {
-  it('revalidates the song page after a successful import', async () => {
+  beforeEach(() => mockBandSong())
+
+  it("imports into the shared Song behind the band's entry, and revalidates the page after success", async () => {
     vi.mocked(importLyricsForSong).mockResolvedValue('imported')
 
-    expect(await findLyrics('song-1')).toEqual({ outcome: 'imported' })
-    expect(revalidatePath).toHaveBeenCalledWith('/songs/song-1')
+    expect(await findLyrics('bs-1')).toEqual({ outcome: 'imported' })
+    expect(importLyricsForSong).toHaveBeenCalledWith('song-1')
+    expect(revalidatePath).toHaveBeenCalledWith('/songs/bs-1')
   })
 
   it('reports no-match without revalidating', async () => {
     vi.mocked(importLyricsForSong).mockResolvedValue('no-match')
 
-    expect(await findLyrics('song-1')).toEqual({ outcome: 'no-match' })
+    expect(await findLyrics('bs-1')).toEqual({ outcome: 'no-match' })
     expect(revalidatePath).not.toHaveBeenCalled()
   })
 
   it('turns a provider failure into an error outcome instead of throwing', async () => {
     vi.mocked(importLyricsForSong).mockRejectedValue(new Error('boom'))
 
-    expect(await findLyrics('song-1')).toEqual({ outcome: 'error' })
+    expect(await findLyrics('bs-1')).toEqual({ outcome: 'error' })
+  })
+
+  it("throws NotFoundError for another band's entry and never calls the provider", async () => {
+    vi.mocked(prisma.bandSong.findFirst).mockResolvedValue(null)
+
+    await expect(findLyrics('foreign-bs')).rejects.toBeInstanceOf(NotFoundError)
+
+    expect(prisma.bandSong.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'foreign-bs', bandId: 'band-1' } })
+    )
+    expect(importLyricsForSong).not.toHaveBeenCalled()
+  })
+
+  it('does not write lyrics into a master song the band is not allowed to edit', async () => {
+    mockBandSong({ ownerBandId: null })
+    mockBand({ isPlatformAdmin: false })
+
+    expect(await findLyrics('bs-1')).toEqual({ outcome: 'error' })
+    expect(importLyricsForSong).not.toHaveBeenCalled()
   })
 })

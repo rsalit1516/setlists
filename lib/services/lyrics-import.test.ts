@@ -136,16 +136,33 @@ describe('importMissingLyrics', () => {
     })) as unknown as typeof fetch
   }
 
-  it('only queries active songs that have no lyrics', async () => {
-    await importMissingLyrics({ fetchImpl: fetchByTitle(), delayMs: 0 })
+  it("only queries active songs without lyrics that are in the band's catalog and that it owns", async () => {
+    await importMissingLyrics({ bandId: 'band-1', fetchImpl: fetchByTitle(), delayMs: 0 })
 
     expect(prisma.song.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { isActive: true, lyrics: null } })
+      expect.objectContaining({
+        where: {
+          isActive: true,
+          lyrics: null,
+          bandSongs: { some: { bandId: 'band-1', isActive: true } },
+          OR: [{ ownerBandId: 'band-1' }],
+        },
+      })
+    )
+  })
+
+  it('also considers master songs when running as a platform admin', async () => {
+    await importMissingLyrics({ bandId: 'band-1', isPlatformAdmin: true, fetchImpl: fetchByTitle(), delayMs: 0 })
+
+    expect(prisma.song.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ OR: [{ ownerBandId: 'band-1' }, { ownerBandId: null }] }),
+      })
     )
   })
 
   it('writes imported lyrics with provenance, guarded so existing lyrics are never overwritten', async () => {
-    const summary = await importMissingLyrics({ fetchImpl: fetchByTitle(), delayMs: 0 })
+    const summary = await importMissingLyrics({ bandId: 'band-1', fetchImpl: fetchByTitle(), delayMs: 0 })
 
     expect(prisma.song.updateMany).toHaveBeenCalledTimes(1)
     expect(prisma.song.updateMany).toHaveBeenCalledWith({
@@ -162,7 +179,7 @@ describe('importMissingLyrics', () => {
   })
 
   it('writes nothing in dry-run mode but still reports what would be imported', async () => {
-    const summary = await importMissingLyrics({ dryRun: true, fetchImpl: fetchByTitle(), delayMs: 0 })
+    const summary = await importMissingLyrics({ bandId: 'band-1', dryRun: true, fetchImpl: fetchByTitle(), delayMs: 0 })
 
     expect(prisma.song.updateMany).not.toHaveBeenCalled()
     expect(summary).toMatchObject({ dryRun: true, imported: 1, noMatch: 1 })
@@ -174,13 +191,13 @@ describe('importMissingLyrics', () => {
       .mockRejectedValueOnce(new Error('network'))
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] }) as unknown as typeof fetch
 
-    const summary = await importMissingLyrics({ fetchImpl, delayMs: 0 })
+    const summary = await importMissingLyrics({ bandId: 'band-1', fetchImpl, delayMs: 0 })
 
     expect(summary).toMatchObject({ imported: 0, noMatch: 1, errors: 1 })
   })
 
   it('passes the limit through to the query', async () => {
-    await importMissingLyrics({ limit: 5, fetchImpl: fetchByTitle(), delayMs: 0 })
+    await importMissingLyrics({ bandId: 'band-1', limit: 5, fetchImpl: fetchByTitle(), delayMs: 0 })
 
     expect(prisma.song.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 5 }))
   })
