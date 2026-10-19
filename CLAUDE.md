@@ -126,6 +126,7 @@ This app must work on **desktop, tablet, and phone**. Always design mobile-first
     const { revision } = await searchParams
   ```
 - Use `<Suspense>` with a skeleton fallback around slow data; add a `loading.tsx` in the route folder for full-page loading states.
+- **Every band-owned query is scoped by band.** Pages, route handlers and actions call `getBandContext()` (`lib/band.ts`) to get the `bandId`, then pass it as the **first argument** to service functions (`getGigs(bandId)`, `getGig(bandId, id)`). Services filter on it; lookups by id use `findFirst({ where: { id, bandId } })` so another band's id returns `null` instead of data. Songs and genres are still global until #133.
 - For parallel independent queries, initiate them without `await`, then `Promise.all`:
   ```ts
   const [songs, venues] = await Promise.all([getSongs(), getVenues()])

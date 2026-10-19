@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { getBandContext } from '@/lib/band'
 import { getSetlist } from '@/lib/services/setlists'
 import { getSongs } from '@/lib/services/songs'
 import { getGenres } from '@/lib/services/genres'
@@ -33,8 +34,9 @@ export default async function SetlistPage({
   const { revision: revParam, sets: setsParam } = await searchParams
   const revision = revParam === '1'
 
+  const { bandId } = await getBandContext()
   const [setlist, songs, allGenres] = await Promise.all([
-    getSetlist(id),
+    getSetlist(bandId, id),
     getSongs(undefined, undefined, true),
     getGenres(),
   ])

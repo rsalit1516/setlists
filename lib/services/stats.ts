@@ -44,13 +44,13 @@ function daysBetween(a: Date, b: Date): number {
 // front of an audience, so they don't count as a "play." Both
 // getMostPlayedSongs and getReadySongsNeverPlayed build on this same
 // per-song count instead of re-deriving the join twice.
-async function getPlayCountsBySongId(): Promise<Map<string, number>> {
+async function getPlayCountsBySongId(bandId: string): Promise<Map<string, number>> {
   const rows = await prisma.setlistItem.findMany({
     where: {
       isActive: true,
       wasPlayed: true,
       section: { not: 'SOUNDCHECK' },
-      setlist: { gig: { isActive: true } },
+      setlist: { bandId, gig: { isActive: true } },
     },
     select: { songId: true },
   })
@@ -64,8 +64,8 @@ async function getPlayCountsBySongId(): Promise<Map<string, number>> {
 
 // Song is not filtered by isActive here — a play count is a historical fact
 // even for a since-deactivated song.
-export async function getMostPlayedSongs(limit = 10): Promise<MostPlayedSong[]> {
-  const counts = await getPlayCountsBySongId()
+export async function getMostPlayedSongs(bandId: string, limit = 10): Promise<MostPlayedSong[]> {
+  const counts = await getPlayCountsBySongId(bandId)
   if (counts.size === 0) return []
 
   const songs = await prisma.song.findMany({
@@ -79,8 +79,8 @@ export async function getMostPlayedSongs(limit = 10): Promise<MostPlayedSong[]> 
     .slice(0, limit)
 }
 
-export async function getReadySongsNeverPlayed(): Promise<ReadySongNeverPlayed[]> {
-  const [counts, readySongs] = await Promise.all([getPlayCountsBySongId(), getSongs('READY')])
+export async function getReadySongsNeverPlayed(bandId: string): Promise<ReadySongNeverPlayed[]> {
+  const [counts, readySongs] = await Promise.all([getPlayCountsBySongId(bandId), getSongs('READY')])
 
   // getSongs orders by title asc already — filtering preserves that order.
   return readySongs
@@ -96,9 +96,9 @@ export async function getReadySongsNeverPlayed(): Promise<ReadySongNeverPlayed[]
 // gigs (most-recent-first) doubles as each song's "gigs since last played."
 // Soundcheck items are excluded for the same reason as getPlayCountsBySongId
 // — a soundcheck run-through isn't a real performance.
-async function getGigsSinceLastPlayedBySongId(): Promise<Map<string, number>> {
+async function getGigsSinceLastPlayedBySongId(bandId: string): Promise<Map<string, number>> {
   const gigs = await prisma.gig.findMany({
-    where: { isActive: true, date: { lte: new Date() } },
+    where: { bandId, isActive: true, date: { lte: new Date() } },
     orderBy: { date: 'desc' },
     select: {
       setlist: {
@@ -132,10 +132,11 @@ async function getGigsSinceLastPlayedBySongId(): Promise<Map<string, number>> {
 // treated as infinitely stale and sort first (gigsSinceLastPlayed: null),
 // ahead of songs merely last played before the window.
 export async function getStaleReadySongs(
+  bandId: string,
   gigWindow = DEFAULT_STALE_GIG_WINDOW
 ): Promise<StaleReadySong[]> {
   const [gigsSinceLastPlayed, readySongs] = await Promise.all([
-    getGigsSinceLastPlayedBySongId(),
+    getGigsSinceLastPlayedBySongId(bandId),
     getSongs('READY'),
   ])
 
@@ -184,9 +185,10 @@ export async function getStaleInProgressSongs(
 // in JS after fetching active past gigs that might have an expected amount
 // (contracted, or a cancellation fee — see expectedAmount).
 // `now` is injectable so tests don't depend on the real clock; callers omit it.
-export async function getUnpaidGigs(now: Date = new Date()): Promise<UnpaidGig[]> {
+export async function getUnpaidGigs(bandId: string, now: Date = new Date()): Promise<UnpaidGig[]> {
   const rows = await prisma.gig.findMany({
     where: {
+      bandId,
       isActive: true,
       date: { lte: now },
       OR: [{ amountContracted: { not: null } }, { cancellationFee: { not: null } }],
@@ -239,6 +241,7 @@ export async function getUnpaidGigs(now: Date = new Date()): Promise<UnpaidGig[]
 // naturally caught by the same logic rather than needing a special case.
 // `now` is injectable so tests don't depend on the real clock; callers omit it.
 export async function getScheduleGaps(
+  bandId: string,
   lookaheadMonths = DEFAULT_GAP_LOOKAHEAD_MONTHS,
   gapDays = DEFAULT_GAP_DAYS,
   now: Date = new Date()
@@ -246,7 +249,7 @@ export async function getScheduleGaps(
   const windowEnd = addMonths(now, lookaheadMonths)
 
   const gigs = await prisma.gig.findMany({
-    where: { isActive: true, cancelledAt: null, date: { gte: now, lte: windowEnd } },
+    where: { bandId, isActive: true, cancelledAt: null, date: { gte: now, lte: windowEnd } },
     orderBy: { date: 'asc' },
     select: { id: true, date: true, venue: { select: { name: true } } },
   })

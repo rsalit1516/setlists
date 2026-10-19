@@ -1,11 +1,13 @@
 import Link from 'next/link'
+import { getBandContext } from '@/lib/band'
 import { getMusicians } from '@/lib/services/musicians'
 import { buttonVariants } from '@/components/ui/button'
 import { DeleteConfirmButton } from '@/components/ui/delete-confirm-button'
 import { deleteMusician } from './actions'
 
 export default async function MusiciansPage() {
-  const musicians = await getMusicians()
+  const { bandId } = await getBandContext()
+  const musicians = await getMusicians(bandId)
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">

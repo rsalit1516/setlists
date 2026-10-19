@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { getBandContext } from '@/lib/band'
 import { getGig } from '@/lib/services/gigs'
 import { getVenues } from '@/lib/services/venues'
 import { getMusicians } from '@/lib/services/musicians'
@@ -12,7 +13,12 @@ export default async function EditGigPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [gig, venues, musicians] = await Promise.all([getGig(id), getVenues(), getMusicians()])
+  const { bandId } = await getBandContext()
+  const [gig, venues, musicians] = await Promise.all([
+    getGig(bandId, id),
+    getVenues(bandId),
+    getMusicians(bandId),
+  ])
 
   if (!gig) notFound()
 

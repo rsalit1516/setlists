@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import prisma from '@/lib/db'
 import { getGig, calculateTotalExpenses, calculateGigNet } from '@/lib/services/gigs'
-import { DEFAULT_BAND_ID } from '@/lib/band'
+import { DEFAULT_BAND_ID, getBandContext } from '@/lib/band'
 import type { SetSection } from '@/lib/types'
 
 export type GigActionState = { error: string } | null
@@ -319,7 +319,8 @@ export async function markAllMusiciansPaid(formData: FormData): Promise<void> {
 
   if (!gigId || !paidAtStr) return
 
-  const gig = await getGig(gigId)
+  const { bandId } = await getBandContext()
+  const gig = await getGig(bandId, gigId)
   if (!gig || gig.musicians.length === 0) return
 
   const totalExpenses = calculateTotalExpenses(gig.expenses)

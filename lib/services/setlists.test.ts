@@ -5,7 +5,7 @@ vi.mock('@/lib/db', () => ({
   default: {
     setlist: {
       findMany: vi.fn(),
-      findUnique: vi.fn(),
+      findFirst: vi.fn(),
     },
   },
 }))
@@ -25,12 +25,15 @@ const mockSetlist = {
 beforeEach(() => vi.clearAllMocks())
 
 describe('getSetlists', () => {
-  it('returns setlists ordered by createdAt desc', async () => {
+  it("returns the band's setlists ordered by createdAt desc", async () => {
     vi.mocked(prisma.setlist.findMany).mockResolvedValue([mockSetlist] as never)
-    const result = await getSetlists()
+    const result = await getSetlists('band-1')
     expect(result).toHaveLength(1)
     expect(prisma.setlist.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { isActive: true }, orderBy: { createdAt: 'desc' } })
+      expect.objectContaining({
+        where: { bandId: 'band-1', isActive: true },
+        orderBy: { createdAt: 'desc' },
+      })
     )
   })
 
@@ -42,7 +45,7 @@ describe('getSetlists', () => {
     }
     vi.mocked(prisma.setlist.findMany).mockResolvedValue([withGig] as never)
 
-    const result = await getSetlists()
+    const result = await getSetlists('band-1')
 
     expect(result[0].gig).toEqual({
       id: 'gig-1',
@@ -60,22 +63,25 @@ describe('getSetlists', () => {
 
   it('returns empty array when no setlists exist', async () => {
     vi.mocked(prisma.setlist.findMany).mockResolvedValue([])
-    expect(await getSetlists()).toEqual([])
+    expect(await getSetlists('band-1')).toEqual([])
   })
 })
 
 describe('getSetlist', () => {
-  it('returns the setlist with items when found', async () => {
-    vi.mocked(prisma.setlist.findUnique).mockResolvedValue(mockSetlist as never)
-    const result = await getSetlist('sl-1')
+  it('returns the setlist with items when found in the band', async () => {
+    vi.mocked(prisma.setlist.findFirst).mockResolvedValue(mockSetlist as never)
+    const result = await getSetlist('band-1', 'sl-1')
     expect(result).toEqual(mockSetlist)
-    expect(prisma.setlist.findUnique).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'sl-1' } })
+    expect(prisma.setlist.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'sl-1', bandId: 'band-1' } })
     )
   })
 
-  it('returns null when setlist does not exist', async () => {
-    vi.mocked(prisma.setlist.findUnique).mockResolvedValue(null)
-    expect(await getSetlist('nonexistent')).toBeNull()
+  it('returns null when setlist does not exist or belongs to another band', async () => {
+    vi.mocked(prisma.setlist.findFirst).mockResolvedValue(null)
+    expect(await getSetlist('band-2', 'sl-1')).toBeNull()
+    expect(prisma.setlist.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'sl-1', bandId: 'band-2' } })
+    )
   })
 })

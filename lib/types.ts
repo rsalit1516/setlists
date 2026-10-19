@@ -2,6 +2,8 @@ export type SongStatus = 'READY' | 'IN_PROGRESS' | 'WISH' | 'SHELVED'
 export type LyricsSource = 'MANUAL' | 'IMPORTED'
 export type SetSection ='SOUNDCHECK' | 'MAIN' | 'ENCORE'
 
+export type MemberRole = 'ADMIN' | 'MEMBER' | 'VIEWER'
+
 export const SONG_STATUS_LABELS: Record<SongStatus, string> = {
   READY: 'Ready',
   IN_PROGRESS: 'In Progress',

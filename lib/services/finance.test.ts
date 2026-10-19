@@ -59,22 +59,22 @@ describe('calculateMusicianPayouts', () => {
 })
 
 describe('getFinanceReport', () => {
-  it('only fetches active gigs, expenses, and musicians', async () => {
+  it("only fetches the band's active gigs, expenses, and musicians", async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([makeGig()] as never)
-    await getFinanceReport(new Date('2026-08-05T12:00:00'))
+    await getFinanceReport('band-1', new Date('2026-08-05T12:00:00'))
     type FindManyArgs = {
       where: unknown
       include: { expenses: { where: unknown }; musicians: { where: unknown } }
     }
     const call = vi.mocked(prisma.gig.findMany).mock.calls[0][0] as unknown as FindManyArgs
-    expect(call.where).toEqual({ isActive: true })
+    expect(call.where).toEqual({ bandId: 'band-1', isActive: true })
     expect(call.include.expenses.where).toEqual({ isActive: true })
     expect(call.include.musicians.where).toEqual({ isActive: true })
   })
 
   it('puts a gig from the current year into currentYearGigs, not pastYears', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([makeGig({ date: new Date('2026-03-01T12:00:00') })] as never)
-    const report = await getFinanceReport(new Date('2026-08-05T12:00:00'))
+    const report = await getFinanceReport('band-1', new Date('2026-08-05T12:00:00'))
     expect(report.currentYear).toBe(2026)
     expect(report.currentYearGigs).toHaveLength(1)
     expect(report.pastYears).toHaveLength(0)
@@ -86,7 +86,7 @@ describe('getFinanceReport', () => {
       makeGig({ id: 'g2', date: new Date('2024-09-01T12:00:00'), amountPaid: '300.00', tips: '10.00' }),
       makeGig({ id: 'g3', date: new Date('2025-01-01T12:00:00'), amountPaid: '100.00', tips: '5.00' }),
     ] as never)
-    const report = await getFinanceReport(new Date('2026-08-05T12:00:00'))
+    const report = await getFinanceReport('band-1', new Date('2026-08-05T12:00:00'))
     expect(report.pastYears).toHaveLength(2)
     const y2024 = report.pastYears.find((y) => y.year === 2024)
     expect(y2024?.gigCount).toBe(2)
@@ -100,7 +100,7 @@ describe('getFinanceReport', () => {
       makeGig({ id: 'g2', date: new Date('2025-06-01T12:00:00') }),
       makeGig({ id: 'g3', date: new Date('2024-06-01T12:00:00') }),
     ] as never)
-    const report = await getFinanceReport(new Date('2026-08-05T12:00:00'))
+    const report = await getFinanceReport('band-1', new Date('2026-08-05T12:00:00'))
     expect(report.pastYears.map((y) => y.year)).toEqual([2025, 2024, 2023])
   })
 
@@ -114,7 +114,7 @@ describe('getFinanceReport', () => {
         musicians: [{ amountPaid: '1000.00' }],
       }),
     ] as never)
-    const report = await getFinanceReport(new Date('2026-08-05T12:00:00'))
+    const report = await getFinanceReport('band-1', new Date('2026-08-05T12:00:00'))
     expect(report.currentYearGigs[0].net).toBe(360)
     expect(report.currentYearGigs[0].totalMusicianPayouts).toBe(1000)
   })
@@ -131,7 +131,7 @@ describe('getFinanceReport', () => {
       }),
       makeGig({ id: 'g3', date: new Date('2026-03-01T12:00:00'), amountContracted: '500.00' }),
     ] as never)
-    const report = await getFinanceReport(new Date('2026-08-05T12:00:00'))
+    const report = await getFinanceReport('band-1', new Date('2026-08-05T12:00:00'))
     const byId = Object.fromEntries(report.currentYearGigs.map((g) => [g.id, g]))
     expect(byId.g1.expectedAmount).toBe('400.00')
     expect(byId.g1.amountContracted).toBe('800.00')
@@ -153,7 +153,7 @@ describe('getFinanceReport', () => {
         expenses: [], musicians: [],
       }),
     ] as never)
-    const report = await getFinanceReport(new Date('2026-08-05T12:00:00'))
+    const report = await getFinanceReport('band-1', new Date('2026-08-05T12:00:00'))
     expect(report.currentYearTotals.gigCount).toBe(2)
     expect(report.currentYearTotals.totalPaidByVenue).toBe(600)
     expect(report.currentYearTotals.net).toBe(550)
@@ -161,7 +161,7 @@ describe('getFinanceReport', () => {
 
   it('returns empty pastYears/currentYearGigs with zeroed totals when no gigs exist', async () => {
     vi.mocked(prisma.gig.findMany).mockResolvedValue([])
-    const report = await getFinanceReport(new Date('2026-08-05T12:00:00'))
+    const report = await getFinanceReport('band-1', new Date('2026-08-05T12:00:00'))
     expect(report.pastYears).toEqual([])
     expect(report.currentYearGigs).toEqual([])
     expect(report.currentYearTotals.net).toBe(0)
