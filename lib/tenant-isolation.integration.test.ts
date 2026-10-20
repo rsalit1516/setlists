@@ -25,6 +25,27 @@ const P = 'iso-'
 // Jan 1 of this year: always in the past, and always in the finance report's current-year bucket.
 const GIG_DATE = new Date(new Date().getFullYear(), 0, 1, 12)
 
+// The song form always submits every field, and the actions read them all.
+const SONG_FORM = {
+  title: 'Test Song',
+  artist: '',
+  key: '',
+  singer: '',
+  status: 'WISH',
+  keyboardRequired: 'false',
+  duration: '',
+  bpm: '',
+  lyrics: '',
+}
+
+// BandSong ids are uuids. Each band has one private song of its own plus the shared master song.
+const BS = {
+  oursOwn: '01900000-0000-7000-8000-0000000e1001',
+  oursShared: '01900000-0000-7000-8000-0000000e1002',
+  theirsOwn: '01900000-0000-7000-8000-0000000e2001',
+  theirsShared: '01900000-0000-7000-8000-0000000e2002',
+}
+
 describe.skipIf(!url)('tenant isolation (real database)', () => {
   let prisma: typeof import('@/lib/db').default
   let ourBand: string
@@ -35,14 +56,30 @@ describe.skipIf(!url)('tenant isolation (real database)', () => {
     setlists: typeof import('@/lib/services/setlists')
     finance: typeof import('@/lib/services/finance')
     stats: typeof import('@/lib/services/stats')
+    songs: typeof import('@/lib/services/songs')
   }
+  let songActions: typeof import('@/app/songs/actions')
   let gigActions: typeof import('@/app/gigs/actions')
   let setlistActions: typeof import('@/app/setlists/actions')
   let venueActions: typeof import('@/app/venues/actions')
   let musicianActions: typeof import('@/app/musicians/actions')
   let ownership: typeof import('@/lib/ownership')
 
-  async function seedBand(bandId: string, tag: string, withPlay: boolean) {
+  async function seedBand(bandId: string, tag: 'ours' | 'theirs', withPlay: boolean) {
+    const own = tag === 'ours' ? BS.oursOwn : BS.theirsOwn
+    const shared = tag === 'ours' ? BS.oursShared : BS.theirsShared
+    await prisma.bandSong.create({
+      data: { id: own, bandId, songId: `${P}song-${tag}`, status: 'READY', singer: `${tag} own singer` },
+    })
+    await prisma.bandSong.create({
+      data: {
+        id: shared,
+        bandId,
+        songId: `${P}song-shared`,
+        status: tag === 'ours' ? 'READY' : 'WISH',
+        singer: `${tag} singer`,
+      },
+    })
     await prisma.venue.create({ data: { id: `${P}venue-${tag}`, name: `Venue ${tag}`, bandId } })
     await prisma.musician.create({ data: { id: `${P}musician-${tag}`, name: `Isolation Musician ${tag}`, bandId } })
     await prisma.setlist.create({ data: { id: `${P}setlist-${tag}`, name: `Setlist ${tag}`, bandId } })
@@ -67,19 +104,23 @@ describe.skipIf(!url)('tenant isolation (real database)', () => {
         section: 'MAIN',
         wasPlayed: withPlay,
         songId: `${P}song-${tag}`,
+        bandSongId: own,
         setlistId: `${P}setlist-${tag}`,
       },
     })
   }
 
   async function cleanup() {
-    await prisma.setlistItem.deleteMany({ where: { id: { startsWith: P } } })
+    await prisma.setlistItem.deleteMany({
+      where: { OR: [{ id: { startsWith: P } }, { setlistId: { startsWith: P } }] },
+    })
     await prisma.gigMusician.deleteMany({ where: { id: { startsWith: P } } })
     await prisma.expense.deleteMany({ where: { id: { startsWith: P } } })
     await prisma.gig.deleteMany({ where: { id: { startsWith: P } } })
     await prisma.setlist.deleteMany({ where: { id: { startsWith: P } } })
     await prisma.musician.deleteMany({ where: { id: { startsWith: P } } })
     await prisma.venue.deleteMany({ where: { id: { startsWith: P } } })
+    await prisma.bandSong.deleteMany({ where: { songId: { startsWith: P } } })
     await prisma.song.deleteMany({ where: { id: { startsWith: P } } })
     await prisma.band.deleteMany({ where: { id: OTHER_BAND } })
   }
@@ -94,7 +135,9 @@ describe.skipIf(!url)('tenant isolation (real database)', () => {
       setlists: await import('@/lib/services/setlists'),
       finance: await import('@/lib/services/finance'),
       stats: await import('@/lib/services/stats'),
+      songs: await import('@/lib/services/songs'),
     }
+    songActions = await import('@/app/songs/actions')
     gigActions = await import('@/app/gigs/actions')
     setlistActions = await import('@/app/setlists/actions')
     venueActions = await import('@/app/venues/actions')
@@ -108,11 +151,13 @@ describe.skipIf(!url)('tenant isolation (real database)', () => {
       create: { id: ourBand, name: 'Isolation Test Band' },
     })
     await prisma.band.create({ data: { id: OTHER_BAND, name: 'Isolation Other Band' } })
-    await prisma.song.create({ data: { id: `${P}song-ours`, title: 'Ours Only Song' } })
-    await prisma.song.create({ data: { id: `${P}song-theirs`, title: 'Theirs Only Song' } })
+    await prisma.song.create({ data: { id: `${P}song-ours`, title: 'Ours Only Song', ownerBandId: ourBand } })
+    await prisma.song.create({ data: { id: `${P}song-theirs`, title: 'Theirs Only Song', ownerBandId: OTHER_BAND } })
+    await prisma.song.create({ data: { id: `${P}song-shared`, title: 'Shared Master Song' } })
     await seedBand(ourBand, 'ours', true)
     await seedBand(OTHER_BAND, 'theirs', true)
-  })
+    // Loading every service and action module cold takes a few seconds on top of the inserts.
+  }, 60_000)
 
   afterAll(async () => {
     if (prisma) {
@@ -163,8 +208,104 @@ describe.skipIf(!url)('tenant isolation (real database)', () => {
       expect(unpaid).not.toContain(`${P}gig-theirs`)
 
       const mostPlayed = (await services.stats.getMostPlayedSongs(ourBand, 50)).map((s) => s.songId)
-      expect(mostPlayed).toContain(`${P}song-ours`)
-      expect(mostPlayed).not.toContain(`${P}song-theirs`)
+      expect(mostPlayed).toContain(BS.oursOwn)
+      expect(mostPlayed).not.toContain(BS.theirsOwn)
+    })
+  })
+
+  describe('the song catalog', () => {
+    it("lists the band's own songs and the master songs it has added, never another band's private song", async () => {
+      const songs = await services.songs.getSongs(ourBand)
+      const ids = songs.map((s) => s.id)
+      expect(ids).toEqual(expect.arrayContaining([BS.oursOwn, BS.oursShared]))
+      expect(ids).not.toContain(BS.theirsOwn)
+      expect(ids).not.toContain(BS.theirsShared)
+      expect(songs.map((s) => s.title)).not.toContain('Theirs Only Song')
+    })
+
+    it("shows a master song with each band's own status and singer", async () => {
+      const ours = (await services.songs.getSongs(ourBand)).find((s) => s.id === BS.oursShared)
+      expect(ours).toMatchObject({ title: 'Shared Master Song', status: 'READY', singer: 'ours singer' })
+
+      const theirs = (await services.songs.getSongs(OTHER_BAND)).find((s) => s.id === BS.theirsShared)
+      expect(theirs).toMatchObject({ title: 'Shared Master Song', status: 'WISH', singer: 'theirs singer' })
+    })
+
+    it("filters by the band's own status, not another band's", async () => {
+      const ready = (await services.songs.getSongs(ourBand, 'READY')).map((s) => s.id)
+      expect(ready).toContain(BS.oursShared)
+      const wishOurs = (await services.songs.getSongs(ourBand, 'WISH')).map((s) => s.id)
+      expect(wishOurs).not.toContain(BS.oursShared)
+      expect(wishOurs).not.toContain(BS.theirsShared)
+    })
+
+    it("getSong by id returns null for another band's entry", async () => {
+      expect(await services.songs.getSong(ourBand, BS.theirsOwn)).toBeNull()
+      expect(await services.songs.getSong(ourBand, BS.theirsShared)).toBeNull()
+      expect(await services.songs.getSong(ourBand, BS.oursOwn)).not.toBeNull()
+    })
+
+    it("addItem refuses a song from another band's catalog, but accepts one from ours", async () => {
+      const form = (bandSongId: string) => {
+        const fd = new FormData()
+        fd.set('setlistId', `${P}setlist-ours`)
+        fd.set('songId', bandSongId)
+        fd.set('section', 'MAIN')
+        fd.set('setNumber', '1')
+        return fd
+      }
+      await expect(setlistActions.addItem(form(BS.theirsOwn))).rejects.toBeInstanceOf(ownership.NotFoundError)
+      await expect(setlistActions.addItem(form(BS.theirsShared))).rejects.toBeInstanceOf(ownership.NotFoundError)
+
+      await setlistActions.addItem(form(BS.oursShared))
+      const added = await prisma.setlistItem.findMany({
+        where: { setlistId: `${P}setlist-ours`, bandSongId: BS.oursShared },
+      })
+      expect(added).toHaveLength(1)
+      expect(added[0].songId).toBe(`${P}song-shared`)
+    })
+
+    it("deleteSong, updateSong and findLyrics cannot touch another band's entry", async () => {
+      await expect(songActions.deleteSong(BS.theirsOwn)).rejects.toBeInstanceOf(ownership.NotFoundError)
+      await expect(songActions.findLyrics(BS.theirsOwn)).rejects.toBeInstanceOf(ownership.NotFoundError)
+      const fd = new FormData()
+      for (const [k, v] of Object.entries({ ...SONG_FORM, id: BS.theirsOwn, title: 'Hijacked', singer: 'x', status: 'READY' })) fd.set(k, v)
+      expect(await songActions.updateSong(null, fd)).toEqual({ error: 'Song not found.' })
+
+      const theirs = await prisma.bandSong.findUnique({ where: { id: BS.theirsOwn }, include: { song: true } })
+      expect(theirs?.isActive).toBe(true)
+      expect(theirs?.singer).toBe('theirs own singer')
+      expect(theirs?.song.title).toBe('Theirs Only Song')
+    })
+
+    it("removing a master song from our catalog leaves the song and the other band's entry alone", async () => {
+      await songActions.deleteSong(BS.oursShared)
+      try {
+        expect((await services.songs.getSongs(ourBand)).map((s) => s.id)).not.toContain(BS.oursShared)
+        expect((await services.songs.getSongs(OTHER_BAND)).map((s) => s.id)).toContain(BS.theirsShared)
+        expect((await prisma.song.findUnique({ where: { id: `${P}song-shared` } }))?.isActive).toBe(true)
+      } finally {
+        await prisma.bandSong.update({ where: { id: BS.oursShared }, data: { isActive: true } })
+      }
+    })
+
+    it('a song we create is private to us and lands in our catalog only', async () => {
+      const fd = new FormData()
+      for (const [k, v] of Object.entries({ ...SONG_FORM, title: 'Iso Created Song', singer: 'Dana', status: 'READY', keyboardRequired: 'false' })) {
+        fd.set(k, v)
+      }
+      await expect(songActions.createSong(null, fd)).rejects.toThrow('REDIRECT:/songs')
+
+      const created = await prisma.song.findFirst({ where: { title: 'Iso Created Song' }, include: { bandSongs: true } })
+      try {
+        expect(created?.ownerBandId).toBe(ourBand)
+        expect(created?.bandSongs).toHaveLength(1)
+        expect(created?.bandSongs[0]).toMatchObject({ bandId: ourBand, singer: 'Dana', status: 'READY' })
+        expect((await services.songs.getSongs(OTHER_BAND)).map((s) => s.title)).not.toContain('Iso Created Song')
+      } finally {
+        await prisma.bandSong.deleteMany({ where: { songId: created?.id } })
+        await prisma.song.delete({ where: { id: created!.id } })
+      }
     })
   })
 
@@ -172,6 +313,9 @@ describe.skipIf(!url)('tenant isolation (real database)', () => {
     it("treat the other band's rows as not owned", async () => {
       expect(await ownership.isOwned('gig', ourBand, `${P}gig-ours`)).toBe(true)
       expect(await ownership.isOwned('gig', ourBand, `${P}gig-theirs`)).toBe(false)
+      expect(await ownership.isOwned('bandSong', ourBand, BS.oursOwn)).toBe(true)
+      expect(await ownership.isOwned('bandSong', ourBand, BS.theirsOwn)).toBe(false)
+      expect(await ownership.isOwned('bandSong', ourBand, BS.theirsShared)).toBe(false)
       expect(await ownership.isOwned('expense', ourBand, `${P}expense-theirs`)).toBe(false)
       expect(await ownership.isOwned('gigMusician', ourBand, `${P}gm-theirs`)).toBe(false)
       expect(await ownership.isOwned('setlistItem', ourBand, `${P}item-theirs`)).toBe(false)

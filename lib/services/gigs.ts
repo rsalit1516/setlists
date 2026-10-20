@@ -137,8 +137,12 @@ export async function getGigForPerformance(bandId: string, id: string): Promise<
               order: true,
               section: true,
               setNumber: true,
-              song: {
-                select: { title: true, key: true, bpm: true, lyrics: true, lyricsSource: true, chartFileUrl: true, chartFileType: true },
+              bandSong: {
+                select: {
+                  song: {
+                    select: { title: true, key: true, bpm: true, lyrics: true, lyricsSource: true, chartFileUrl: true, chartFileType: true },
+                  },
+                },
               },
             },
             orderBy: [{ setNumber: 'asc' }, { order: 'asc' }],
@@ -148,9 +152,9 @@ export async function getGigForPerformance(bandId: string, id: string): Promise<
     },
   }).then((row) => {
     if (!row) return null
-    const items = row.setlist.items.map((i) => ({
+    const items = row.setlist.items.map(({ bandSong, ...i }) => ({
       ...i,
-      song: { ...i.song, lyrics: sanitizeLyricsHtml(i.song.lyrics) },
+      song: { ...bandSong.song, lyrics: sanitizeLyricsHtml(bandSong.song.lyrics) },
     }))
     const soundcheck = items.filter((i) => i.section === 'SOUNDCHECK')
     const main = items.filter((i) => i.section === 'MAIN')
@@ -169,7 +173,7 @@ export async function getGig(bandId: string, id: string): Promise<GigWithDetails
           include: {
             items: {
               where: { isActive: true },
-              include: { song: { select: { title: true, key: true, singer: true } } },
+              include: { bandSong: { select: { singer: true, song: { select: { title: true, key: true } } } } },
               orderBy: [{ setNumber: 'asc' }, { order: 'asc' }],
             },
           },
@@ -185,6 +189,13 @@ export async function getGig(bandId: string, id: string): Promise<GigWithDetails
   if (!row) return null
   return {
     ...row,
+    setlist: {
+      ...row.setlist,
+      items: row.setlist.items.map(({ bandSong, ...item }) => ({
+        ...item,
+        song: { title: bandSong.song.title, key: bandSong.song.key, singer: bandSong.singer },
+      })),
+    },
     amountContracted: toStr(row.amountContracted),
     amountPaid: toStr(row.amountPaid),
     tips: toStr(row.tips),

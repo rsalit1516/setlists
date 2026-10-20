@@ -37,7 +37,20 @@ const mockGig = {
   venueId: 'v-1',
   setlistId: 'sl-1',
   venue: { id: 'v-1', name: 'The Jazz Club', address: null, notes: null, createdAt: new Date(), updatedAt: new Date() },
-  setlist: { id: 'sl-1', name: 'Friday Night' },
+  setlist: {
+    id: 'sl-1',
+    name: 'Friday Night',
+    items: [
+      {
+        id: 'item-1',
+        order: 0,
+        section: 'MAIN',
+        setNumber: 1,
+        wasPlayed: null,
+        bandSong: { singer: 'Alice', song: { title: 'Friend of the Devil', key: 'G' } },
+      },
+    ],
+  },
   expenses: [],
   musicians: [
     {
@@ -169,6 +182,13 @@ describe('getGig', () => {
     )
   })
 
+  it("flattens each setlist item's song to title, generic key and the band's singer", async () => {
+    vi.mocked(prisma.gig.findFirst).mockResolvedValue(mockGig as never)
+    const result = await getGig('band-1', 'gig-1')
+    expect(result?.setlist.items[0].song).toEqual({ title: 'Friend of the Devil', key: 'G', singer: 'Alice' })
+    expect(result?.setlist.items[0]).not.toHaveProperty('bandSong')
+  })
+
   it('only fetches active (non-removed) setlist items', async () => {
     vi.mocked(prisma.gig.findFirst).mockResolvedValue(mockGig as never)
     await getGig('band-1', 'gig-1')
@@ -221,12 +241,14 @@ describe('getGigForPerformance', () => {
           order: 0,
           section: 'MAIN',
           setNumber: 1,
-          song: {
-            title: 'Friend of the Devil',
-            key: 'G',
-            lyrics: 'Line one\nLine two',
-            chartFileUrl: null,
-            chartFileType: null,
+          bandSong: {
+            song: {
+              title: 'Friend of the Devil',
+              key: 'G',
+              lyrics: 'Line one\nLine two',
+              chartFileUrl: null,
+              chartFileType: null,
+            },
           },
         },
       ],
@@ -246,7 +268,9 @@ describe('getGigForPerformance', () => {
         items: [
           {
             ...mockPerformanceGig.setlist.items[0],
-            song: { ...mockPerformanceGig.setlist.items[0].song, lyrics: '<p>Hi <script>alert(1)</script></p>' },
+            bandSong: {
+              song: { ...mockPerformanceGig.setlist.items[0].bandSong.song, lyrics: '<p>Hi <script>alert(1)</script></p>' },
+            },
           },
         ],
       },

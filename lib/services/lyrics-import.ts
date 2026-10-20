@@ -106,13 +106,26 @@ function sleep(ms: number): Promise<void> {
 
 // Never overwrites: only songs with empty lyrics are considered, and the write
 // is guarded on `lyrics: null` so a band member's edit made mid-run wins.
-export async function importMissingLyrics(
-  options: { dryRun?: boolean; limit?: number; delayMs?: number; fetchImpl?: typeof fetch } = {}
-): Promise<ImportSummary> {
-  const { dryRun = false, limit, delayMs = 1000, fetchImpl = fetch } = options
+//
+// Scoped to one band: only songs in that band's catalog, and only ones it may edit (its own private
+// songs, plus master songs when it acts as a platform admin), since the lyrics are written to the Song.
+export async function importMissingLyrics(options: {
+  bandId: string
+  isPlatformAdmin?: boolean
+  dryRun?: boolean
+  limit?: number
+  delayMs?: number
+  fetchImpl?: typeof fetch
+}): Promise<ImportSummary> {
+  const { bandId, isPlatformAdmin = false, dryRun = false, limit, delayMs = 1000, fetchImpl = fetch } = options
 
   const songs = await prisma.song.findMany({
-    where: { isActive: true, lyrics: null },
+    where: {
+      isActive: true,
+      lyrics: null,
+      bandSongs: { some: { bandId, isActive: true } },
+      OR: [{ ownerBandId: bandId }, ...(isPlatformAdmin ? [{ ownerBandId: null }] : [])],
+    },
     select: { id: true, title: true, artist: true, durationSeconds: true },
     orderBy: { title: 'asc' },
     ...(limit ? { take: limit } : {}),

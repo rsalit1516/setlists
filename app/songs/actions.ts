@@ -9,6 +9,8 @@ import { sanitizeLyricsHtml } from '@/lib/services/sanitize-lyrics'
 import { importLyricsForSong, type ImportOutcome } from '@/lib/services/lyrics-import'
 import { SONGS_GENRES_COOKIE, parseGenreFilterValue, toggleGenreId } from '@/lib/songs-genre-filter'
 import { parseBpm } from '@/lib/bpm'
+import { canEditSong, getBandContext } from '@/lib/band'
+import { assertOwned, NotFoundError } from '@/lib/ownership'
 import type { SongStatus } from '@/lib/types'
 
 export type SongActionState = { error: string } | null
@@ -23,20 +25,25 @@ function parseDuration(value: string | null): number | null {
   return isNaN(n) ? null : n
 }
 
+// `generic` lands on the shared Song row; `band` on this band's BandSong.
 function parseSongFormData(formData: FormData) {
   const bpm = parseBpm(formData.get('bpm') as string | null)
   if ('error' in bpm) return bpm
 
   return {
-    title: (formData.get('title') as string).trim(),
-    artist: (formData.get('artist') as string).trim() || null,
-    key: (formData.get('key') as string).trim() || null,
-    singer: (formData.get('singer') as string).trim() || null,
-    status: (formData.get('status') as SongStatus) ?? 'WISH',
-    keyboardRequired: formData.get('keyboardRequired') === 'true',
-    durationSeconds: parseDuration(formData.get('duration') as string | null),
-    bpm: bpm.bpm,
-    lyrics: sanitizeLyricsHtml(formData.get('lyrics') as string | null),
+    generic: {
+      title: (formData.get('title') as string).trim(),
+      artist: (formData.get('artist') as string).trim() || null,
+      key: (formData.get('key') as string).trim() || null,
+      durationSeconds: parseDuration(formData.get('duration') as string | null),
+      bpm: bpm.bpm,
+      lyrics: sanitizeLyricsHtml(formData.get('lyrics') as string | null),
+    },
+    band: {
+      singer: (formData.get('singer') as string).trim() || null,
+      status: (formData.get('status') as SongStatus) ?? 'WISH',
+      keyboardRequired: formData.get('keyboardRequired') === 'true',
+    },
   }
 }
 
@@ -95,18 +102,23 @@ export async function createSong(
   _state: SongActionState,
   formData: FormData
 ): Promise<SongActionState> {
-  const data = parseSongFormData(formData)
-  if ('error' in data) return data
-  if (!data.title) return { error: 'Title is required.' }
+  const parsed = parseSongFormData(formData)
+  if ('error' in parsed) return parsed
+  const { generic, band } = parsed
+  if (!generic.title) return { error: 'Title is required.' }
   const genreIds = parseGenreIds(formData)
+  const { bandId } = await getBandContext()
 
+  // A song a band enters is private to it (ownerBandId); sharing it is a deliberate step, not a side effect.
   let song
   try {
     song = await prisma.song.create({
       data: {
-        ...data,
-        ...lyricsProvenance(null, data.lyrics),
+        ...generic,
+        ...lyricsProvenance(null, generic.lyrics),
+        ownerBandId: bandId,
         genres: { connect: genreIds.map((genreId) => ({ id: genreId })) },
+        bandSongs: { create: { bandId, ...band } },
       },
     })
   } catch {
@@ -119,6 +131,7 @@ export async function createSong(
       await prisma.song.update({ where: { id: song.id }, data: chartUpdate })
     }
   } catch (err) {
+    await prisma.bandSong.deleteMany({ where: { songId: song.id } }).catch(() => {})
     await prisma.song.delete({ where: { id: song.id } }).catch(() => {})
     return { error: errorMessage(err, 'Failed to upload chart file.') }
   }
@@ -131,30 +144,53 @@ export async function updateSong(
   _state: SongActionState,
   formData: FormData
 ): Promise<SongActionState> {
+  // `id` is the BandSong id (the id the UI knows a song by); the shared Song row hangs off it.
   const id = formData.get('id') as string
-  const data = parseSongFormData(formData)
-  if ('error' in data) return data
-  if (!data.title) return { error: 'Title is required.' }
+  const parsed = parseSongFormData(formData)
+  if ('error' in parsed) return parsed
+  const { generic, band } = parsed
+  if (!generic.title) return { error: 'Title is required.' }
   const genreIds = parseGenreIds(formData)
+
+  const ctx = await getBandContext()
+  const bandSong = await prisma.bandSong.findFirst({
+    where: { id, bandId: ctx.bandId },
+    select: { songId: true, song: { select: { ownerBandId: true, chartFileUrl: true, lyrics: true } } },
+  })
+  if (!bandSong) return { error: 'Song not found.' }
+
+  // The band always owns its status/singer/keyboard. Title, lyrics, charts and the like live on the
+  // shared Song, so they only change if this band may edit it; otherwise those fields are left alone.
+  const canEditGeneric = canEditSong(ctx, bandSong.song)
 
   let chartUpdate
   let provenance
-  try {
-    const current = await prisma.song.findUnique({
-      where: { id },
-      select: { chartFileUrl: true, lyrics: true },
-    })
-    provenance = lyricsProvenance(current, data.lyrics)
-    chartUpdate = await resolveChartFile(formData, id, current?.chartFileUrl ?? null)
-  } catch (err) {
-    return { error: errorMessage(err, 'Failed to upload chart file.') }
+  if (canEditGeneric) {
+    try {
+      provenance = lyricsProvenance(bandSong.song, generic.lyrics)
+      chartUpdate = await resolveChartFile(formData, bandSong.songId, bandSong.song.chartFileUrl)
+    } catch (err) {
+      return { error: errorMessage(err, 'Failed to upload chart file.') }
+    }
   }
 
   try {
-    await prisma.song.update({
-      where: { id },
-      data: { ...data, ...chartUpdate, ...provenance, genres: { set: genreIds.map((genreId) => ({ id: genreId })) } },
-    })
+    await prisma.$transaction([
+      prisma.bandSong.update({ where: { id }, data: band }),
+      ...(canEditGeneric
+        ? [
+            prisma.song.update({
+              where: { id: bandSong.songId },
+              data: {
+                ...generic,
+                ...chartUpdate,
+                ...provenance,
+                genres: { set: genreIds.map((genreId) => ({ id: genreId })) },
+              },
+            }),
+          ]
+        : []),
+    ])
   } catch {
     return { error: 'Failed to update song.' }
   }
@@ -164,9 +200,18 @@ export async function updateSong(
 }
 
 export async function findLyrics(id: string): Promise<{ outcome: ImportOutcome }> {
+  const ctx = await getBandContext()
+  const bandSong = await prisma.bandSong.findFirst({
+    where: { id, bandId: ctx.bandId },
+    select: { songId: true, song: { select: { ownerBandId: true } } },
+  })
+  if (!bandSong) throw new NotFoundError('bandSong')
+  // The lyrics are written to the shared Song, so a band that can't edit it gets no import.
+  if (!canEditSong(ctx, bandSong.song)) return { outcome: 'error' }
+
   let outcome: ImportOutcome
   try {
-    outcome = await importLyricsForSong(id)
+    outcome = await importLyricsForSong(bandSong.songId)
   } catch {
     outcome = 'error'
   }
@@ -174,8 +219,11 @@ export async function findLyrics(id: string): Promise<{ outcome: ImportOutcome }
   return { outcome }
 }
 
+// Removes the song from this band's catalog only; the shared Song, and other bands' entries, stay.
 export async function deleteSong(id: string): Promise<void> {
-  await prisma.song.update({ where: { id }, data: { isActive: false } })
+  const { bandId } = await getBandContext()
+  await assertOwned('bandSong', bandId, id)
+  await prisma.bandSong.update({ where: { id }, data: { isActive: false } })
   revalidatePath('/songs')
 }
 

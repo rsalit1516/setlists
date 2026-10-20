@@ -4,7 +4,7 @@ import prisma from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getBandContext } from '@/lib/band'
-import { assertOwned, isOwned } from '@/lib/ownership'
+import { assertOwned, isOwned, NotFoundError } from '@/lib/ownership'
 import type { SetSection } from '@/lib/types'
 
 export type SetlistActionState = { error: string } | null
@@ -17,12 +17,20 @@ export type SetlistActionState = { error: string } | null
 
 export async function addItem(formData: FormData): Promise<void> {
   const setlistId = formData.get('setlistId') as string
-  const songId = formData.get('songId') as string
+  // The form field is still called songId, but its value is the BandSong id (what the picker lists).
+  const bandSongId = formData.get('songId') as string
   const section = formData.get('section') as SetSection
   const setNumber = parseInt(formData.get('setNumber') as string) || 1
 
   const { bandId } = await getBandContext()
   await assertOwned('setlist', bandId, setlistId)
+  // Looked up within the band, so a song from another band's catalog can't be added; also gives the
+  // legacy songId the SetlistItem still has to carry until #136.
+  const bandSong = await prisma.bandSong.findFirst({
+    where: { id: bandSongId, bandId, isActive: true },
+    select: { songId: true },
+  })
+  if (!bandSong) throw new NotFoundError('bandSong')
 
   const lastItem = await prisma.setlistItem.findFirst({
     where: { setlistId, section, setNumber },
@@ -31,7 +39,7 @@ export async function addItem(formData: FormData): Promise<void> {
   const order = (lastItem?.order ?? 0) + 1
 
   await prisma.setlistItem.create({
-    data: { setlistId, songId, section, setNumber, order },
+    data: { setlistId, bandSongId, songId: bandSong.songId, section, setNumber, order },
   })
 
   revalidatePath(`/setlists/${setlistId}`)

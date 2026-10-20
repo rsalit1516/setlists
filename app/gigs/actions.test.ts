@@ -251,8 +251,8 @@ describe('createGig', () => {
   it('clones the source setlist\'s active items into a new setlist instead of pointing at the same row', async () => {
     vi.mocked(prisma.setlist.findUnique).mockResolvedValue({
       items: [
-        { songId: 's-1', section: 'MAIN', setNumber: 1, order: 0, isActive: true },
-        { songId: 's-2', section: 'MAIN', setNumber: 1, order: 1, isActive: true },
+        { songId: 's-1', bandSongId: 'bs-1', section: 'MAIN', setNumber: 1, order: 0, isActive: true },
+        { songId: 's-2', bandSongId: 'bs-2', section: 'MAIN', setNumber: 1, order: 1, isActive: true },
       ],
     } as never)
     const fd = buildFormData({ setlistId: 'setlist-1', createSetlist: '' })
@@ -271,8 +271,8 @@ describe('createGig', () => {
         bandId: '01900000-0000-7000-8000-000000000001',
         items: {
           create: [
-            { songId: 's-1', section: 'MAIN', setNumber: 1, order: 0 },
-            { songId: 's-2', section: 'MAIN', setNumber: 1, order: 1 },
+            { songId: 's-1', bandSongId: 'bs-1', section: 'MAIN', setNumber: 1, order: 0 },
+            { songId: 's-2', bandSongId: 'bs-2', section: 'MAIN', setNumber: 1, order: 1 },
           ],
         },
       },
@@ -699,8 +699,8 @@ describe('deleteGig', () => {
 
 describe('copySetlistToGig', () => {
   const sourceItems = [
-    { songId: 'song-1', section: 'MAIN', setNumber: 1, order: 1 },
-    { songId: 'song-2', section: 'ENCORE', setNumber: 1, order: 1 },
+    { songId: 'song-1', bandSongId: 'bs-1', section: 'MAIN', setNumber: 1, order: 1 },
+    { songId: 'song-2', bandSongId: 'bs-2', section: 'ENCORE', setNumber: 1, order: 1 },
   ]
 
   beforeEach(() => {

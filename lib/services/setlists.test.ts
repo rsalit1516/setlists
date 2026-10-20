@@ -77,6 +77,44 @@ describe('getSetlist', () => {
     )
   })
 
+  it("resolves each item's song through its BandSong, keeping the BandSong id as songId", async () => {
+    const updatedAt = new Date('2026-05-01')
+    vi.mocked(prisma.setlist.findFirst).mockResolvedValue({
+      ...mockSetlist,
+      items: [
+        {
+          id: 'item-1',
+          order: 0,
+          bandSongId: 'bs-1',
+          songId: 'legacy-song-id',
+          bandSong: {
+            id: 'bs-1',
+            status: 'READY',
+            singer: 'Dana',
+            keyboardRequired: true,
+            isActive: true,
+            updatedAt,
+            song: { id: 'song-1', title: 'Wonderwall', key: 'F#m', isActive: true, updatedAt },
+          },
+        },
+      ],
+    } as never)
+
+    const result = await getSetlist('band-1', 'sl-1')
+
+    const item = result?.items[0]
+    expect(item?.songId).toBe('bs-1')
+    expect(item?.song).toMatchObject({ id: 'bs-1', title: 'Wonderwall', key: 'F#m', singer: 'Dana', keyboardRequired: true })
+    expect(item).not.toHaveProperty('bandSong')
+    expect(prisma.setlist.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          items: expect.objectContaining({ include: { bandSong: { include: { song: true } } } }),
+        }),
+      })
+    )
+  })
+
   it('returns null when setlist does not exist or belongs to another band', async () => {
     vi.mocked(prisma.setlist.findFirst).mockResolvedValue(null)
     expect(await getSetlist('band-2', 'sl-1')).toBeNull()

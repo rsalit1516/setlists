@@ -80,7 +80,7 @@ export default async function StatsPage({
     getMostPlayedSongs(bandId),
     getReadySongsNeverPlayed(bandId),
     getStaleReadySongs(bandId, gigWindow),
-    getStaleInProgressSongs(),
+    getStaleInProgressSongs(bandId),
     getUnpaidGigs(bandId),
     getScheduleGaps(bandId, gapLookaheadMonths, gapDays),
   ]);

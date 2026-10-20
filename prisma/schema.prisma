@@ -194,12 +194,12 @@ model SetlistItem {
   isActive    Boolean    @default(true)
   songId      String
   setlistId   String
-  // Nullable until #134 switches the app to write it; then it becomes required and songId goes.
-  bandSongId  String?    @db.Uuid
+  bandSongId  String     @db.Uuid
 
-  song     Song      @relation(fields: [songId], references: [id])
-  setlist  Setlist   @relation(fields: [setlistId], references: [id])
-  bandSong BandSong? @relation(fields: [bandSongId], references: [id])
+  // songId is legacy: the app reads bandSongId and still writes both until #136 drops this column.
+  song     Song     @relation(fields: [songId], references: [id])
+  setlist  Setlist  @relation(fields: [setlistId], references: [id])
+  bandSong BandSong @relation(fields: [bandSongId], references: [id], onDelete: Restrict)
 
   @@index([bandSongId])
 }

@@ -12,6 +12,9 @@ vi.mock('@/lib/db', () => ({
     setlist: {
       update: vi.fn(),
     },
+    bandSong: {
+      findFirst: vi.fn(),
+    },
     $transaction: vi.fn((ops: unknown[]) => Promise.resolve(ops)),
   },
 }))
@@ -188,6 +191,43 @@ describe('markSectionPlayed', () => {
     const call = vi.mocked(prisma.setlistItem.updateMany).mock.calls[0][0]
     expect(call.data).toEqual({ wasPlayed: true })
     expect(call.where).not.toHaveProperty('wasPlayed')
+  })
+})
+
+describe('addItem', () => {
+  const BAND = '01900000-0000-7000-8000-000000000001'
+
+  function addForm(songId = 'bs-1') {
+    const fd = new FormData()
+    fd.set('setlistId', 'sl-1')
+    fd.set('songId', songId)
+    fd.set('section', 'MAIN')
+    fd.set('setNumber', '1')
+    return fd
+  }
+
+  it("adds a song from the band's catalog, writing the BandSong id and the legacy song id", async () => {
+    vi.mocked(prisma.bandSong.findFirst).mockResolvedValue({ songId: 'song-1' } as never)
+    vi.mocked(prisma.setlistItem.findFirst).mockResolvedValue({ order: 3 } as never)
+    vi.mocked(prisma.setlistItem.create).mockResolvedValue({} as never)
+
+    await addItem(addForm())
+
+    expect(prisma.bandSong.findFirst).toHaveBeenCalledWith({
+      where: { id: 'bs-1', bandId: BAND, isActive: true },
+      select: { songId: true },
+    })
+    expect(prisma.setlistItem.create).toHaveBeenCalledWith({
+      data: { setlistId: 'sl-1', bandSongId: 'bs-1', songId: 'song-1', section: 'MAIN', setNumber: 1, order: 4 },
+    })
+  })
+
+  it("refuses a song that isn't in the band's active catalog and writes nothing", async () => {
+    vi.mocked(prisma.bandSong.findFirst).mockResolvedValue(null)
+
+    await expect(addItem(addForm('other-bands-bs'))).rejects.toBeInstanceOf(NotFoundError)
+
+    expect(prisma.setlistItem.create).not.toHaveBeenCalled()
   })
 })
 
