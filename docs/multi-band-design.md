@@ -67,7 +67,9 @@ Resolution lives in one function (e.g. `resolveSong(bandSong, song)` in `lib/ser
 
 "Generic lyrics changed since you forked" is derived by comparing `lyricsBasedOn` with `Song.lyricsUpdatedAt`. That column exists since #133 and is maintained wherever lyrics change (song save and both importers), because `updatedAt` also moves on unrelated edits.
 
-`SetlistItem` points at `BandSong`, not `Song`. This makes a later switch from a band's private copy to a master version a one-column repoint (`BandSong.songId`) that leaves setlists, play history and stats untouched. `SetlistItem.bandSongId` is nullable in #133 (the running app still writes `songId`) and becomes required in #134.
+`SetlistItem` points at `BandSong`, not `Song`. This makes a later switch from a band's private copy to a master version a one-column repoint (`BandSong.songId`) that leaves setlists, play history and stats untouched. `SetlistItem.bandSongId` was nullable in #133 (the running app still wrote `songId`) and is required since #134. `SetlistItem.songId` stays, written alongside it, until the contract migration (#136) drops it.
+
+Built in #134: `resolveSong` (`lib/resolve-song.ts`) assembles the UI's `Song` from a `BandSong` and its `Song` (and is where overrides will be applied); `getSongs`/`getSong`, setlists, gig detail/performance, stats and the lyrics import read through `BandSong`; `createSong` makes a private song plus its `BandSong`; `updateSong` writes band-owned fields to `BandSong` and shared fields to `Song` only when `canEditSong` allows; `deleteSong` deactivates the `BandSong` only. Because `Song.updatedAt` does not move on a status change, the resolved `updatedAt` is the later of the two rows'.
 
 ### Keeping the UI churn small
 

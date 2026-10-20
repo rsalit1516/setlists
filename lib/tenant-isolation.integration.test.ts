@@ -25,6 +25,19 @@ const P = 'iso-'
 // Jan 1 of this year: always in the past, and always in the finance report's current-year bucket.
 const GIG_DATE = new Date(new Date().getFullYear(), 0, 1, 12)
 
+// The song form always submits every field, and the actions read them all.
+const SONG_FORM = {
+  title: 'Test Song',
+  artist: '',
+  key: '',
+  singer: '',
+  status: 'WISH',
+  keyboardRequired: 'false',
+  duration: '',
+  bpm: '',
+  lyrics: '',
+}
+
 // BandSong ids are uuids. Each band has one private song of its own plus the shared master song.
 const BS = {
   oursOwn: '01900000-0000-7000-8000-0000000e1001',
@@ -143,7 +156,8 @@ describe.skipIf(!url)('tenant isolation (real database)', () => {
     await prisma.song.create({ data: { id: `${P}song-shared`, title: 'Shared Master Song' } })
     await seedBand(ourBand, 'ours', true)
     await seedBand(OTHER_BAND, 'theirs', true)
-  })
+    // Loading every service and action module cold takes a few seconds on top of the inserts.
+  }, 60_000)
 
   afterAll(async () => {
     if (prisma) {
@@ -255,7 +269,7 @@ describe.skipIf(!url)('tenant isolation (real database)', () => {
       await expect(songActions.deleteSong(BS.theirsOwn)).rejects.toBeInstanceOf(ownership.NotFoundError)
       await expect(songActions.findLyrics(BS.theirsOwn)).rejects.toBeInstanceOf(ownership.NotFoundError)
       const fd = new FormData()
-      for (const [k, v] of Object.entries({ id: BS.theirsOwn, title: 'Hijacked', singer: 'x', status: 'READY' })) fd.set(k, v)
+      for (const [k, v] of Object.entries({ ...SONG_FORM, id: BS.theirsOwn, title: 'Hijacked', singer: 'x', status: 'READY' })) fd.set(k, v)
       expect(await songActions.updateSong(null, fd)).toEqual({ error: 'Song not found.' })
 
       const theirs = await prisma.bandSong.findUnique({ where: { id: BS.theirsOwn }, include: { song: true } })
@@ -277,7 +291,7 @@ describe.skipIf(!url)('tenant isolation (real database)', () => {
 
     it('a song we create is private to us and lands in our catalog only', async () => {
       const fd = new FormData()
-      for (const [k, v] of Object.entries({ title: 'Iso Created Song', singer: 'Dana', status: 'READY', keyboardRequired: 'false' })) {
+      for (const [k, v] of Object.entries({ ...SONG_FORM, title: 'Iso Created Song', singer: 'Dana', status: 'READY', keyboardRequired: 'false' })) {
         fd.set(k, v)
       }
       await expect(songActions.createSong(null, fd)).rejects.toThrow('REDIRECT:/songs')
