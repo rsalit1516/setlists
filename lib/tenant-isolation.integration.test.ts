@@ -38,6 +38,12 @@ const SONG_FORM = {
   lyrics: '',
 }
 
+const songForm = (fields: Record<string, string>) => {
+  const fd = new FormData()
+  for (const [k, v] of Object.entries({ ...SONG_FORM, ...fields })) fd.set(k, v)
+  return fd
+}
+
 // BandSong ids are uuids. Each band has one private song of its own plus the shared master song.
 const BS = {
   oursOwn: '01900000-0000-7000-8000-0000000e1001',
@@ -154,6 +160,8 @@ describe.skipIf(!url)('tenant isolation (real database)', () => {
     await prisma.song.create({ data: { id: `${P}song-ours`, title: 'Ours Only Song', ownerBandId: ourBand } })
     await prisma.song.create({ data: { id: `${P}song-theirs`, title: 'Theirs Only Song', ownerBandId: OTHER_BAND } })
     await prisma.song.create({ data: { id: `${P}song-shared`, title: 'Shared Master Song' } })
+    // A master song neither band has added yet.
+    await prisma.song.create({ data: { id: `${P}song-unadded`, title: 'Unadded Master Song', artist: 'Iso Artist' } })
     await seedBand(ourBand, 'ours', true)
     await seedBand(OTHER_BAND, 'theirs', true)
     // Loading every service and action module cold takes a few seconds on top of the inserts.
@@ -305,6 +313,79 @@ describe.skipIf(!url)('tenant isolation (real database)', () => {
       } finally {
         await prisma.bandSong.deleteMany({ where: { songId: created?.id } })
         await prisma.song.delete({ where: { id: created!.id } })
+      }
+    })
+  })
+
+  describe('searching and adding songs', () => {
+    it("search finds master songs and our own private songs, and never another band's private song", async () => {
+      const ids = async (bandId: string, title: string) =>
+        (await services.songs.searchCatalog(bandId, { title })).map((m) => m.songId)
+
+      expect(await ids(ourBand, 'Ours Only Song')).toContain(`${P}song-ours`)
+      expect(await ids(ourBand, 'Theirs Only Song')).not.toContain(`${P}song-theirs`)
+      expect(await ids(OTHER_BAND, 'Ours Only Song')).not.toContain(`${P}song-ours`)
+      expect(await ids(OTHER_BAND, 'Theirs Only Song')).toContain(`${P}song-theirs`)
+      expect(await ids(ourBand, 'Unadded Master Song')).toContain(`${P}song-unadded`)
+      expect(await ids(OTHER_BAND, 'Unadded Master Song')).toContain(`${P}song-unadded`)
+    })
+
+    it('search reports, per band, whether a song is already in that band\'s songs', async () => {
+      const shared = (bandId: string) =>
+        services.songs.searchCatalog(bandId, { title: 'Shared Master Song' }).then((r) => r.find((m) => m.songId === `${P}song-shared`))
+
+      expect(await shared(ourBand)).toMatchObject({ isMaster: true, bandSongId: BS.oursShared })
+      expect(await shared(OTHER_BAND)).toMatchObject({ isMaster: true, bandSongId: BS.theirsShared })
+
+      const unadded = (await services.songs.searchCatalog(ourBand, { title: 'Unadded Master Song' })).find(
+        (m) => m.songId === `${P}song-unadded`
+      )
+      expect(unadded).toMatchObject({ isMaster: true, bandSongId: null, removed: false })
+    })
+
+    it("a band cannot add another band's private song to its catalog", async () => {
+      await expect(songActions.addSongToCatalog(`${P}song-theirs`)).rejects.toBeInstanceOf(ownership.NotFoundError)
+      expect(await prisma.bandSong.count({ where: { bandId: ourBand, songId: `${P}song-theirs` } })).toBe(0)
+    })
+
+    it('adding a master song creates only our entry; removing and re-adding keeps our status', async () => {
+      await expect(songActions.addSongToCatalog(`${P}song-unadded`)).rejects.toThrow(/REDIRECT:\/songs\/.+\/edit/)
+
+      const ours = await prisma.bandSong.findUnique({
+        where: { bandId_songId: { bandId: ourBand, songId: `${P}song-unadded` } },
+      })
+      expect(ours).toMatchObject({ isActive: true, status: 'WISH' })
+      expect(await prisma.bandSong.count({ where: { bandId: OTHER_BAND, songId: `${P}song-unadded` } })).toBe(0)
+
+      await prisma.bandSong.update({ where: { id: ours!.id }, data: { status: 'READY' } })
+      await songActions.deleteSong(ours!.id)
+      const removed = (await services.songs.searchCatalog(ourBand, { title: 'Unadded Master Song' })).find(
+        (m) => m.songId === `${P}song-unadded`
+      )
+      expect(removed).toMatchObject({ removed: true, bandSongId: null })
+
+      await expect(songActions.addSongToCatalog(`${P}song-unadded`)).rejects.toThrow(/REDIRECT/)
+      const back = await prisma.bandSong.findUnique({ where: { id: ours!.id } })
+      expect(back).toMatchObject({ isActive: true, status: 'READY' })
+    })
+
+    it('creating a song that already exists in the shared catalog is refused', async () => {
+      const result = await songActions.createSong(null, songForm({ title: 'shared master song' }))
+      expect(result).toEqual({ error: expect.stringContaining('already in your songs') })
+      expect(await prisma.song.count({ where: { title: 'shared master song' } })).toBe(0)
+    })
+
+    it("the duplicate check cannot see, or reveal, another band's private song", async () => {
+      await expect(songActions.createSong(null, songForm({ title: 'Theirs Only Song' }))).rejects.toThrow('REDIRECT:/songs')
+
+      const created = await prisma.song.findFirst({ where: { title: 'Theirs Only Song', ownerBandId: ourBand } })
+      try {
+        expect(created).not.toBeNull()
+      } finally {
+        if (created) {
+          await prisma.bandSong.deleteMany({ where: { songId: created.id } })
+          await prisma.song.delete({ where: { id: created.id } })
+        }
       }
     })
   })

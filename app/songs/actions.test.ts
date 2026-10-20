@@ -6,10 +6,12 @@ vi.mock('@/lib/db', () => ({
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      findMany: vi.fn(),
     },
     bandSong: {
       findFirst: vi.fn(),
       update: vi.fn(),
+      upsert: vi.fn(),
       deleteMany: vi.fn(),
     },
     genre: {
@@ -56,7 +58,7 @@ import { revalidatePath } from 'next/cache'
 import { importLyricsForSong } from '@/lib/services/lyrics-import'
 import { getBandContext } from '@/lib/band'
 import { assertOwned, NotFoundError } from '@/lib/ownership'
-import { createSong, updateSong, findLyrics, deleteSong, toggleSongsGenreFilter } from './actions'
+import { createSong, updateSong, findLyrics, deleteSong, addSongToCatalog, toggleSongsGenreFilter } from './actions'
 import { SONGS_GENRES_COOKIE } from '@/lib/songs-genre-filter'
 
 function mockBand(overrides: { bandId?: string; isPlatformAdmin?: boolean } = {}) {
@@ -80,6 +82,8 @@ function mockBandSong(song: { ownerBandId?: string | null; chartFileUrl?: string
 beforeEach(() => {
   vi.clearAllMocks()
   mockBand()
+  vi.mocked(assertOwned).mockResolvedValue(undefined)
+  vi.mocked(prisma.song.findMany).mockResolvedValue([])
 })
 
 function mockCookieStore(currentValue?: string) {
@@ -256,6 +260,105 @@ describe('createSong', () => {
     expect(data).not.toHaveProperty('singer')
     expect(data).not.toHaveProperty('status')
     expect(data).not.toHaveProperty('keyboardRequired')
+  })
+})
+
+describe('createSong duplicate check', () => {
+  const existing = (overrides: Record<string, unknown> = {}) => ({
+    id: 'song-9',
+    title: "Don't Stop Believin'",
+    artist: 'Journey',
+    ownerBandId: null,
+    bandSongs: [],
+    ...overrides,
+  })
+
+  beforeEach(() => {
+    vi.mocked(prisma.song.create).mockResolvedValue({ id: 'song-1' } as never)
+  })
+
+  it('refuses a song that is already in the shared catalog and points to Add Song', async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([existing()] as never)
+
+    const result = await createSong(null, buildFormData({ title: 'dont stop believin', artist: 'journey' }))
+
+    expect(result).toEqual({ error: expect.stringContaining('is already in the catalog') })
+    expect(prisma.song.create).not.toHaveBeenCalled()
+  })
+
+  it('says so when the band already has the song', async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([
+      existing({ bandSongs: [{ id: 'bs-1', isActive: true }] }),
+    ] as never)
+
+    const result = await createSong(null, buildFormData({ title: "Don't Stop Believin'", artist: 'Journey' }))
+
+    expect(result).toEqual({ error: expect.stringContaining('is already in your songs') })
+  })
+
+  it('searches only within the acting band', async () => {
+    await expect(createSong(null, buildFormData({ title: 'Wonderwall' }))).rejects.toThrow('REDIRECT:/songs')
+
+    expect(prisma.song.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ OR: [{ ownerBandId: null }, { ownerBandId: 'band-1' }] }),
+      })
+    )
+  })
+
+  it('lets a cover by a different artist through', async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([
+      existing({ title: 'Hurt', artist: 'Nine Inch Nails' }),
+    ] as never)
+
+    await expect(createSong(null, buildFormData({ title: 'Hurt', artist: 'Johnny Cash' }))).rejects.toThrow(
+      'REDIRECT:/songs'
+    )
+    expect(prisma.song.create).toHaveBeenCalledTimes(1)
+  })
+
+  it('skips the check when Add Song has already shown the user the matches', async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([existing()] as never)
+
+    await expect(
+      createSong(null, buildFormData({ title: "Don't Stop Believin'", artist: 'Journey', allowDuplicate: 'true' }))
+    ).rejects.toThrow('REDIRECT:/songs')
+
+    expect(prisma.song.findMany).not.toHaveBeenCalled()
+    expect(prisma.song.create).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('addSongToCatalog', () => {
+  it("gives the band its own entry for a song it is allowed to add, then opens it for editing", async () => {
+    vi.mocked(prisma.bandSong.upsert).mockResolvedValue({ id: 'bs-9' } as never)
+
+    await expect(addSongToCatalog('song-9')).rejects.toThrow('REDIRECT:/songs/bs-9/edit')
+
+    expect(assertOwned).toHaveBeenCalledWith('song', 'band-1', 'song-9')
+    expect(prisma.bandSong.upsert).toHaveBeenCalledWith({
+      where: { bandId_songId: { bandId: 'band-1', songId: 'song-9' } },
+      update: { isActive: true },
+      create: { bandId: 'band-1', songId: 'song-9' },
+    })
+    expect(revalidatePath).toHaveBeenCalledWith('/songs')
+  })
+
+  it('brings a previously removed entry back without touching its status or singer', async () => {
+    vi.mocked(prisma.bandSong.upsert).mockResolvedValue({ id: 'bs-9' } as never)
+
+    await expect(addSongToCatalog('song-9')).rejects.toThrow('REDIRECT')
+
+    const { update } = vi.mocked(prisma.bandSong.upsert).mock.calls[0][0]
+    expect(update).toEqual({ isActive: true })
+  })
+
+  it("refuses another band's private song, or a retired one, without writing", async () => {
+    vi.mocked(assertOwned).mockRejectedValue(new NotFoundError('song'))
+
+    await expect(addSongToCatalog('someone-elses-song')).rejects.toBeInstanceOf(NotFoundError)
+
+    expect(prisma.bandSong.upsert).not.toHaveBeenCalled()
   })
 })
 
