@@ -11,6 +11,8 @@ import { SONGS_GENRES_COOKIE, parseGenreFilterValue, toggleGenreId } from '@/lib
 import { parseBpm } from '@/lib/bpm'
 import { canEditSong, getBandContext } from '@/lib/band'
 import { assertOwned, NotFoundError } from '@/lib/ownership'
+import { searchCatalog } from '@/lib/services/songs'
+import { isLikelyDuplicate } from '@/lib/song-match'
 import type { SongStatus } from '@/lib/types'
 
 export type SongActionState = { error: string } | null
@@ -109,6 +111,19 @@ export async function createSong(
   const genreIds = parseGenreIds(formData)
   const { bandId } = await getBandContext()
 
+  // Add Song's search page sets allowDuplicate once the user has seen the matches and chosen to create
+  // anyway; a form submitted without it is checked here so a copy isn't created by accident.
+  if (formData.get('allowDuplicate') !== 'true') {
+    const matches = await searchCatalog(bandId, { title: generic.title, artist: generic.artist })
+    const duplicate = matches.find((match) => isLikelyDuplicate(generic, match))
+    if (duplicate) {
+      const name = duplicate.artist ? `"${duplicate.title}" by ${duplicate.artist}` : `"${duplicate.title}"`
+      return {
+        error: `${name} is already ${duplicate.bandSongId ? 'in your songs' : 'in the catalog'}. Search for it on Add Song instead of creating a copy.`,
+      }
+    }
+  }
+
   // A song a band enters is private to it (ownerBandId); sharing it is a deliberate step, not a side effect.
   let song
   try {
@@ -138,6 +153,22 @@ export async function createSong(
 
   revalidatePath('/songs')
   redirect('/songs')
+}
+
+// Adds an existing song (a master song, or one of this band's own) to the band's catalog without copying
+// anything: the band gets its own BandSong for it, and a song it once removed comes back with its old status.
+export async function addSongToCatalog(songId: string): Promise<void> {
+  const { bandId } = await getBandContext()
+  await assertOwned('song', bandId, songId)
+
+  const entry = await prisma.bandSong.upsert({
+    where: { bandId_songId: { bandId, songId } },
+    update: { isActive: true },
+    create: { bandId, songId },
+  })
+
+  revalidatePath('/songs')
+  redirect(`/songs/${entry.id}/edit`)
 }
 
 export async function updateSong(

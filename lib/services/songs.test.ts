@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getSongs, getSong } from "./songs";
+import { getSongs, getSong, searchCatalog } from "./songs";
 
 vi.mock("@/lib/db", () => ({
   default: {
     bandSong: {
       findMany: vi.fn(),
       findFirst: vi.fn(),
+    },
+    song: {
+      findMany: vi.fn(),
     },
   },
 }));
@@ -153,5 +156,85 @@ describe("getSong", () => {
     expect(prisma.bandSong.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "bs-1", bandId: "band-2" } })
     );
+  });
+});
+
+describe("searchCatalog", () => {
+  const row = (overrides: Record<string, unknown> = {}) => ({
+    id: "song-1",
+    title: "Don't Stop Believin'",
+    artist: "Journey",
+    ownerBandId: null,
+    bandSongs: [],
+    ...overrides,
+  });
+
+  it("looks only at master songs and the band's own private songs", async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([]);
+    await searchCatalog("band-1", { title: "Don't Stop Believin'" });
+
+    expect(prisma.song.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          isActive: true,
+          OR: [{ ownerBandId: null }, { ownerBandId: "band-1" }],
+        }),
+      })
+    );
+  });
+
+  it("finds candidates by the title's longest words, case-insensitively", async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([]);
+    await searchCatalog("band-1", { title: "dont stop believin" });
+
+    const { where } = vi.mocked(prisma.song.findMany).mock.calls[0][0] as unknown as {
+      where: { AND: { OR: { title: { contains: string; mode: string } }[] }[] };
+    };
+    expect(where.AND[0].OR).toEqual([
+      { title: { contains: "believin", mode: "insensitive" } },
+      { title: { contains: "dont", mode: "insensitive" } },
+      { title: { contains: "stop", mode: "insensitive" } },
+    ]);
+  });
+
+  it("matches despite apostrophes and case, ranking the exact title first", async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([
+      row({ id: "partial", title: "Stop Believin' In Me", artist: "Other" }),
+      row({ id: "exact" }),
+    ] as never);
+
+    const result = await searchCatalog("band-1", { title: "dont stop believin" });
+
+    expect(result.map((m) => m.songId)).toEqual(["exact", "partial"]);
+    expect(result[0].score).toBe(1);
+  });
+
+  it("marks master and private songs, and whether the band already has them", async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([
+      row({ id: "in-catalog", title: "Hurt", ownerBandId: null, bandSongs: [{ id: "bs-1", isActive: true }] }),
+      row({ id: "removed", title: "Hurt Me", ownerBandId: null, bandSongs: [{ id: "bs-2", isActive: false }] }),
+      row({ id: "private", title: "Hurt Again", ownerBandId: "band-1", bandSongs: [] }),
+    ] as never);
+
+    const result = await searchCatalog("band-1", { title: "hurt" });
+    const byId = Object.fromEntries(result.map((m) => [m.songId, m]));
+
+    expect(byId["in-catalog"]).toMatchObject({ isMaster: true, bandSongId: "bs-1", removed: false });
+    expect(byId["removed"]).toMatchObject({ isMaster: true, bandSongId: null, removed: true });
+    expect(byId["private"]).toMatchObject({ isMaster: false, bandSongId: null, removed: false });
+  });
+
+  it("drops candidates whose titles barely overlap with the query", async () => {
+    vi.mocked(prisma.song.findMany).mockResolvedValue([
+      row({ id: "weak", title: "Stop Making Sense Of Anything Else", artist: null }),
+    ] as never);
+
+    expect(await searchCatalog("band-1", { title: "stop believin wonderwall" })).toEqual([]);
+  });
+
+  it("returns nothing, without querying, for an empty or too-short title", async () => {
+    expect(await searchCatalog("band-1", { title: "   " })).toEqual([]);
+    expect(await searchCatalog("band-1", { title: "go" })).toEqual([]);
+    expect(prisma.song.findMany).not.toHaveBeenCalled();
   });
 });

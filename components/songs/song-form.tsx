@@ -34,10 +34,16 @@ export function SongForm({
   song,
   genres,
   action,
+  initial,
+  allowDuplicate = false,
 }: {
   song?: Song
   genres: Genre[]
   action: FormAction
+  // Pre-fills title and artist on a new song, from the Add Song search.
+  initial?: { title?: string; artist?: string }
+  // Add Song's search has already shown the user any matching songs, so skip the server's duplicate check.
+  allowDuplicate?: boolean
 }) {
   const [state, formAction, pending] = useActionState(action, null)
   const [keyboardRequired, setKeyboardRequired] = useState(song?.keyboardRequired ?? false)
@@ -45,6 +51,7 @@ export function SongForm({
   return (
     <form action={formAction} encType="multipart/form-data" className="space-y-5">
       {song && <input type="hidden" name="id" value={song.id} />}
+      {allowDuplicate && <input type="hidden" name="allowDuplicate" value="true" />}
       <input type="hidden" name="keyboardRequired" value={keyboardRequired ? 'true' : 'false'} />
 
       {state?.error && (
@@ -57,11 +64,11 @@ export function SongForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="title">Title *</Label>
-          <Input id="title" name="title" required defaultValue={song?.title} />
+          <Input id="title" name="title" required defaultValue={song?.title ?? initial?.title} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="artist">Original Artist</Label>
-          <Input id="artist" name="artist" defaultValue={song?.artist ?? ''} />
+          <Input id="artist" name="artist" defaultValue={song?.artist ?? initial?.artist ?? ''} />
         </div>
       </div>
 

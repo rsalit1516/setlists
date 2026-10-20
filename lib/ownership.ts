@@ -6,6 +6,7 @@ export type OwnedEntity =
   | 'venue'
   | 'musician'
   | 'bandSong'
+  | 'song'
   | 'expense'
   | 'gigMusician'
   | 'setlistItem'
@@ -33,6 +34,10 @@ function countOwned(entity: OwnedEntity, bandId: string, ids: string[]): Promise
       return prisma.musician.count({ where: { id, bandId } })
     case 'bandSong':
       return prisma.bandSong.count({ where: { id, bandId } })
+    // Not ownership in the strict sense: a shared Song row a band may add to its catalog, i.e. an
+    // active master song or one of its own private songs. Never another band's private song.
+    case 'song':
+      return prisma.song.count({ where: { id, isActive: true, OR: [{ ownerBandId: null }, { ownerBandId: bandId }] } })
     case 'expense':
       return prisma.expense.count({ where: { id, gig: { bandId } } })
     case 'gigMusician':

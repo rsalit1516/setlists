@@ -71,6 +71,12 @@ Resolution lives in one function (e.g. `resolveSong(bandSong, song)` in `lib/ser
 
 Built in #134: `resolveSong` (`lib/resolve-song.ts`) assembles the UI's `Song` from a `BandSong` and its `Song` (and is where overrides will be applied); `getSongs`/`getSong`, setlists, gig detail/performance, stats and the lyrics import read through `BandSong`; `createSong` makes a private song plus its `BandSong`; `updateSong` writes band-owned fields to `BandSong` and shared fields to `Song` only when `canEditSong` allows; `deleteSong` deactivates the `BandSong` only. Because `Song.updatedAt` does not move on a status change, the resolved `updatedAt` is the later of the two rows'.
 
+### Adding a song (#135)
+
+`/songs/new` starts with a search, not a form. `searchCatalog` (`lib/services/songs.ts`) looks at **master songs and the band's own private songs only**, never another band's private songs, and ranks them with the normalizing matcher in `lib/song-match.ts`, so `dont stop believin` finds `Don't Stop Believin'`. Each result is either **Add to my songs** (`addSongToCatalog`, which gives the band its own `BandSong` and copies nothing; a song the band had removed comes back with its old status) or **Open** if the band already has it. Only after the user has seen the matches does **None of these: create a new song** lead to the form, pre-filled and carrying `allowDuplicate=true`. A form submitted without that flag is checked on the server (`createSong`): a likely duplicate (same normalized title, artists not contradicting each other) is refused with a pointer back to the search. The check only ever sees master and own songs, so it cannot reveal that another band has a private song with the same title.
+
+Limits worth knowing: matching is by words, not spelling, so a typo in every long word finds nothing; and two bands that each create the same song privately do not see each other's copy (a platform admin merging them into a master song is #145).
+
 ### Keeping the UI churn small
 
 `lib/types.ts` keeps its `Song` type, but it now means the **resolved view**, with `id` equal to the `BandSong` id. Routes such as `/songs/[id]` keep working with new ids, and components that render a song need little or no change. Only the service layer and the song create/edit/import actions change shape.
